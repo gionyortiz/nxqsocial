@@ -1,0 +1,54 @@
+<svg width="64" height="64" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1e1b2e"/>
+      <stop offset="1" stop-color="#0b0a14"/>
+    </linearGradient>
+    <linearGradient id="steel" x1="20" y1="10" x2="100" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#e8edf5"/>
+      <stop offset="0.45" stop-color="#9aa7bd"/>
+      <stop offset="0.75" stop-color="#5b6b85"/>
+      <stop offset="1" stop-color="#3a4456"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="60" y1="22" x2="60" y2="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7dd3fc"/>
+      <stop offset="0.5" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <linearGradient id="purple" x1="20" y1="10" x2="100" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#c084fc"/>
+      <stop offset="0.5" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#7c3aed"/>
+    </linearGradient>
+    <radialGradient id="core" cx="50%" cy="45%" r="55%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.35" stop-color="#bae6fd"/>
+      <stop offset="0.7" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#0369a1"/>
+    </radialGradient>
+    <radialGradient id="aura" cx="50%" cy="50%" r="50%">
+      <stop offset="0" stop-color="#a855f7" stop-opacity="0.9"/>
+      <stop offset="0.6" stop-color="#7c3aed" stop-opacity="0.4"/>
+      <stop offset="1" stop-color="#7c3aed" stop-opacity="0"/>
+    </radialGradient>
+  </defs>
+
+  <rect width="120" height="120" rx="26" fill="url(#bg)"/>
+  <circle cx="60" cy="60" r="50" fill="url(#aura)"/>
+
+  <polygon points="60,12 102,36 102,84 60,108 18,84 18,36" fill="url(#steel)" stroke="url(#purple)" stroke-width="3"/>
+  <polygon points="60,20 95,40 95,80 60,100 25,80 25,40" fill="none" stroke="url(#glow)" stroke-width="3"/>
+
+  <g stroke="#22d3ee" stroke-width="1.6" stroke-linecap="round" opacity="0.85">
+    <path d="M60 20 V34"/>
+    <path d="M95 40 L80 49"/>
+    <path d="M95 80 L80 71"/>
+    <path d="M60 100 V86"/>
+    <path d="M25 80 L40 71"/>
+    <path d="M25 40 L40 49"/>
+  </g>
+
+  <polygon points="60,36 82,49 82,71 60,84 38,71 38,49" fill="#1e293b" stroke="url(#glow)" stroke-width="2"/>
+  <circle cx="60" cy="60" r="12" fill="url(#core)"/>
+  <circle cx="56" cy="56" r="3" fill="#ffffff" opacity="0.9"/>
+</svg>

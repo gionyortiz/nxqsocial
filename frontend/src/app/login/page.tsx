@@ -45,7 +45,7 @@ export default function LoginPage() {
           <div className="flex justify-center mb-4">
             <Logo size={72} />
           </div>
-          <h1 className="text-4xl font-black bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
+          <h1 className="text-4xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent">
             NXQ Social
           </h1>
           <p className="text-gray-500 mt-2 text-sm">Sign in to your account</p>

@@ -53,17 +53,30 @@ export function LogoMark({ size = 40, className }: { size?: number; className?: 
           <stop offset="0.7" stopColor="#38bdf8" />
           <stop offset="1" stopColor="#0369a1" />
         </radialGradient>
-        <filter id={`${uid}-shadow`} x="-30%" y="-30%" width="160%" height="160%">
-          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#0ea5e9" floodOpacity="0.55" />
+        <radialGradient id={`${uid}-aura`} cx="50%" cy="50%" r="50%">
+          <stop offset="0" stopColor="#a855f7" stopOpacity="0.85" />
+          <stop offset="0.6" stopColor="#7c3aed" stopOpacity="0.45" />
+          <stop offset="1" stopColor="#7c3aed" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={`${uid}-purple`} x1="20" y1="10" x2="100" y2="110" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#c084fc" />
+          <stop offset="0.5" stopColor="#a855f7" />
+          <stop offset="1" stopColor="#7c3aed" />
+        </linearGradient>
+        <filter id={`${uid}-shadow`} x="-40%" y="-40%" width="180%" height="180%">
+          <feDropShadow dx="0" dy="2" stdDeviation="3" floodColor="#a855f7" floodOpacity="0.65" />
         </filter>
       </defs>
+
+      {/* Purple aura glow behind the mark */}
+      <circle cx="60" cy="60" r="58" fill={`url(#${uid}-aura)`} />
 
       {/* Outer hexagon — metallic body */}
       <polygon
         points="60,6 108,33 108,87 60,114 12,87 12,33"
         fill={`url(#${uid}-steel)`}
-        stroke="#cfd8e6"
-        strokeWidth="2"
+        stroke={`url(#${uid}-purple)`}
+        strokeWidth="3"
         filter={`url(#${uid}-shadow)`}
       />
 
@@ -116,7 +129,7 @@ export default function Logo({ size = 40, withWordmark = false, wordmark = 'Nexa
     <span className={`inline-flex items-center gap-2 ${className ?? ''}`}>
       <LogoMark size={size} />
       <span
-        className="font-black tracking-tight bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent"
+        className="font-black tracking-tight bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent"
         style={{ fontSize: size * 0.55 }}
       >
         {wordmark}

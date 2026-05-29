@@ -29,7 +29,7 @@ export function Navbar() {
         {/* Logo */}
         <Link href="/feed" className="mb-6 px-3 flex items-center gap-2">
           <Logo size={34} />
-          <span className="text-xl font-black bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight">
+          <span className="text-xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent tracking-tight">
             NXQ Social
           </span>
         </Link>
