@@ -20,6 +20,7 @@ import { StorageModule } from './common/storage/storage.module';
 import { MediaModule } from './media/media.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
+import { CallsModule } from './calls/calls.module';
 
 @Module({
   imports: [
@@ -43,6 +44,7 @@ import { HealthModule } from './health/health.module';
     MediaModule,
     AdminModule,
     HealthModule,
+    CallsModule,
   ],
 })
 export class AppModule {}

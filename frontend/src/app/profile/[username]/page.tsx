@@ -5,7 +5,10 @@ import Image from 'next/image';
 import {
   Grid, Film, MapPin, Globe, Calendar, ShieldCheck,
   Trash2, Heart, MessageCircle, Share2, UserPlus, Settings, User,
+  Video, Phone,
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
+import { startCall, callHref } from '@/lib/calls';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -57,6 +60,7 @@ function displayWebsite(url: string) {
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const { user: me, updateUser } = useAuthStore();
+  const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
@@ -80,6 +84,11 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       })
       .catch(() => setError('Profile not found'));
   }, [username]);
+
+  const startVideoCall = async (video: boolean) => {
+    const room = await startCall({ targets: [username], video });
+    router.push(callHref(room, video));
+  };
 
   const toggleFollow = async () => {
     const nextFollowing = !following;
@@ -206,6 +215,20 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                       <span className="flex items-center gap-1.5"><UserPlus size={14} /> Follow</span>
                     )}
                   </Button>
+                  <button
+                    onClick={() => startVideoCall(true)}
+                    className="p-2 rounded-full border-2 border-gray-200 text-purple-600 hover:bg-purple-50 hover:border-purple-200 transition-all"
+                    title={`Video call ${profile.displayName}`}
+                  >
+                    <Video size={16} />
+                  </button>
+                  <button
+                    onClick={() => startVideoCall(false)}
+                    className="p-2 rounded-full border-2 border-gray-200 text-green-600 hover:bg-green-50 hover:border-green-200 transition-all"
+                    title={`Voice call ${profile.displayName}`}
+                  >
+                    <Phone size={16} />
+                  </button>
                   <button
                     className="p-2 rounded-full border-2 border-gray-200 text-gray-500 hover:bg-gray-50 transition-all"
                     title="Share profile"

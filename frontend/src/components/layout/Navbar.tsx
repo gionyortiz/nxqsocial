@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Play, PlusSquare, User, Search, LogOut, ShieldCheck, ShieldAlert } from 'lucide-react';
+import { Home, Play, PlusSquare, User, Search, LogOut, ShieldCheck, ShieldAlert, Video } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
@@ -13,6 +13,7 @@ const NAV = [
   { href: '/feed',   icon: Home,        label: 'Home' },
   { href: '/search', icon: Search,      label: 'Search' },
   { href: '/reels',  icon: Play,        label: 'Reels' },
+  { href: '/call/new', icon: Video,     label: 'Call' },
   { href: '/upload', icon: PlusSquare,  label: 'Upload' },
   { href: '/verify', icon: ShieldCheck, label: 'Verify' },
 ];
