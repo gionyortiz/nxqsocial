@@ -2,7 +2,7 @@
 
 import { use, useEffect, useState } from 'react';
 import Image from 'next/image';
-import { Grid, Film, MapPin, Link2 } from 'lucide-react';
+import { Grid, Film, MapPin, Link2, Settings, Trash2, Heart } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -30,12 +30,12 @@ interface Profile {
 interface Post {
   id: string;
   type: string;
+  caption?: string;
   media: MediaAsset[];
   _count: { likes: number };
 }
 
-const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
-function mediaSrc(url: string) { return url.startsWith('http') ? url : `${mediaBase}${url}`; }
+function mediaSrc(url: string) { return url.startsWith('http') ? url : url; }
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
@@ -45,6 +45,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [tab, setTab] = useState<'posts' | 'reels'>('posts');
   const [following, setFollowing] = useState(false);
   const [followerCount, setFollowerCount] = useState(0);
+  const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([
@@ -71,6 +73,20 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     }
   };
 
+  const deletePost = async (postId: string) => {
+    setDeletingId(postId);
+    try {
+      await api.delete(`/posts/${postId}`);
+      setPosts((prev) => prev.filter((p) => p.id !== postId));
+      if (profile) setProfile({ ...profile, _count: { ...profile._count, posts: profile._count.posts - 1 } });
+    } catch {
+      // ignore
+    } finally {
+      setDeletingId(null);
+      setConfirmDelete(null);
+    }
+  };
+
   const isMe = me?.username === username;
   const filteredPosts = posts.filter((p) =>
     tab === 'reels' ? (p.type === 'VIDEO' || p.type === 'SHORT_VIDEO') : (p.type === 'PHOTO' || p.type === 'TEXT')
@@ -88,72 +104,162 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
   return (
     <AppShell>
-      <div className="max-w-2xl mx-auto px-4 py-8">
-        {/* Profile header */}
-        <div className="flex items-start gap-6 mb-6">
-          <Avatar src={profile.avatarUrl} alt={profile.username} size="xl" />
-          <div className="flex-1">
-            <div className="flex items-center gap-2 mb-1">
-              <h1 className="text-xl font-bold">{profile.displayName}</h1>
+      <div className="max-w-3xl mx-auto">
+        {/* Banner */}
+        <div className="relative h-48 sm:h-56 w-full bg-gradient-to-br from-purple-600 via-violet-500 to-pink-500 overflow-hidden">
+          {profile.bannerUrl && (
+            <Image src={mediaSrc(profile.bannerUrl)} alt="banner" fill className="object-cover" sizes="100vw" />
+          )}
+          <div className="absolute inset-0 bg-black/10" />
+        </div>
+
+        {/* Profile info row */}
+        <div className="px-4 sm:px-6 pb-4">
+          <div className="flex items-end justify-between -mt-14 mb-4">
+            <div className="relative">
+              <div className="w-28 h-28 rounded-full ring-4 ring-white bg-white overflow-hidden shadow-lg">
+                <Avatar src={profile.avatarUrl} alt={profile.username} size="xl" className="w-full h-full" />
+              </div>
+            </div>
+            <div className="flex gap-2 mb-2">
+              {isMe ? (
+                <button className="flex items-center gap-1.5 px-4 py-2 rounded-full border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors">
+                  <Settings size={15} /> Edit profile
+                </button>
+              ) : (
+                <Button variant={following ? 'secondary' : 'primary'} size="sm" onClick={toggleFollow} className="rounded-full px-5">
+                  {following ? 'Following' : 'Follow'}
+                </Button>
+              )}
+            </div>
+          </div>
+
+          {/* Name & bio */}
+          <div className="mb-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              <h1 className="text-xl font-bold text-gray-900">{profile.displayName}</h1>
               <TrustBadge status={profile.verificationStatus} showLabel />
             </div>
-            <p className="text-gray-500 text-sm mb-1">@{profile.username}</p>
-            {profile.location && <p className="text-xs text-gray-400 flex items-center gap-1 mb-1"><MapPin size={11} />{profile.location}</p>}
-            {profile.website && <a href={profile.website} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-500 flex items-center gap-1 mb-2 hover:underline"><Link2 size={11} />{profile.website}</a>}
-            {profile.bio && <p className="text-sm text-gray-700 mb-4">{profile.bio}</p>}
-
-            <div className="flex gap-6 text-sm mb-4">
-              <div className="text-center"><span className="font-bold block">{formatCount(profile._count.posts)}</span><span className="text-gray-400">Posts</span></div>
-              <div className="text-center"><span className="font-bold block">{formatCount(followerCount)}</span><span className="text-gray-400">Followers</span></div>
-              <div className="text-center"><span className="font-bold block">{formatCount(profile._count.following)}</span><span className="text-gray-400">Following</span></div>
+            <p className="text-gray-500 text-sm mt-0.5">@{profile.username}</p>
+            {profile.bio && <p className="text-sm text-gray-700 mt-2 leading-relaxed">{profile.bio}</p>}
+            <div className="flex flex-wrap gap-3 mt-2">
+              {profile.location && (
+                <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <MapPin size={12} />{profile.location}
+                </span>
+              )}
+              {profile.website && (
+                <a href={profile.website} target="_blank" rel="noopener noreferrer"
+                  className="flex items-center gap-1 text-xs text-purple-500 hover:underline">
+                  <Link2 size={12} />{profile.website}
+                </a>
+              )}
             </div>
+          </div>
 
-            {!isMe && (
-              <Button variant={following ? 'secondary' : 'primary'} size="sm" onClick={toggleFollow}>
-                {following ? 'Following' : 'Follow'}
-              </Button>
-            )}
+          {/* Stats */}
+          <div className="flex gap-6 py-3 border-t border-b border-gray-100">
+            {[
+              { label: 'Posts', value: profile._count.posts },
+              { label: 'Followers', value: followerCount },
+              { label: 'Following', value: profile._count.following },
+            ].map(({ label, value }) => (
+              <div key={label} className="text-center">
+                <div className="text-lg font-bold text-gray-900">{formatCount(value)}</div>
+                <div className="text-xs text-gray-500 uppercase tracking-wide">{label}</div>
+              </div>
+            ))}
           </div>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-gray-100 mb-4">
+        <div className="flex border-b border-gray-200 px-4 sm:px-6">
           <button
             onClick={() => setTab('posts')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${tab === 'posts' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-400'}`}
+            className={`flex items-center gap-2 py-3 px-4 text-sm font-semibold border-b-2 transition-colors ${tab === 'posts' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
-            <Grid size={16} /> Posts
+            <Grid size={15} /> Posts
           </button>
           <button
             onClick={() => setTab('reels')}
-            className={`flex-1 flex items-center justify-center gap-2 py-3 text-sm font-medium border-b-2 transition-colors ${tab === 'reels' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-400'}`}
+            className={`flex items-center gap-2 py-3 px-4 text-sm font-semibold border-b-2 transition-colors ${tab === 'reels' ? 'border-purple-600 text-purple-600' : 'border-transparent text-gray-400 hover:text-gray-600'}`}
           >
-            <Film size={16} /> Reels
+            <Film size={15} /> Reels
           </button>
         </div>
 
         {/* Grid */}
-        <div className="grid grid-cols-3 gap-1">
-          {filteredPosts.map((post) => {
-            const first = post.media?.[0];
-            const src = first ? mediaSrc(first.url) : null;
-            const isVideo = first?.mimeType?.startsWith('video/');
-            return (
-              <div key={post.id} className="relative aspect-square bg-gray-100 overflow-hidden rounded-md">
-                {src && (isVideo ? (
-                  <video src={src} className="w-full h-full object-cover" />
-                ) : (
-                  <Image src={src} alt="post" fill className="object-cover" sizes="33vw" />
-                ))}
-              </div>
-            );
-          })}
-        </div>
+        <div className="p-1 sm:p-2">
+          {filteredPosts.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-20 text-gray-400">
+              <Grid size={40} strokeWidth={1} className="mb-3 opacity-40" />
+              <p className="text-sm font-medium">No {tab} yet</p>
+              {isMe && <p className="text-xs mt-1 text-gray-300">Share your first {tab === 'posts' ? 'photo' : 'reel'}</p>}
+            </div>
+          ) : (
+            <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
+              {filteredPosts.map((post) => {
+                const first = post.media?.[0];
+                const src = first ? mediaSrc(first.url) : null;
+                const isVideo = first?.mimeType?.startsWith('video/');
+                return (
+                  <div key={post.id} className="group relative aspect-square bg-gray-100 overflow-hidden">
+                    {src && (isVideo ? (
+                      <video src={src} className="w-full h-full object-cover" />
+                    ) : (
+                      <Image src={src} alt={post.caption ?? 'post'} fill className="object-cover group-hover:scale-105 transition-transform duration-200" sizes="33vw" />
+                    ))}
 
-        {filteredPosts.length === 0 && (
-          <p className="text-center text-gray-400 py-12">No {tab} yet.</p>
-        )}
+                    {/* Hover overlay */}
+                    <div className="absolute inset-0 bg-black/0 group-hover:bg-black/40 transition-colors duration-200 flex items-center justify-center gap-4 opacity-0 group-hover:opacity-100">
+                      <span className="flex items-center gap-1 text-white text-sm font-semibold drop-shadow">
+                        <Heart size={18} fill="white" /> {formatCount(post._count.likes)}
+                      </span>
+                      {isMe && (
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setConfirmDelete(post.id); }}
+                          className="p-1.5 rounded-full bg-red-500/80 hover:bg-red-600 text-white transition-colors"
+                          title="Delete post"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
       </div>
+
+      {/* Delete confirm modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Delete post?</h3>
+            <p className="text-sm text-gray-500 mb-6">This will permanently delete the post and its media. This action cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(null)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => deletePost(confirmDelete)}
+                disabled={!!deletingId}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors disabled:opacity-60"
+              >
+                {deletingId ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </AppShell>
   );
 }

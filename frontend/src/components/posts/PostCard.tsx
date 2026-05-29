@@ -1,13 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, MessageCircle, Share2, Bookmark, Flag } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Trash2 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import { formatCount, timeAgo, cn } from '@/lib/utils';
 import { api } from '@/lib/api';
+import { useAuthStore } from '@/store/auth';
 
 interface MediaAsset {
   id: string;
@@ -38,6 +39,7 @@ interface Post {
 interface PostCardProps {
   post: Post;
   onCommentClick?: (postId: string) => void;
+  onDelete?: (postId: string) => void;
 }
 
 const AI_LABEL_TEXT: Record<string, string> = {
@@ -46,9 +48,36 @@ const AI_LABEL_TEXT: Record<string, string> = {
   SOURCE_UNKNOWN: '❓ Source unverified',
 };
 
-export function PostCard({ post, onCommentClick }: PostCardProps) {
+export function PostCard({ post, onCommentClick, onDelete }: PostCardProps) {
   const [liked, setLiked] = useState(post.isLiked);
   const [likeCount, setLikeCount] = useState(post._count.likes);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const { user: me } = useAuthStore();
+  const isMe = me?.username === post.author.username;
+
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  const handleDelete = async () => {
+    setDeleting(true);
+    try {
+      await api.delete(`/posts/${post.id}`);
+      onDelete?.(post.id);
+    } catch {
+      // ignore
+    } finally {
+      setDeleting(false);
+      setConfirmDelete(false);
+    }
+  };
   const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
   const firstMedia = post.media?.[0];
   const mediaSrc = firstMedia
@@ -92,6 +121,26 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
           </Link>
           <p className="text-xs text-gray-400">@{post.author.username} · {timeAgo(post.createdAt)}</p>
         </div>
+        {isMe && (
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setMenuOpen((o) => !o)}
+              className="p-1.5 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 transition-colors"
+            >
+              <MoreHorizontal size={20} />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-8 z-20 w-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
+                <button
+                  onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
+                  className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
+                >
+                  <Trash2 size={15} /> Delete post
+                </button>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Media */}
@@ -156,6 +205,34 @@ export function PostCard({ post, onCommentClick }: PostCardProps) {
             </Link>
             {post.caption}
           </p>
+        </div>
+      )}
+
+      {/* Delete confirm modal */}
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
+            <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <Trash2 size={22} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Delete post?</h3>
+            <p className="text-sm text-gray-500 mb-6">This will permanently remove this post. This cannot be undone.</p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmDelete(false)}
+                className="flex-1 py-2.5 rounded-xl border border-gray-200 text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleDelete}
+                disabled={deleting}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-medium transition-colors disabled:opacity-60"
+              >
+                {deleting ? 'Deleting…' : 'Delete'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </article>

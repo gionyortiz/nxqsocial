@@ -92,7 +92,11 @@ export default function FeedPage() {
         )}
 
         {posts.map((post) => (
-          <PostCard key={post.id} post={post} />
+          <PostCard
+            key={post.id}
+            post={post}
+            onDelete={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
+          />
         ))}
 
         <div ref={loader} className="py-4 flex justify-center">
