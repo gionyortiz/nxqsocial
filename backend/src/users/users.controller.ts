@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Put, Patch, Post, Param, Body, Query,
+  Controller, Get, Put, Patch, Post, Delete, Param, Body, Query,
   UseGuards, UseInterceptors, UploadedFile,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
@@ -112,5 +112,41 @@ export class UsersController {
   uploadAvatar(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
     const avatarUrl = `/uploads/avatars/${file.filename}`;
     return this.usersService.updateAvatar(user.id, avatarUrl);
+  }
+
+  @Delete('me/avatar')
+  @UseGuards(JwtAuthGuard)
+  removeAvatar(@CurrentUser() user: any) {
+    return this.usersService.removeAvatar(user.id);
+  }
+
+  @Patch('me/banner')
+  @UseGuards(JwtAuthGuard)
+  @UseInterceptors(
+    FileInterceptor('banner', {
+      storage: diskStorage({
+        destination: './uploads/avatars',
+        filename: (_req, file, cb) => {
+          cb(null, `banner-${randomUUID()}${extname(file.originalname)}`);
+        },
+      }),
+      fileFilter: (_req, file, cb) => {
+        if (!file.mimetype.match(/^image\/(jpeg|png|webp|gif)$/)) {
+          return cb(new Error('Only image files allowed'), false);
+        }
+        cb(null, true);
+      },
+      limits: { fileSize: 8 * 1024 * 1024 },
+    }),
+  )
+  uploadBanner(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
+    const bannerUrl = `/uploads/avatars/${file.filename}`;
+    return this.usersService.updateBanner(user.id, bannerUrl);
+  }
+
+  @Delete('me/banner')
+  @UseGuards(JwtAuthGuard)
+  removeBanner(@CurrentUser() user: any) {
+    return this.usersService.removeBanner(user.id);
   }
 }

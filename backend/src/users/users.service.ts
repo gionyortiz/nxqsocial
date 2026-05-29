@@ -58,6 +58,33 @@ export class UsersService {
     return { id: user.id, avatarUrl: user.profile?.avatarUrl };
   }
 
+  async removeAvatar(userId: string) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { profile: { update: { avatarUrl: null } } },
+      select: USER_PUBLIC_SELECT,
+    });
+    return flattenUser(user);
+  }
+
+  async updateBanner(userId: string, bannerUrl: string) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { profile: { update: { bannerUrl } } },
+      select: { id: true, profile: { select: { bannerUrl: true } } },
+    });
+    return { id: user.id, bannerUrl: user.profile?.bannerUrl };
+  }
+
+  async removeBanner(userId: string) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { profile: { update: { bannerUrl: null } } },
+      select: USER_PUBLIC_SELECT,
+    });
+    return flattenUser(user);
+  }
+
   async searchUsers(query: string) {
     const users = await this.prisma.user.findMany({
       where: {
