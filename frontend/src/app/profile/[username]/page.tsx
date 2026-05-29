@@ -124,27 +124,38 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
   return (
     <AppShell>
-      <div className="max-w-3xl mx-auto">
+      <div className="max-w-3xl mx-auto sm:px-4 sm:py-5">
+        <div className="sm:rounded-3xl sm:shadow-[0_8px_40px_-12px_rgba(124,58,237,0.25)] sm:ring-1 sm:ring-gray-100 overflow-hidden bg-white">
 
         {/* ── Banner ─────────────────────────────────────────────────────── */}
         <div className="relative h-52 sm:h-64 w-full overflow-hidden">
           {profile.bannerUrl ? (
             <Image src={mediaSrc(profile.bannerUrl)} alt="banner" fill className="object-cover" sizes="100vw" priority />
           ) : (
-            <div className="w-full h-full bg-gradient-to-br from-purple-700 via-violet-600 to-pink-500" />
+            <div className="w-full h-full bg-gradient-to-br from-purple-700 via-violet-600 to-pink-500">
+              {/* decorative glow orbs */}
+              <div className="absolute -top-10 -left-6 w-48 h-48 rounded-full bg-white/10 blur-3xl" />
+              <div className="absolute top-6 right-10 w-40 h-40 rounded-full bg-pink-300/20 blur-3xl" />
+              <div className="absolute bottom-0 left-1/3 w-56 h-32 rounded-full bg-violet-400/20 blur-3xl" />
+            </div>
           )}
-          <div className="absolute inset-x-0 bottom-0 h-16 bg-gradient-to-t from-black/20 to-transparent" />
+          <div className="absolute inset-0 bg-gradient-to-t from-black/30 via-transparent to-white/5" />
         </div>
 
         {/* ── Profile card ───────────────────────────────────────────────── */}
         <div className="px-4 sm:px-6 bg-white border-b border-gray-100 pb-5">
 
           {/* Avatar + action buttons row */}
-          <div className="flex items-end justify-between -mt-12 sm:-mt-14 mb-4">
+          <div className="flex items-end justify-between -mt-14 sm:-mt-16 mb-4">
             <div className="relative">
-              <div className="w-24 h-24 sm:w-28 sm:h-28 rounded-full ring-4 ring-white bg-white overflow-hidden shadow-xl">
+              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full ring-4 ring-white bg-white overflow-hidden shadow-[0_8px_30px_-6px_rgba(124,58,237,0.45)]">
                 <Avatar src={profile.avatarUrl} alt={profile.username} size="xl" className="w-full h-full" />
               </div>
+              {profile.verificationStatus === 'VERIFIED' && (
+                <div className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 ring-4 ring-white flex items-center justify-center shadow-lg">
+                  <ShieldCheck size={14} className="text-white" strokeWidth={2.5} />
+                </div>
+              )}
             </div>
             <div className="flex items-center gap-2 pb-1">
               {isMe ? (
@@ -234,15 +245,19 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           )}
 
           {/* Stats */}
-          <div className="flex divide-x divide-gray-100 border border-gray-100 rounded-2xl overflow-hidden bg-gray-50/60">
+          <div className="grid grid-cols-3 gap-2.5">
             {[
               { label: 'Posts', value: profile._count.posts },
               { label: 'Followers', value: followerCount },
               { label: 'Following', value: profile._count.following },
             ].map(({ label, value }) => (
-              <div key={label} className="flex-1 text-center py-3.5 hover:bg-white transition-colors cursor-default">
-                <div className="text-xl font-black text-gray-900">{formatCount(value)}</div>
-                <div className="text-xs text-gray-500 font-semibold mt-0.5 uppercase tracking-widest">{label}</div>
+              <div
+                key={label}
+                className="group relative text-center py-4 rounded-2xl bg-gradient-to-b from-gray-50 to-white ring-1 ring-gray-100 hover:ring-purple-200 hover:shadow-[0_4px_20px_-8px_rgba(124,58,237,0.4)] transition-all cursor-default overflow-hidden"
+              >
+                <div className="absolute inset-x-0 -top-px h-1 bg-gradient-to-r from-purple-500 to-pink-500 opacity-0 group-hover:opacity-100 transition-opacity" />
+                <div className="text-2xl font-black text-gray-900 group-hover:gradient-text transition-all">{formatCount(value)}</div>
+                <div className="text-[11px] text-gray-400 font-bold mt-0.5 uppercase tracking-[0.12em]">{label}</div>
               </div>
             ))}
           </div>
@@ -338,6 +353,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               })}
             </div>
           )}
+        </div>
         </div>
       </div>
 
