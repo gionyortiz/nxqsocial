@@ -1,0 +1,13 @@
+﻿{
+  "name": "nxqsocial",
+  "private": true,
+  "scripts": {
+    "dev:backend": "cd backend && npm run start:dev",
+    "dev:frontend": "cd frontend && npm run dev -- --port 3001",
+    "db:up": "docker-compose up -d",
+    "db:down": "docker-compose down",
+    "db:migrate": "cd backend && npx prisma migrate dev",
+    "db:studio": "cd backend && npx prisma studio",
+    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+  }
+}

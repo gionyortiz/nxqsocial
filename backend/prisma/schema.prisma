@@ -1,0 +1,340 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// ─────────────────────────────────────────
+// Core user + profile
+// ─────────────────────────────────────────
+model User {
+  id                 String             @id @default(cuid())
+  email              String             @unique
+  phone              String?            @unique
+  username           String             @unique
+  passwordHash       String
+  role               UserRole           @default(USER)
+  verificationStatus VerificationStatus @default(BASIC)
+  trustScore         Int                @default(10)
+  emailVerified      Boolean            @default(false)
+  phoneVerified      Boolean            @default(false)
+  isSuspended        Boolean            @default(false)
+  isBanned           Boolean            @default(false)
+  createdAt          DateTime           @default(now())
+  updatedAt          DateTime           @updatedAt
+
+  profile         Profile?
+  posts           Post[]
+  likes           Like[]
+  saves           Save[]
+  comments        Comment[]
+  followers       Follow[]       @relation("following")
+  following       Follow[]       @relation("follower")
+  reportsGiven    Report[]       @relation("reporter")
+  reportsReceived Report[]       @relation("reported")
+  verifications   Verification[]
+  feedPref        FeedPreference?
+  otpCodes        OtpCode[]
+  auditLogs       AuditLog[]     @relation("auditAdmin")
+  mediaAssets     MediaAsset[]
+}
+
+model Profile {
+  id          String  @id @default(cuid())
+  userId      String  @unique
+  displayName String
+  bio         String?
+  avatarUrl   String?
+  bannerUrl   String?
+  location    String?
+  website     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// Posts + media
+// ─────────────────────────────────────────
+model Post {
+  id         String     @id @default(cuid())
+  authorId   String
+  caption    String?
+  type       PostType   @default(PHOTO)
+  visibility Visibility @default(PUBLIC)
+  status     PostStatus @default(PUBLISHED)
+  aiLabel    AiLabel    @default(NONE)
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  author   User         @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  media    MediaAsset[]
+  likes    Like[]
+  saves    Save[]
+  comments Comment[]
+  reports  Report[]
+}
+
+model MediaAsset {
+  id               String           @id @default(cuid())
+  userId           String
+  postId           String?
+  s3Key            String           @unique
+  bucket           String
+  url              String?
+  thumbnailUrl     String?
+  mimeType         String
+  size             Int
+  width            Int?
+  height           Int?
+  durationSec      Int?
+  c2paStatus       String?
+  uploadStatus     UploadStatus     @default(PENDING)
+  moderationStatus ModerationStatus @default(PENDING)
+  safetyJobId      String?
+  safetyResult     Json?
+  order            Int              @default(0)
+  createdAt        DateTime         @default(now())
+  updatedAt        DateTime         @updatedAt
+
+  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+}
+
+// ─────────────────────────────────────────
+// Engagement
+// ─────────────────────────────────────────
+model Like {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model Save {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, postId])
+}
+
+model Comment {
+  id        String   @id @default(cuid())
+  userId    String
+  postId    String
+  content   String
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post Post @relation(fields: [postId], references: [id], onDelete: Cascade)
+}
+
+model Follow {
+  id          String   @id @default(cuid())
+  followerId  String
+  followingId String
+  createdAt   DateTime @default(now())
+
+  follower  User @relation("follower", fields: [followerId], references: [id], onDelete: Cascade)
+  following User @relation("following", fields: [followingId], references: [id], onDelete: Cascade)
+
+  @@unique([followerId, followingId])
+}
+
+// ─────────────────────────────────────────
+// Trust & verification
+// ─────────────────────────────────────────
+model Verification {
+  id          String             @id @default(cuid())
+  userId      String
+  provider    String
+  providerRef String
+  level       VerificationStatus
+  status      String             @default("pending")
+  ageBand     String?
+  country     String?
+  verifiedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime           @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// Moderation
+// ─────────────────────────────────────────
+model Report {
+  id          String       @id @default(cuid())
+  reporterId  String
+  reportedId  String?
+  postId      String?
+  reason      ReportReason
+  description String?
+  status      ReportStatus @default(PENDING)
+  createdAt   DateTime     @default(now())
+
+  reporter User  @relation("reporter", fields: [reporterId], references: [id], onDelete: Cascade)
+  reported User? @relation("reported", fields: [reportedId], references: [id], onDelete: SetNull)
+  post     Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+}
+
+// ─────────────────────────────────────────
+// Feed preferences
+// ─────────────────────────────────────────
+model FeedPreference {
+  id       String   @id @default(cuid())
+  userId   String   @unique
+  feedMode FeedMode @default(FOR_YOU)
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// OTP verification codes
+// ─────────────────────────────────────────
+model OtpCode {
+  id        String   @id @default(cuid())
+  userId    String
+  channel   String   // "email" | "phone"
+  code      String
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// Audit log
+// ─────────────────────────────────────────
+model AuditLog {
+  id           String   @id @default(cuid())
+  adminId      String
+  actionType   String
+  targetUserId String?
+  targetPostId String?
+  reason       String?
+  meta         Json?
+  createdAt    DateTime @default(now())
+
+  admin User @relation("auditAdmin", fields: [adminId], references: [id], onDelete: Cascade)
+}
+
+// ─────────────────────────────────────────
+// Safety flags (scam / link detection)
+// ─────────────────────────────────────────
+model SafetyFlag {
+  id         String   @id @default(cuid())
+  entityType String   // "post" | "comment" | "message"
+  entityId   String
+  flagType   String   // "phishing" | "crypto_scam" | "spam_link" | "suspicious_url" | "fake_giveaway"
+  detail     String?
+  resolvedAt DateTime?
+  createdAt  DateTime @default(now())
+}
+
+// ─────────────────────────────────────────
+// Enums
+// ─────────────────────────────────────────
+enum UserRole {
+  USER
+  CREATOR
+  BUSINESS
+  MODERATOR
+  ADMIN
+}
+
+enum VerificationStatus {
+  UNVERIFIED
+  BASIC
+  HUMAN_VERIFIED
+  ID_VERIFIED
+  BUSINESS_VERIFIED
+}
+
+enum PostType {
+  PHOTO
+  VIDEO
+  SHORT_VIDEO
+  TEXT
+}
+
+enum Visibility {
+  PUBLIC
+  FOLLOWERS
+  PRIVATE
+}
+
+enum PostStatus {
+  DRAFT
+  PUBLISHED
+  UNDER_REVIEW
+  REMOVED
+}
+
+enum AiLabel {
+  NONE
+  AI_GENERATED
+  AI_EDITED
+  VERIFIED_CAMERA_SOURCE
+  SOURCE_UNKNOWN
+}
+
+enum ModerationStatus {
+  PENDING
+  APPROVED
+  FLAGGED
+  REJECTED
+  REMOVED
+}
+
+enum UploadStatus {
+  PENDING
+  SCANNING
+  PUBLISHED
+  REJECTED
+}
+
+enum ReportReason {
+  SPAM
+  SCAM
+  FAKE_ACCOUNT
+  HARASSMENT
+  HATE_SPEECH
+  VIOLENCE
+  NUDITY
+  MISINFORMATION
+  DEEPFAKE
+  OTHER
+}
+
+enum ReportStatus {
+  PENDING
+  REVIEWED
+  ACTION_TAKEN
+  DISMISSED
+}
+
+enum FeedMode {
+  FOLLOWING
+  FOR_YOU
+  VERIFIED_HUMANS
+  LEARNING
+  LOCAL
+  FAMILY_SAFE
+}
+

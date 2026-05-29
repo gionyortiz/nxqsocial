@@ -1,0 +1,20 @@
+# ── OS / editor ───────────────────────────────────────────────────────────────
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/settings.json
+
+# ── Secrets — NEVER commit these ──────────────────────────────────────────────
+# Root docker-compose secrets file (see DEPLOY.md §2)
+.env
+.env.prod
+.env.staging
+.env.local
+
+# ── Dependencies ──────────────────────────────────────────────────────────────
+node_modules/
+
+# ── Build outputs ─────────────────────────────────────────────────────────────
+dist/
+.next/
+out/
