@@ -10,6 +10,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
+import Logo from '@/components/Logo';
 
 const schema = z.object({
   email: z.string().email('Invalid email'),
@@ -41,7 +42,10 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-4xl font-black bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">
+          <div className="flex justify-center mb-4">
+            <Logo size={72} />
+          </div>
+          <h1 className="text-4xl font-black bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent">
             NXQ Social
           </h1>
           <p className="text-gray-500 mt-2 text-sm">Sign in to your account</p>

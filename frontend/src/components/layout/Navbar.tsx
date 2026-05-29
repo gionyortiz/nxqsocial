@@ -6,6 +6,7 @@ import { Home, Play, PlusSquare, User, Search, LogOut, ShieldCheck, ShieldAlert 
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
+import Logo from '@/components/Logo';
 import { cn } from '@/lib/utils';
 
 const NAV = [
@@ -27,10 +28,8 @@ export function Navbar() {
 
         {/* Logo */}
         <Link href="/feed" className="mb-6 px-3 flex items-center gap-2">
-          <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-purple-600 to-pink-500 flex items-center justify-center shadow-sm flex-shrink-0">
-            <span className="text-white text-xs font-black">NXQ</span>
-          </div>
-          <span className="text-xl font-black bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent tracking-tight">
+          <Logo size={34} />
+          <span className="text-xl font-black bg-gradient-to-r from-sky-400 via-cyan-400 to-blue-500 bg-clip-text text-transparent tracking-tight">
             NXQ Social
           </span>
         </Link>
