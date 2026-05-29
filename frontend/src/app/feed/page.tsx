@@ -3,6 +3,8 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { PostCard } from '@/components/posts/PostCard';
+import { StoriesBar } from '@/components/feed/StoriesBar';
+import { RightSidebar } from '@/components/feed/RightSidebar';
 import { api } from '@/lib/api';
 
 const FEED_MODES = [
@@ -65,8 +67,11 @@ export default function FeedPage() {
   }, [cursor, hasMore, loading, fetchPosts]);
 
   return (
-    <AppShell>
-      <div className="max-w-xl mx-auto px-4 py-6 flex flex-col gap-4">
+    <AppShell aside={<RightSidebar />}>
+      <div className="px-4 py-6 flex flex-col gap-4">
+        {/* Stories */}
+        <StoriesBar />
+
         {/* Feed mode tabs */}
         <div className="flex gap-1 overflow-x-auto scrollbar-hide pb-1">
           {FEED_MODES.map((m) => (
