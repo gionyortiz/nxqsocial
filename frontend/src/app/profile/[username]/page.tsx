@@ -4,7 +4,7 @@ import { use, useEffect, useState } from 'react';
 import Image from 'next/image';
 import {
   Grid, Film, MapPin, Globe, Calendar, ShieldCheck,
-  Trash2, Heart, MessageCircle, Share2, UserPlus, Settings,
+  Trash2, Heart, MessageCircle, Share2, UserPlus, Settings, User,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
@@ -45,14 +45,20 @@ function formatJoinDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
 }
 
+function normalizeWebsite(url: string) {
+  if (!url) return '';
+  return url.startsWith('http://') || url.startsWith('https://') ? url : `https://${url}`;
+}
+
 function displayWebsite(url: string) {
-  try { return new URL(url).hostname.replace(/^www\./, ''); } catch { return url; }
+  try { return new URL(normalizeWebsite(url)).hostname.replace(/^www\./, ''); } catch { return url; }
 }
 
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const { user: me, updateUser } = useAuthStore();
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const [posts, setPosts] = useState<Post[]>([]);
   const [tab, setTab] = useState<'posts' | 'reels'>('posts');
   const [following, setFollowing] = useState(false);
@@ -72,17 +78,18 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         setFollowerCount(p._count.followers);
         setPosts(pp.data);
       })
-      .catch(() => {});
+      .catch(() => setError('Profile not found'));
   }, [username]);
 
   const toggleFollow = async () => {
+    const nextFollowing = !following;
+    setFollowing(nextFollowing);
+    setFollowerCount((c) => nextFollowing ? c + 1 : Math.max(0, c - 1));
     try {
-      setFollowing((f) => !f);
-      setFollowerCount((c) => following ? c - 1 : c + 1);
       await api.post(`/users/${username}/follow`);
     } catch {
-      setFollowing((f) => !f);
-      setFollowerCount((c) => following ? c + 1 : c - 1);
+      setFollowing(!nextFollowing);
+      setFollowerCount((c) => nextFollowing ? Math.max(0, c - 1) : c + 1);
     }
   };
 
@@ -111,6 +118,20 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       ? (p.type === 'VIDEO' || p.type === 'SHORT_VIDEO')
       : (p.type === 'PHOTO' || p.type === 'TEXT'),
   );
+
+  if (error) {
+    return (
+      <AppShell>
+        <div className="flex flex-col items-center justify-center pt-24 px-6 text-center">
+          <div className="w-16 h-16 rounded-full bg-gray-100 flex items-center justify-center mb-4">
+            <User size={28} className="text-gray-400" strokeWidth={1.5} />
+          </div>
+          <h2 className="text-lg font-bold text-gray-900">{error}</h2>
+          <p className="text-sm text-gray-500 mt-1">This user may not exist or the profile is unavailable.</p>
+        </div>
+      </AppShell>
+    );
+  }
 
   if (!profile) {
     return (
@@ -151,7 +172,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full ring-4 ring-white bg-white overflow-hidden shadow-[0_8px_30px_-6px_rgba(124,58,237,0.45)]">
                 <Avatar src={profile.avatarUrl} alt={profile.username} size="xl" className="w-full h-full" />
               </div>
-              {profile.verificationStatus === 'VERIFIED' && (
+              {['HUMAN_VERIFIED', 'ID_VERIFIED', 'BUSINESS_VERIFIED'].includes(profile.verificationStatus) && (
                 <div className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 ring-4 ring-white flex items-center justify-center shadow-lg">
                   <ShieldCheck size={14} className="text-white" strokeWidth={2.5} />
                 </div>
@@ -219,7 +240,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             )}
             {profile.website && (
               <a
-                href={profile.website}
+                href={normalizeWebsite(profile.website)}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center gap-1.5 text-xs text-purple-600 hover:text-purple-700 hover:underline font-medium transition-colors"
