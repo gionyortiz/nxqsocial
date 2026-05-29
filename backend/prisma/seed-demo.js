@@ -32,17 +32,17 @@ const CAPTIONS = [
   'Verified human, verified vibes. Glad to be part of NXQ ⚡',
 ];
 
-// Public sample MP4s (Google's open test bucket) so the Reels feed + video
-// posts have real, playable content for the demo.
+// Public sample MP4s (reliable, hot-link-friendly CDNs) so the Reels feed +
+// video posts have real, playable content for the demo.
 const VIDEOS = [
-  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',        caption: 'Caught this in 4K 🎥 sound on! #reels' },
-  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',      caption: 'POV: when the light hits just right ✨' },
-  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4',     caption: 'A little behind-the-scenes from today 🎬' },
-  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerEscapes.mp4',    caption: 'Weekend adventures hit different 🌍' },
-  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerFun.mp4',        caption: 'Save this one for later 😄 #fun' },
-  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerJoyrides.mp4',   caption: 'Turn it up 🔊 full send' },
-  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/ForBiggerMeltdowns.mp4',  caption: 'Real moments > perfect moments 💯' },
-  { url: 'https://storage.googleapis.com/gtv-videos-bucket/sample/SubaruOutbackOnStreetAndDirt.mp4', caption: 'On the road again 🚗💨' },
+  { url: 'https://download.samplelib.com/mp4/sample-15s.mp4',                                 caption: 'Caught this in 4K 🎥 sound on! #reels' },
+  { url: 'https://media.w3.org/2010/05/sintel/trailer.mp4',                                   caption: 'POV: when the light hits just right ✨' },
+  { url: 'https://download.samplelib.com/mp4/sample-20s.mp4',                                  caption: 'A little behind-the-scenes from today 🎬' },
+  { url: 'https://test-videos.co.uk/vids/jellyfish/mp4/h264/360/Jellyfish_360_10s_1MB.mp4',   caption: 'Weekend adventures hit different 🌍' },
+  { url: 'https://download.samplelib.com/mp4/sample-30s.mp4',                                  caption: 'Save this one for later 😄 #fun' },
+  { url: 'https://media.w3.org/2010/05/bunny/movie.mp4',                                       caption: 'Turn it up 🔊 full send' },
+  { url: 'https://download.samplelib.com/mp4/sample-10s.mp4',                                  caption: 'Real moments > perfect moments 💯' },
+  { url: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4', caption: 'On the road again 🚗💨' },
 ];
 
 async function main() {
@@ -98,9 +98,9 @@ async function main() {
     }
 
     // One short-video reel per demo user
+    const vid = VIDEOS[i % VIDEOS.length];
     const videoCount = await prisma.post.count({ where: { authorId: user.id, type: 'SHORT_VIDEO' } });
     if (videoCount < 1) {
-      const vid = VIDEOS[i % VIDEOS.length];
       await prisma.post.create({
         data: {
           authorId: user.id,
@@ -125,6 +125,13 @@ async function main() {
         },
       });
       posts++;
+    } else {
+      // Repair: existing demo reels may point at dead URLs — refresh them.
+      const updated = await prisma.mediaAsset.updateMany({
+        where: { s3Key: `demo/${u.username}-reel.mp4` },
+        data: { url: vid.url },
+      });
+      if (updated.count > 0) console.log(`Repaired reel URL for ${u.username}`);
     }
   }
   console.log(`Demo content ready: ${DEMO_USERS.length} users, ${posts} posts`);
