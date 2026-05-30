@@ -29,14 +29,15 @@ const CREATE = [
 ];
 
 const FOOTER_LINKS = [
-  { href: '/about',   label: 'About' },
-  { href: '/help',    label: 'Help' },
-  { href: '/press',   label: 'Press' },
-  { href: '/careers', label: 'Careers' },
-  { href: '/privacy', label: 'Privacy' },
-  { href: '/terms',   label: 'Terms' },
-  { href: '/verify',  label: 'NXQ Verified' },
-  { href: '/contact', label: 'Contact' },
+  { href: '/about',    label: 'About' },
+  { href: '/help',     label: 'Help' },
+  { href: '/press',    label: 'Press' },
+  { href: '/careers',  label: 'Careers' },
+  { href: '/privacy',  label: 'Privacy' },
+  { href: '/terms',    label: 'Terms' },
+  { href: '/settings', label: 'Language' },
+  { href: '/verify',   label: 'NXQ Verified' },
+  { href: '/contact',  label: 'Contact' },
 ];
 
 export function MenuPanel({ onClose }: Props) {
