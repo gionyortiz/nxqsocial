@@ -1,4 +1,4 @@
-﻿#!/usr/bin/env node
+#!/usr/bin/env node
 /**
  * NXQ Social — Post-deployment smoke test
  *
@@ -78,7 +78,7 @@ console.log(`\nNXQ Social smoke test → ${API}\n`);
   const id = uid();
   const email = `smoke_${id}@nxqsocial-test.invalid`;
   const username = `smoke_${id}`;
-  const password = 'SmokePa$$1!';
+  const password = 'SmokePa$$1!9';
   let token;
 
   await check('POST /auth/register creates a new user', async () => {
