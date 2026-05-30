@@ -68,6 +68,12 @@ export default function LoginPage() {
               {...register('password')}
             />
 
+            <div className="text-right -mt-2">
+              <Link href="/forgot-password" className="text-xs text-purple-600 font-medium hover:underline">
+                Forgot password?
+              </Link>
+            </div>
+
             {serverError && (
               <p className="text-sm text-red-500 bg-red-50 px-4 py-2 rounded-xl">{serverError}</p>
             )}

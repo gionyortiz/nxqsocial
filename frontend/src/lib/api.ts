@@ -22,7 +22,7 @@ api.interceptors.response.use(
       localStorage.removeItem('nxqsocial-auth');
       const path = window.location.pathname;
       // Only bounce to login from protected pages, and never loop on public pages.
-      const publicPaths = ['/login', '/register', '/', '/terms', '/privacy', '/community-guidelines'];
+      const publicPaths = ['/login', '/register', '/', '/terms', '/privacy', '/community-guidelines', '/forgot-password', '/reset-password'];
       if (!publicPaths.includes(path)) {
         window.location.href = '/login';
       }
