@@ -44,7 +44,7 @@ function ViewerItem({ post, active, muted, onToggleMute }: {
     setLiked((p) => !p);
     setLikeCount((c) => liked ? c - 1 : c + 1);
     try {
-      const { data } = await api.post(`/likes/${post.id}`);
+      const { data } = await api.post(`/posts/${post.id}/likes`);
       setLiked(data.liked);
       setLikeCount(data.count);
     } catch {

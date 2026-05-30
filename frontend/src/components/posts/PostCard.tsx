@@ -90,7 +90,7 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
     try {
       setLiked((p) => !p);
       setLikeCount((c) => liked ? c - 1 : c + 1);
-      const { data } = await api.post(`/likes/${post.id}`);
+      const { data } = await api.post(`/posts/${post.id}/likes`);
       setLiked(data.liked);
       setLikeCount(data.count);
     } catch {

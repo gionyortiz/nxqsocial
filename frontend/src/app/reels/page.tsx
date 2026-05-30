@@ -40,7 +40,7 @@ function ReelItem({ reel, active }: { reel: Reel; active: boolean }) {
     setLiked((p) => !p);
     setLikeCount((c) => liked ? c - 1 : c + 1);
     try {
-      const { data } = await api.post(`/likes/${reel.id}`);
+      const { data } = await api.post(`/posts/${reel.id}/likes`);
       setLiked(data.liked);
       setLikeCount(data.count);
     } catch {
