@@ -42,7 +42,7 @@ export default function NewLivePage() {
           <ul className="flex flex-col gap-3 mb-6">
             <Feature icon={Video} title="Live video & audio" desc="Broadcast straight from your camera and mic." />
             <Feature icon={Users} title="Viewer count" desc="See how many people are watching in real time." />
-            <Feature icon={MessageSquare} title="Live chat" desc="Chat with viewers (coming soon during Beta)." />
+            <Feature icon={MessageSquare} title="Live chat & reactions" desc="Viewers comment and send hearts ❤️ live." />
             <Feature icon={Mic} title="One broadcaster" desc="You present; viewers join watch-only." />
           </ul>
 

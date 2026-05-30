@@ -2,19 +2,11 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import {
-  LiveKitRoom,
-  RoomAudioRenderer,
-  GridLayout,
-  ParticipantTile,
-  ControlBar,
-  useTracks,
-  useParticipants,
-} from '@livekit/components-react';
-import { Track } from 'livekit-client';
+import { LiveKitRoom } from '@livekit/components-react';
 import '@livekit/components-styles';
-import { Radio, Users, Link2, Check, MessageSquare, X } from 'lucide-react';
+import { Radio } from 'lucide-react';
 import { api } from '@/lib/api';
+import { LiveExperience } from '@/components/live/LiveExperience';
 
 export default function LiveRoomPage() {
   const params = useParams();
@@ -92,95 +84,8 @@ export default function LiveRoomPage() {
         onDisconnected={leave}
         style={{ height: '100%' }}
       >
-        <LiveStage host={host} room={room} onLeave={leave} />
-        <RoomAudioRenderer />
+        <LiveExperience host={host} room={room} onLeave={leave} />
       </LiveKitRoom>
-    </div>
-  );
-}
-
-function LiveStage({ host, room, onLeave }: { host: boolean; room: string; onLeave: () => void }) {
-  const participants = useParticipants();
-  const cameraTracks = useTracks(
-    [
-      { source: Track.Source.Camera, withPlaceholder: false },
-      { source: Track.Source.ScreenShare, withPlaceholder: false },
-    ],
-    { onlySubscribed: false },
-  );
-  const [copied, setCopied] = useState(false);
-
-  // Viewers = everyone except the broadcaster.
-  const viewers = Math.max(0, participants.length - 1);
-
-  const copyLink = async () => {
-    try {
-      const url = `${window.location.origin}/live/${encodeURIComponent(room)}`;
-      await navigator.clipboard.writeText(url);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      /* ignore */
-    }
-  };
-
-  return (
-    <div className="flex flex-col h-full">
-      {/* Top bar */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-gray-900/95 text-white">
-        <span className="flex items-center gap-1.5 px-2 py-1 rounded-full bg-rose-600 text-white text-xs font-bold">
-          <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> LIVE
-        </span>
-        <span className="flex items-center gap-1 text-sm text-gray-200">
-          <Users size={15} /> {viewers} watching
-        </span>
-        <div className="flex-1" />
-        {host && (
-          <button
-            onClick={copyLink}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium"
-          >
-            {copied ? <Check size={14} /> : <Link2 size={14} />}
-            {copied ? 'Copied' : 'Share link'}
-          </button>
-        )}
-        <button
-          onClick={onLeave}
-          className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-rose-500 hover:bg-rose-600 text-xs font-semibold"
-        >
-          <X size={14} /> {host ? 'End' : 'Leave'}
-        </button>
-      </div>
-
-      {/* Stage */}
-      <div className="flex-1 min-h-0 relative">
-        {cameraTracks.length > 0 ? (
-          <GridLayout tracks={cameraTracks} style={{ height: '100%' }}>
-            <ParticipantTile />
-          </GridLayout>
-        ) : (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
-            <Radio size={36} className="text-rose-500 mb-3" />
-            <p className="text-sm text-gray-300">
-              {host ? 'Turn on your camera to start broadcasting.' : 'Waiting for the broadcaster…'}
-            </p>
-          </div>
-        )}
-      </div>
-
-      {/* Bottom controls */}
-      {host ? (
-        <div className="bg-gray-900/95">
-          <ControlBar
-            variation="minimal"
-            controls={{ microphone: true, camera: true, screenShare: true, chat: false, leave: true }}
-          />
-        </div>
-      ) : (
-        <div className="flex items-center justify-center gap-2 px-3 py-3 bg-gray-900/95 text-gray-400 text-xs">
-          <MessageSquare size={14} /> Live chat coming soon
-        </div>
-      )}
     </div>
   );
 }

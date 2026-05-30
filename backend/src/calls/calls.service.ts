@@ -69,14 +69,16 @@ export class CallsService {
       ttl: '2h',
     });
 
-    // Watch-only viewers (host === false) may subscribe but not publish.
+    // Watch-only viewers (host === false) may subscribe but not publish media
+    // (camera/mic). They CAN still publish data so live chat + reactions work
+    // for everyone in the room.
     const canPublish = opts.host !== false;
     at.addGrant({
       roomJoin: true,
       room,
       canPublish,
       canSubscribe: true,
-      canPublishData: canPublish,
+      canPublishData: true,
     });
 
     return {
