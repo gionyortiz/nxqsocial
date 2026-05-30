@@ -6,15 +6,81 @@ import {
   VideoConference,
   RoomAudioRenderer,
   formatChatMessageLinks,
+  useParticipants,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { Minimize2, Maximize2, Square, PhoneOff, GripHorizontal } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useCallStore } from '@/store/call';
 
+const RINGBACK_SRC = '/sounds/outgoing-ring.wav';
+
 interface DragPos {
   x: number;
   y: number;
+}
+
+/**
+ * Runs inside the LiveKitRoom. Plays an outgoing "ringback" tone for the caller
+ * while they are alone (waiting for the other person to answer), and ends the
+ * call automatically once the other party leaves the room.
+ */
+function CallRoomInner({ onEnd }: { onEnd: () => void }) {
+  const participants = useParticipants();
+  const remoteCount = participants.filter((p) => !p.isLocal).length;
+  const joinedRef = useRef(false);
+  const ringbackRef = useRef<HTMLAudioElement | null>(null);
+
+  // Outgoing ringback while waiting for someone to join.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    let el = ringbackRef.current;
+    if (!el) {
+      el = new Audio(RINGBACK_SRC);
+      el.loop = true;
+      el.volume = 0.5;
+      ringbackRef.current = el;
+    }
+    if (remoteCount === 0 && !joinedRef.current) {
+      el.play().catch(() => {});
+    } else {
+      try {
+        el.pause();
+        el.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+    }
+  }, [remoteCount]);
+
+  // Track whether the other party ever joined, and auto-end when they leave.
+  useEffect(() => {
+    if (remoteCount > 0) {
+      joinedRef.current = true;
+      return;
+    }
+    if (joinedRef.current && remoteCount === 0) {
+      // The other participant hung up — close our window too.
+      onEnd();
+    }
+  }, [remoteCount, onEnd]);
+
+  // Stop the ringback on unmount.
+  useEffect(() => {
+    return () => {
+      const el = ringbackRef.current;
+      if (el) {
+        try {
+          el.pause();
+          el.currentTime = 0;
+        } catch {
+          /* ignore */
+        }
+      }
+    };
+  }, []);
+
+  return null;
 }
 
 export function FloatingCall() {
@@ -212,6 +278,7 @@ export function FloatingCall() {
             onDisconnected={end}
             style={{ height: '100%' }}
           >
+            <CallRoomInner onEnd={end} />
             <VideoConference chatMessageFormatter={formatChatMessageLinks} />
             <RoomAudioRenderer />
           </LiveKitRoom>
