@@ -1,16 +1,18 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Compass, Play, Video, PlusSquare, ShieldCheck,
-  Settings, LogOut, ShieldAlert,
+  Settings, LogOut, ShieldAlert, Menu as MenuIcon,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import Logo from '@/components/Logo';
 import { cn } from '@/lib/utils';
+import { MenuPanel } from './MenuPanel';
 
 // Primary destinations — every link points to a real page.
 const NAV = [
@@ -33,6 +35,7 @@ const MOBILE_NAV = [
 export function Navbar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+  const [menuOpen, setMenuOpen] = useState(false);
 
   const isActive = (href: string) =>
     href === '/feed' ? pathname === '/feed' : pathname === href || pathname.startsWith(href + '/');
@@ -77,6 +80,17 @@ export function Navbar() {
               </Link>
             );
           })}
+
+          {/* Menu button — opens the full panel */}
+          <button
+            onClick={() => setMenuOpen(true)}
+            className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition-all"
+          >
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white transition-colors">
+              <MenuIcon size={20} strokeWidth={2} />
+            </span>
+            Menu
+          </button>
         </div>
 
         {/* Bottom section */}
@@ -198,7 +212,21 @@ export function Navbar() {
             Profile
           </Link>
         )}
+
+        {/* Menu tab */}
+        <button
+          onClick={() => setMenuOpen(true)}
+          className="flex-1 flex flex-col items-center py-2 gap-0.5 text-[11px] font-semibold text-gray-400 hover:text-gray-600 transition-colors"
+        >
+          <div className="p-1.5 rounded-xl">
+            <MenuIcon size={22} strokeWidth={2} />
+          </div>
+          Menu
+        </button>
       </nav>
+
+      {/* ── Full menu panel ──────────────────────────────────────────────── */}
+      {menuOpen && <MenuPanel onClose={() => setMenuOpen(false)} />}
     </>
   );
 }
