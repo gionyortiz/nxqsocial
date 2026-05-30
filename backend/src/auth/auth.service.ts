@@ -32,8 +32,13 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const requiredCode = process.env.BETA_INVITE_CODE;
-    if (requiredCode && dto.inviteCode !== requiredCode) {
-      throw new ForbiddenException('Invalid invite code — this is a closed beta');
+    if (requiredCode) {
+      // Normalize both sides so copy-paste whitespace and casing don't cause
+      // spurious "invalid invite code" failures.
+      const normalize = (s?: string) => (s ?? '').trim().toUpperCase();
+      if (normalize(dto.inviteCode) !== normalize(requiredCode)) {
+        throw new ForbiddenException('Invalid invite code — this is a closed beta');
+      }
     }
 
     const existing = await this.prisma.user.findFirst({
