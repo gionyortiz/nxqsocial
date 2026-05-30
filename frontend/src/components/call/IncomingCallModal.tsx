@@ -23,7 +23,54 @@ export function IncomingCallModal() {
   const router = useRouter();
   const pathname = usePathname();
   const [invite, setInvite] = useState<Invite | null>(null);
-  const ringtone = useRef<HTMLAudioElement | null>(null);
+  const audioCtxRef = useRef<AudioContext | null>(null);
+  const ringTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  // Play a ringing sound + vibrate while there is an incoming call.
+  useEffect(() => {
+    if (!invite) return;
+
+    const playRing = () => {
+      try {
+        let ctx = audioCtxRef.current;
+        if (!ctx) {
+          const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          ctx = new Ctor();
+          audioCtxRef.current = ctx;
+        }
+        if (ctx.state === 'suspended') void ctx.resume();
+
+        // Classic two-tone phone ring (two short beeps).
+        const now = ctx.currentTime;
+        [0, 0.4].forEach((offset) => {
+          const osc = ctx!.createOscillator();
+          const gain = ctx!.createGain();
+          osc.type = 'sine';
+          osc.frequency.value = 480 + offset * 100;
+          gain.gain.setValueAtTime(0, now + offset);
+          gain.gain.linearRampToValueAtTime(0.25, now + offset + 0.02);
+          gain.gain.setValueAtTime(0.25, now + offset + 0.32);
+          gain.gain.linearRampToValueAtTime(0, now + offset + 0.36);
+          osc.connect(gain).connect(ctx!.destination);
+          osc.start(now + offset);
+          osc.stop(now + offset + 0.38);
+        });
+      } catch {
+        /* audio not available */
+      }
+      // Vibrate on phones.
+      try { navigator.vibrate?.([400, 200, 400]); } catch { /* ignore */ }
+    };
+
+    playRing();
+    ringTimerRef.current = setInterval(playRing, 2500);
+
+    return () => {
+      if (ringTimerRef.current) clearInterval(ringTimerRef.current);
+      ringTimerRef.current = null;
+      try { navigator.vibrate?.(0); } catch { /* ignore */ }
+    };
+  }, [invite]);
 
   useEffect(() => {
     // Don't poll when logged out or already inside a call.
