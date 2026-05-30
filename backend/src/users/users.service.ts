@@ -1,7 +1,7 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { AuditService } from '../audit/audit.service';
-import { UpdateProfileDto } from './users.dto';
+import { UpdateProfileDto, UpdateSettingsDto } from './users.dto';
 
 const USER_PUBLIC_SELECT = {
   id: true, username: true, role: true,
@@ -83,6 +83,88 @@ export class UsersService {
       select: USER_PUBLIC_SELECT,
     });
     return flattenUser(user);
+  }
+
+  // ── Self: account settings ──────────────────────────────────────────────────
+
+  async getSettings(userId: string) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: userId },
+      select: { id: true, email: true, username: true, emailNotifications: true },
+    });
+    if (!user) throw new NotFoundException('User not found');
+    return user;
+  }
+
+  async updateSettings(userId: string, dto: UpdateSettingsDto) {
+    const user = await this.prisma.user.update({
+      where: { id: userId },
+      data: { emailNotifications: dto.emailNotifications },
+      select: { id: true, email: true, username: true, emailNotifications: true },
+    });
+    return user;
+  }
+
+  async deleteAccount(userId: string) {
+    await this.prisma.user.delete({ where: { id: userId } });
+    return { message: 'Your account has been deleted.' };
+  }
+
+  // ── Self: blocking ──────────────────────────────────────────────────────────
+
+  async blockUser(userId: string, targetUsername: string) {
+    const target = await this.prisma.user.findUnique({
+      where: { username: targetUsername },
+      select: { id: true },
+    });
+    if (!target) throw new NotFoundException('User not found');
+    if (target.id === userId) throw new BadRequestException('You cannot block yourself');
+
+    await this.prisma.block.upsert({
+      where: { blockerId_blockedId: { blockerId: userId, blockedId: target.id } },
+      create: { blockerId: userId, blockedId: target.id },
+      update: {},
+    });
+    // Remove any follow relationship in both directions.
+    await this.prisma.follow.deleteMany({
+      where: {
+        OR: [
+          { followerId: userId, followingId: target.id },
+          { followerId: target.id, followingId: userId },
+        ],
+      },
+    });
+    return { blocked: true };
+  }
+
+  async unblockUser(userId: string, targetUsername: string) {
+    const target = await this.prisma.user.findUnique({
+      where: { username: targetUsername },
+      select: { id: true },
+    });
+    if (!target) throw new NotFoundException('User not found');
+
+    await this.prisma.block.deleteMany({
+      where: { blockerId: userId, blockedId: target.id },
+    });
+    return { blocked: false };
+  }
+
+  async listBlocked(userId: string) {
+    const blocks = await this.prisma.block.findMany({
+      where: { blockerId: userId },
+      orderBy: { createdAt: 'desc' },
+      select: {
+        createdAt: true,
+        blocked: {
+          select: {
+            id: true, username: true, verificationStatus: true,
+            profile: { select: { displayName: true, avatarUrl: true } },
+          },
+        },
+      },
+    });
+    return blocks.map((b) => ({ ...flattenUser(b.blocked), blockedAt: b.createdAt }));
   }
 
   async searchUsers(query: string) {

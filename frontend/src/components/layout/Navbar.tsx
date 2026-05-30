@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Play, PlusSquare, User, Search, LogOut, ShieldCheck, ShieldAlert, Video } from 'lucide-react';
+import { Home, Play, PlusSquare, User, Search, LogOut, ShieldCheck, ShieldAlert, Video, Settings } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
@@ -101,6 +101,20 @@ export function Navbar() {
               </Link>
             </>
           )}
+
+          {/* Log out */}
+          <Link
+            href="/settings"
+            className={cn(
+              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all',
+              pathname === '/settings'
+                ? 'bg-purple-50 text-purple-600 ring-1 ring-purple-100'
+                : 'text-gray-500 hover:bg-gray-50',
+            )}
+          >
+            <Settings size={20} />
+            Settings
+          </Link>
 
           {/* Log out */}
           <button

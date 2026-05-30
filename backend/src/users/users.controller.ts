@@ -10,7 +10,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
-import { UpdateProfileDto } from './users.dto';
+import { UpdateProfileDto, UpdateSettingsDto } from './users.dto';
 import { IsOptional, IsString } from 'class-validator';
 
 class AdminActionDto {
@@ -76,6 +76,18 @@ export class UsersController {
   @Get('search')
   search(@Query('q') query: string) {
     return this.usersService.searchUsers(query ?? '');
+  }
+
+  @Get('me/settings')
+  @UseGuards(JwtAuthGuard)
+  getSettings(@CurrentUser() user: any) {
+    return this.usersService.getSettings(user.id);
+  }
+
+  @Get('me/blocked')
+  @UseGuards(JwtAuthGuard)
+  listBlocked(@CurrentUser() user: any) {
+    return this.usersService.listBlocked(user.id);
   }
 
   @Get(':username')
@@ -148,5 +160,29 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   removeBanner(@CurrentUser() user: any) {
     return this.usersService.removeBanner(user.id);
+  }
+
+  @Patch('me/settings')
+  @UseGuards(JwtAuthGuard)
+  updateSettings(@CurrentUser() user: any, @Body() dto: UpdateSettingsDto) {
+    return this.usersService.updateSettings(user.id, dto);
+  }
+
+  @Delete('me')
+  @UseGuards(JwtAuthGuard)
+  deleteAccount(@CurrentUser() user: any) {
+    return this.usersService.deleteAccount(user.id);
+  }
+
+  @Post(':username/block')
+  @UseGuards(JwtAuthGuard)
+  blockUser(@CurrentUser() user: any, @Param('username') username: string) {
+    return this.usersService.blockUser(user.id, username);
+  }
+
+  @Delete(':username/block')
+  @UseGuards(JwtAuthGuard)
+  unblockUser(@CurrentUser() user: any, @Param('username') username: string) {
+    return this.usersService.unblockUser(user.id, username);
   }
 }

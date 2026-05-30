@@ -23,6 +23,7 @@ model User {
   trustScore         Int                @default(10)
   emailVerified      Boolean            @default(false)
   phoneVerified      Boolean            @default(false)
+  emailNotifications Boolean            @default(true)
   isSuspended        Boolean            @default(false)
   isBanned           Boolean            @default(false)
   createdAt          DateTime           @default(now())
@@ -43,6 +44,22 @@ model User {
   auditLogs       AuditLog[]     @relation("auditAdmin")
   mediaAssets     MediaAsset[]
   passwordResets  PasswordResetToken[]
+  blocking        Block[]        @relation("blocker")
+  blockedBy       Block[]        @relation("blocked")
+}
+
+model Block {
+  id            String   @id @default(cuid())
+  blockerId     String
+  blockedId     String
+  createdAt     DateTime @default(now())
+
+  blocker User @relation("blocker", fields: [blockerId], references: [id], onDelete: Cascade)
+  blocked User @relation("blocked", fields: [blockedId], references: [id], onDelete: Cascade)
+
+  @@unique([blockerId, blockedId])
+  @@index([blockerId])
+  @@index([blockedId])
 }
 
 model PasswordResetToken {

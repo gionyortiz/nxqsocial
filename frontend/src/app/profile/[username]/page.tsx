@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
   Grid, Film, MapPin, Globe, Calendar, ShieldCheck,
   Trash2, Heart, MessageCircle, Share2, UserPlus, Settings, User,
-  Video, Phone,
+  Video, Phone, Ban,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { startCall, callHref } from '@/lib/calls';
@@ -70,6 +70,8 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
   const [editOpen, setEditOpen] = useState(false);
+  const [confirmBlock, setConfirmBlock] = useState(false);
+  const [blocking, setBlocking] = useState(false);
 
   useEffect(() => {
     Promise.all([
@@ -102,6 +104,17 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     }
   };
 
+  const blockUser = async () => {
+    setBlocking(true);
+    try {
+      await api.post(`/users/${username}/block`);
+      setConfirmBlock(false);
+      router.push('/feed');
+    } catch {
+      setBlocking(false);
+    }
+  };
+
   const deletePost = async (postId: string) => {
     setDeletingId(postId);
     try {
@@ -120,7 +133,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     setProfile((prev) => prev ? { ...prev, ...updates } : prev);
     updateUser(updates as any);
   };
-
   const isMe = me?.username === username;
   const filteredPosts = posts.filter((p) =>
     tab === 'reels'
@@ -197,6 +209,13 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     <Settings size={14} /> Edit profile
                   </button>
                   <button
+                    onClick={() => router.push('/settings')}
+                    className="p-2 rounded-full border-2 border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                    title="Settings"
+                  >
+                    <Settings size={16} />
+                  </button>
+                  <button
                     className="p-2 rounded-full border-2 border-gray-200 text-gray-500 hover:bg-gray-50 hover:border-gray-300 transition-all"
                     title="Share profile"
                   >
@@ -228,6 +247,13 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     title={`Voice call ${profile.displayName}`}
                   >
                     <Phone size={16} />
+                  </button>
+                  <button
+                    onClick={() => setConfirmBlock(true)}
+                    className="p-2 rounded-full border-2 border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"
+                    title={`Block ${profile.displayName}`}
+                  >
+                    <Ban size={15} />
                   </button>
                   <button
                     className="p-2 rounded-full border-2 border-gray-200 text-gray-500 hover:bg-gray-50 transition-all"
@@ -408,6 +434,39 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           onClose={() => setEditOpen(false)}
           onSaved={handleProfileSaved}
         />
+      )}
+
+      {/* ── Block confirm modal ────────────────────────────────────────────── */}
+      {confirmBlock && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 text-center">
+            <div className="w-14 h-14 rounded-full bg-red-100 flex items-center justify-center mx-auto mb-4">
+              <Ban size={24} className="text-red-500" />
+            </div>
+            <h3 className="text-lg font-bold text-gray-900 mb-1">Block @{profile.username}?</h3>
+            <p className="text-sm text-gray-500 mb-6 leading-relaxed">
+              They won&apos;t be able to follow you, and you&apos;ll unfollow each other. You can unblock anytime in Settings.
+            </p>
+            <div className="flex gap-3">
+              <button
+                onClick={() => setConfirmBlock(false)}
+                disabled={blocking}
+                className="flex-1 py-2.5 rounded-xl border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={blockUser}
+                disabled={blocking}
+                className="flex-1 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+              >
+                {blocking
+                  ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Blocking…</>
+                  : 'Block'}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
 
       {/* ── Delete confirm modal ───────────────────────────────────────────── */}
