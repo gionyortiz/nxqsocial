@@ -56,6 +56,32 @@ function displayWebsite(url: string) {
   try { return new URL(normalizeWebsite(url)).hostname.replace(/^www\./, ''); } catch { return url; }
 }
 
+const VERIFIED_STATUSES = ['HUMAN_VERIFIED', 'ID_VERIFIED', 'BUSINESS_VERIFIED'];
+
+function verificationLabel(status: string) {
+  switch (status) {
+    case 'ID_VERIFIED': return 'ID Verified';
+    case 'HUMAN_VERIFIED': return 'Human Verified';
+    case 'BUSINESS_VERIFIED': return 'Business Verified';
+    default: return 'Basic';
+  }
+}
+
+/** Compute profile completeness (0–100) and the list of remaining steps. */
+function computeCompleteness(p: Profile) {
+  const checks: { label: string; done: boolean }[] = [
+    { label: 'Add a profile photo', done: !!p.avatarUrl },
+    { label: 'Add a banner image', done: !!p.bannerUrl },
+    { label: 'Write a bio', done: !!p.bio?.trim() },
+    { label: 'Add your location', done: !!p.location?.trim() },
+    { label: 'Add a website', done: !!p.website?.trim() },
+    { label: 'Get verified', done: VERIFIED_STATUSES.includes(p.verificationStatus) },
+  ];
+  const done = checks.filter((c) => c.done).length;
+  const percent = Math.round((done / checks.length) * 100);
+  return { percent, checks, remaining: checks.filter((c) => !c.done) };
+}
+
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const { user: me, updateUser } = useAuthStore();
@@ -158,6 +184,9 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     );
   }
 
+  const isVerified = VERIFIED_STATUSES.includes(profile.verificationStatus);
+  const completeness = computeCompleteness(profile);
+
   return (
     <AppShell>
       <div className="max-w-3xl mx-auto sm:px-4 sm:py-5">
@@ -187,7 +216,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full ring-4 ring-white bg-white overflow-hidden shadow-[0_8px_30px_-6px_rgba(124,58,237,0.45)]">
                 <Avatar src={profile.avatarUrl} alt={profile.username} size="xl" className="w-full h-full" />
               </div>
-              {['HUMAN_VERIFIED', 'ID_VERIFIED', 'BUSINESS_VERIFIED'].includes(profile.verificationStatus) && (
+              {VERIFIED_STATUSES.includes(profile.verificationStatus) && (
                 <div className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 ring-4 ring-white flex items-center justify-center shadow-lg">
                   <ShieldCheck size={14} className="text-white" strokeWidth={2.5} />
                 </div>
@@ -284,15 +313,36 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
             )}
           </div>
 
-          {/* Trust score */}
-          {profile.trustScore > 0 && (
-            <div className="flex items-center gap-2 mb-4">
-              <div className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-emerald-50 border border-emerald-100">
+          {/* Trust summary */}
+          <div className="grid grid-cols-3 gap-2.5 mb-4">
+            <div className="rounded-2xl bg-gradient-to-b from-emerald-50 to-white ring-1 ring-emerald-100 px-3 py-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
                 <ShieldCheck size={13} className="text-emerald-500" />
-                <span className="text-xs font-semibold text-emerald-700">Trust Score: {profile.trustScore}/100</span>
+                <span className="text-[10px] font-bold text-emerald-600 uppercase tracking-wider">Trust Score</span>
+              </div>
+              <div className="text-lg font-black text-gray-900 leading-none">{profile.trustScore}<span className="text-xs font-semibold text-gray-400">/100</span></div>
+              <div className="mt-2 h-1.5 rounded-full bg-emerald-100 overflow-hidden">
+                <div className="h-full rounded-full bg-gradient-to-r from-emerald-400 to-emerald-500 transition-all" style={{ width: `${Math.min(100, profile.trustScore)}%` }} />
               </div>
             </div>
-          )}
+            <div className="rounded-2xl bg-gradient-to-b from-purple-50 to-white ring-1 ring-purple-100 px-3 py-3 flex flex-col">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <ShieldCheck size={13} className={isVerified ? 'text-purple-500' : 'text-gray-300'} />
+                <span className="text-[10px] font-bold text-purple-600 uppercase tracking-wider">Verification</span>
+              </div>
+              <div className="text-sm font-black text-gray-900 leading-tight">{verificationLabel(profile.verificationStatus)}</div>
+              {!isVerified && isMe && (
+                <button onClick={() => router.push('/verify')} className="mt-auto pt-1.5 text-[11px] font-semibold text-purple-600 hover:text-purple-700 text-left">Get verified →</button>
+              )}
+            </div>
+            <div className="rounded-2xl bg-gradient-to-b from-gray-50 to-white ring-1 ring-gray-100 px-3 py-3">
+              <div className="flex items-center gap-1.5 mb-1.5">
+                <Calendar size={13} className="text-gray-400" />
+                <span className="text-[10px] font-bold text-gray-500 uppercase tracking-wider">Member Since</span>
+              </div>
+              <div className="text-sm font-black text-gray-900 leading-tight">{formatJoinDate(profile.createdAt)}</div>
+            </div>
+          </div>
 
           {/* Stats */}
           <div className="grid grid-cols-3 gap-2.5">
@@ -311,6 +361,30 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               </div>
             ))}
           </div>
+
+          {/* Profile completeness (own profile only) */}
+          {isMe && completeness.percent < 100 && (
+            <div className="mt-4 rounded-2xl ring-1 ring-purple-100 bg-gradient-to-br from-purple-50/60 to-white p-4">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm font-bold text-gray-900">Complete your profile</span>
+                <span className="text-sm font-black gradient-text">{completeness.percent}%</span>
+              </div>
+              <div className="h-2 rounded-full bg-purple-100 overflow-hidden mb-3">
+                <div className="h-full rounded-full bg-gradient-to-r from-purple-500 to-pink-500 transition-all" style={{ width: `${completeness.percent}%` }} />
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                {completeness.remaining.map((step) => (
+                  <button
+                    key={step.label}
+                    onClick={() => (step.label === 'Get verified' ? router.push('/verify') : setEditOpen(true))}
+                    className="px-2.5 py-1 rounded-full bg-white ring-1 ring-purple-100 text-[11px] font-semibold text-purple-600 hover:ring-purple-300 hover:bg-purple-50 transition-all"
+                  >
+                    {step.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
 
         {/* ── Tabs ───────────────────────────────────────────────────────── */}
