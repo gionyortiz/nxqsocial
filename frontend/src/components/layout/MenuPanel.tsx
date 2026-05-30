@@ -28,6 +28,17 @@ const CREATE = [
   { href: '/upload', icon: Film,      label: 'Reel',  hint: 'Share a video' },
 ];
 
+const FOOTER_LINKS = [
+  { href: '/about',   label: 'About' },
+  { href: '/help',    label: 'Help' },
+  { href: '/press',   label: 'Press' },
+  { href: '/careers', label: 'Careers' },
+  { href: '/privacy', label: 'Privacy' },
+  { href: '/terms',   label: 'Terms' },
+  { href: '/verify',  label: 'NXQ Verified' },
+  { href: '/contact', label: 'Contact' },
+];
+
 export function MenuPanel({ onClose }: Props) {
   const router = useRouter();
   const { user, logout } = useAuthStore();
@@ -178,6 +189,24 @@ export function MenuPanel({ onClose }: Props) {
               </p>
             </div>
           </div>
+        </div>
+
+        {/* ── Footer links ───────────────────────────────────────────── */}
+        <div className="px-5 pb-6 pt-2 border-t border-gray-100">
+          <div className="flex flex-wrap gap-x-3 gap-y-1.5 text-xs text-gray-400 font-medium">
+            {FOOTER_LINKS.map(({ href, label }) => (
+              <button
+                key={label}
+                onClick={() => go(href)}
+                className="hover:text-purple-600 transition-colors"
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-gray-400 mt-3 tracking-wide">
+            © {new Date().getFullYear()} NXQ SOCIAL
+          </p>
         </div>
       </div>
     </div>
