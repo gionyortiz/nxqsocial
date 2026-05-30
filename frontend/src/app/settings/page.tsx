@@ -11,19 +11,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { ProfileEditModal } from '@/components/profile/ProfileEditModal';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-
-const LANGUAGES = [
-  { code: 'en', label: 'English', native: 'English' },
-  { code: 'es', label: 'Spanish', native: 'Español' },
-  { code: 'fr', label: 'French', native: 'Français' },
-  { code: 'pt', label: 'Portuguese', native: 'Português' },
-  { code: 'de', label: 'German', native: 'Deutsch' },
-  { code: 'it', label: 'Italian', native: 'Italiano' },
-  { code: 'ar', label: 'Arabic', native: 'العربية' },
-  { code: 'hi', label: 'Hindi', native: 'हिन्दी' },
-  { code: 'zh', label: 'Chinese', native: '中文' },
-  { code: 'ja', label: 'Japanese', native: '日本語' },
-];
+import { useI18n, LANGUAGES } from '@/lib/i18n';
 
 interface BlockedUser {
   id: string;
@@ -35,6 +23,7 @@ interface BlockedUser {
 export default function SettingsPage() {
   const router = useRouter();
   const { user, updateUser, logout } = useAuthStore();
+  const { t, lang, setLang } = useI18n();
 
   const [editOpen, setEditOpen] = useState(false);
 
@@ -54,7 +43,6 @@ export default function SettingsPage() {
 
   // Language
   const [langOpen, setLangOpen] = useState(false);
-  const [language, setLanguage] = useState('en');
 
   // Blocked users
   const [blockOpen, setBlockOpen] = useState(false);
@@ -74,17 +62,8 @@ export default function SettingsPage() {
       .finally(() => setNotifLoaded(true));
   }, []);
 
-  useEffect(() => {
-    const saved = typeof window !== 'undefined' ? localStorage.getItem('nxq_language') : null;
-    if (saved) setLanguage(saved);
-  }, []);
-
   const chooseLanguage = (code: string) => {
-    setLanguage(code);
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('nxq_language', code);
-      document.documentElement.lang = code;
-    }
+    setLang(code as typeof lang);
     setLangOpen(false);
   };
 
@@ -183,7 +162,7 @@ export default function SettingsPage() {
           >
             <ArrowLeft size={20} />
           </button>
-          <h1 className="text-2xl font-black text-gray-900">Settings</h1>
+          <h1 className="text-2xl font-black text-gray-900">{t('settings.title')}</h1>
         </div>
 
         {/* Account card */}
@@ -224,18 +203,18 @@ export default function SettingsPage() {
         </div>
 
         {/* ── Privacy ──────────────────────────────────────────────── */}
-        <SectionTitle>Privacy</SectionTitle>
+        <SectionTitle>{t('settings.privacy')}</SectionTitle>
         <div className="rounded-2xl ring-1 ring-gray-100 bg-white overflow-hidden mb-6 shadow-sm">
-          <Row icon={<ShieldOff size={18} />} label="Blocked accounts" desc="Manage people you've blocked" onClick={openBlocked} />
+          <Row icon={<ShieldOff size={18} />} label={t('settings.blocked')} desc="Manage people you've blocked" onClick={openBlocked} />
         </div>
 
-        {/* ── Language ─────────────────────────────────────────────── */}
-        <SectionTitle>Language</SectionTitle>
+        {/* ── Language ────────────────────────────── */}
+        <SectionTitle>{t('settings.language')}</SectionTitle>
         <div className="rounded-2xl ring-1 ring-gray-100 bg-white overflow-hidden mb-6 shadow-sm">
           <Row
             icon={<Globe size={18} />}
-            label="Language"
-            desc={LANGUAGES.find((l) => l.code === language)?.native ?? 'English'}
+            label={t('settings.language')}
+            desc={LANGUAGES.find((l) => l.code === lang)?.native ?? 'English'}
             onClick={() => setLangOpen(true)}
           />
         </div>
@@ -248,7 +227,7 @@ export default function SettingsPage() {
             className="w-full flex items-center gap-3 px-4 py-3.5 hover:bg-gray-50 transition-colors text-left"
           >
             <span className="text-gray-500"><LogOut size={18} /></span>
-            <span className="text-sm font-semibold text-gray-900">Log out</span>
+            <span className="text-sm font-semibold text-gray-900">{t('settings.logout')}</span>
           </button>
           <Divider />
           <button
@@ -257,7 +236,7 @@ export default function SettingsPage() {
           >
             <span className="text-red-500"><Trash2 size={18} /></span>
             <div>
-              <p className="text-sm font-semibold text-red-600">Delete account</p>
+              <p className="text-sm font-semibold text-red-600">{t('settings.deleteAccount')}</p>
               <p className="text-xs text-gray-400">Permanently remove your account and data</p>
             </div>
           </button>
@@ -333,7 +312,7 @@ export default function SettingsPage() {
 
       {/* ── Language modal ─────────────────────────────────────────── */}
       {langOpen && (
-        <Modal onClose={() => setLangOpen(false)} title="Choose language">
+        <Modal onClose={() => setLangOpen(false)} title={t('settings.chooseLanguage')}>
           <div className="flex flex-col gap-1">
             {LANGUAGES.map((l) => (
               <button
@@ -345,7 +324,7 @@ export default function SettingsPage() {
                   <p className="text-sm font-semibold text-gray-900">{l.native}</p>
                   <p className="text-xs text-gray-400">{l.label}</p>
                 </div>
-                {language === l.code && <Check size={18} className="text-purple-600" />}
+                {lang === l.code && <Check size={18} className="text-purple-600" />}
               </button>
             ))}
           </div>

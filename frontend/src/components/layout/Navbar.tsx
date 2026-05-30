@@ -12,29 +12,31 @@ import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import Logo from '@/components/Logo';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/lib/i18n';
 import { MenuPanel } from './MenuPanel';
 
 // Primary destinations — every link points to a real page.
 const NAV = [
-  { href: '/feed',     icon: Home,        label: 'Home' },
-  { href: '/search',   icon: Compass,     label: 'Explore' },
-  { href: '/reels',    icon: Play,        label: 'Reels' },
-  { href: '/call/new', icon: Video,       label: 'Call' },
-  { href: '/upload',   icon: PlusSquare,  label: 'Create' },
-  { href: '/verify',   icon: ShieldCheck, label: 'Verify' },
+  { href: '/feed',     icon: Home,        tkey: 'nav.home' },
+  { href: '/search',   icon: Compass,     tkey: 'nav.explore' },
+  { href: '/reels',    icon: Play,        tkey: 'nav.reels' },
+  { href: '/call/new', icon: Video,       tkey: 'nav.call' },
+  { href: '/upload',   icon: PlusSquare,  tkey: 'nav.create' },
+  { href: '/verify',   icon: ShieldCheck, tkey: 'nav.verify' },
 ];
 
 // Items shown on the compact mobile bar (max 5 for thumb reach).
 const MOBILE_NAV = [
-  { href: '/feed',     icon: Home,        label: 'Home' },
-  { href: '/search',   icon: Compass,     label: 'Explore' },
-  { href: '/upload',   icon: PlusSquare,  label: 'Create' },
-  { href: '/reels',    icon: Play,        label: 'Reels' },
+  { href: '/feed',     icon: Home,        tkey: 'nav.home' },
+  { href: '/search',   icon: Compass,     tkey: 'nav.explore' },
+  { href: '/upload',   icon: PlusSquare,  tkey: 'nav.create' },
+  { href: '/reels',    icon: Play,        tkey: 'nav.reels' },
 ];
 
 export function Navbar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+  const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const isActive = (href: string) =>
@@ -55,8 +57,9 @@ export function Navbar() {
 
         {/* Primary nav */}
         <div className="flex flex-col gap-1">
-          {NAV.map(({ href, icon: Icon, label }) => {
+          {NAV.map(({ href, icon: Icon, tkey }) => {
             const active = isActive(href);
+            const label = t(tkey);
             return (
               <Link
                 key={href}
@@ -89,7 +92,7 @@ export function Navbar() {
             <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white transition-colors">
               <MenuIcon size={20} strokeWidth={2} />
             </span>
-            Menu
+            {t('nav.menu')}
           </button>
         </div>
 
@@ -112,7 +115,7 @@ export function Navbar() {
                 <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/40">
                   <ShieldAlert size={20} strokeWidth={2} />
                 </span>
-                Moderation
+                {t('nav.moderation')}
               </Link>
             </>
           )}
@@ -130,7 +133,7 @@ export function Navbar() {
             <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white">
               <Settings size={20} />
             </span>
-            Settings
+            {t('nav.settings')}
           </Link>
 
           {/* Log out */}
@@ -141,7 +144,7 @@ export function Navbar() {
             <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white">
               <LogOut size={20} />
             </span>
-            Log out
+            {t('nav.logout')}
           </button>
 
           {/* Profile card */}
@@ -173,8 +176,9 @@ export function Navbar() {
 
       {/* ── Mobile bottom bar ────────────────────────────────────────────── */}
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 z-40 flex items-stretch pb-[env(safe-area-inset-bottom)]">
-        {MOBILE_NAV.map(({ href, icon: Icon, label }) => {
+        {MOBILE_NAV.map(({ href, icon: Icon, tkey }) => {
           const active = isActive(href);
+          const label = t(tkey);
           return (
             <Link
               key={href}
@@ -209,7 +213,7 @@ export function Navbar() {
             >
               <Avatar src={user.avatarUrl} alt={user.username} size="xs" />
             </div>
-            Profile
+            {t('nav.profile')}
           </Link>
         )}
 
@@ -221,7 +225,7 @@ export function Navbar() {
           <div className="p-1.5 rounded-xl">
             <MenuIcon size={22} strokeWidth={2} />
           </div>
-          Menu
+          {t('nav.menu')}
         </button>
       </nav>
 
