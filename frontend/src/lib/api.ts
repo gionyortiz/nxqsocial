@@ -17,8 +17,15 @@ api.interceptors.response.use(
   (res) => res,
   (err) => {
     if (err.response?.status === 401 && typeof window !== 'undefined') {
+      // Stale/expired token: clear saved session so background polls stop failing.
       localStorage.removeItem('access_token');
-      window.location.href = '/login';
+      localStorage.removeItem('nxqsocial-auth');
+      const path = window.location.pathname;
+      // Only bounce to login from protected pages, and never loop on public pages.
+      const publicPaths = ['/login', '/register', '/', '/terms', '/privacy', '/community-guidelines'];
+      if (!publicPaths.includes(path)) {
+        window.location.href = '/login';
+      }
     }
     return Promise.reject(err);
   },
