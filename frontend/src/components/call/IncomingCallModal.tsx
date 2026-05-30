@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useRouter, usePathname } from 'next/navigation';
-import { Phone, Video, PhoneOff } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import { Phone, Video, PhoneOff, Volume2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { useCallStore } from '@/store/call';
 import { Avatar } from '@/components/ui/Avatar';
-import { callHref } from '@/lib/calls';
 
 interface Invite {
   room: string;
@@ -20,26 +20,35 @@ const POLL_MS = 3000;
 
 export function IncomingCallModal() {
   const { user } = useAuthStore();
-  const router = useRouter();
   const pathname = usePathname();
+  const startCall = useCallStore((s) => s.start);
+  const activeRoom = useCallStore((s) => s.room);
   const [invite, setInvite] = useState<Invite | null>(null);
+  const [soundBlocked, setSoundBlocked] = useState(false);
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ringTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  const ensureCtx = (): AudioContext | null => {
+    try {
+      let ctx = audioCtxRef.current;
+      if (!ctx) {
+        const Ctor =
+          window.AudioContext ||
+          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+        ctx = new Ctor();
+        audioCtxRef.current = ctx;
+      }
+      return ctx;
+    } catch {
+      return null;
+    }
+  };
 
   // Unlock audio on the first user interaction (browsers block sound until then).
   useEffect(() => {
     const unlock = () => {
-      try {
-        let ctx = audioCtxRef.current;
-        if (!ctx) {
-          const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-          ctx = new Ctor();
-          audioCtxRef.current = ctx;
-        }
-        if (ctx.state === 'suspended') void ctx.resume();
-      } catch {
-        /* ignore */
-      }
+      const ctx = ensureCtx();
+      if (ctx?.state === 'suspended') void ctx.resume();
     };
     window.addEventListener('pointerdown', unlock);
     window.addEventListener('keydown', unlock);
@@ -56,39 +65,45 @@ export function IncomingCallModal() {
     if (!invite) return;
 
     const playRing = () => {
-      try {
-        let ctx = audioCtxRef.current;
-        if (!ctx) {
-          const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-          ctx = new Ctor();
-          audioCtxRef.current = ctx;
+      const ctx = ensureCtx();
+      if (!ctx) return;
+      if (ctx.state === 'suspended') {
+        // Couldn't auto-start audio — offer a tap-to-enable button.
+        void ctx.resume();
+        if (ctx.state === 'suspended') {
+          setSoundBlocked(true);
+          try { navigator.vibrate?.([500, 250, 500]); } catch { /* ignore */ }
+          return;
         }
-        if (ctx.state === 'suspended') void ctx.resume();
-
-        // Classic two-tone phone ring (two short beeps).
+      }
+      setSoundBlocked(false);
+      try {
+        // Classic warbling phone ring: a ~1s burst of two alternating tones.
         const now = ctx.currentTime;
-        [0, 0.4].forEach((offset) => {
-          const osc = ctx!.createOscillator();
-          const gain = ctx!.createGain();
-          osc.type = 'sine';
-          osc.frequency.value = 480 + offset * 100;
-          gain.gain.setValueAtTime(0, now + offset);
-          gain.gain.linearRampToValueAtTime(0.25, now + offset + 0.02);
-          gain.gain.setValueAtTime(0.25, now + offset + 0.32);
-          gain.gain.linearRampToValueAtTime(0, now + offset + 0.36);
-          osc.connect(gain).connect(ctx!.destination);
-          osc.start(now + offset);
-          osc.stop(now + offset + 0.38);
-        });
+        const master = ctx.createGain();
+        master.gain.value = 0.0001;
+        master.connect(ctx.destination);
+        master.gain.setValueAtTime(0.0001, now);
+        master.gain.exponentialRampToValueAtTime(0.5, now + 0.05);
+        master.gain.setValueAtTime(0.5, now + 0.95);
+        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.0);
+
+        const osc = ctx.createOscillator();
+        osc.type = 'sine';
+        const warbleHz = [440, 480, 440, 480, 440, 480, 440, 480];
+        warbleHz.forEach((f, i) => osc.frequency.setValueAtTime(f, now + i * 0.12));
+        osc.connect(master);
+        osc.start(now);
+        osc.stop(now + 1.05);
       } catch {
         /* audio not available */
       }
-      // Vibrate on phones.
-      try { navigator.vibrate?.([400, 200, 400]); } catch { /* ignore */ }
+      try { navigator.vibrate?.([500, 250, 500]); } catch { /* ignore */ }
     };
 
     playRing();
-    ringTimerRef.current = setInterval(playRing, 2500);
+    // North-American cadence: ring ~1s, silence ~2s.
+    ringTimerRef.current = setInterval(playRing, 3000);
 
     return () => {
       if (ringTimerRef.current) clearInterval(ringTimerRef.current);
@@ -98,8 +113,8 @@ export function IncomingCallModal() {
   }, [invite]);
 
   useEffect(() => {
-    // Don't poll when logged out or already inside a call.
-    if (!user || pathname?.startsWith('/call/')) {
+    // Don't poll when logged out, on a call page, or already inside a call.
+    if (!user || pathname?.startsWith('/call/') || activeRoom) {
       setInvite(null);
       return;
     }
@@ -123,14 +138,19 @@ export function IncomingCallModal() {
       active = false;
       clearInterval(id);
     };
-  }, [user, pathname]);
+  }, [user, pathname, activeRoom]);
+
+  const enableSound = () => {
+    const ctx = ensureCtx();
+    if (ctx?.state === 'suspended') void ctx.resume();
+    setSoundBlocked(false);
+  };
 
   const accept = () => {
     if (!invite) return;
-    const room = invite.room;
-    const video = invite.video;
+    const { room, video } = invite;
     setInvite(null);
-    router.push(callHref(room, video));
+    startCall(room, video);
   };
 
   const decline = async () => {
@@ -145,45 +165,51 @@ export function IncomingCallModal() {
   if (!invite) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end sm:items-center justify-center bg-black/40 backdrop-blur-sm p-4">
-      <div className="w-full max-w-sm rounded-3xl bg-white shadow-2xl p-6 text-center animate-in fade-in slide-in-from-bottom-4">
-        <div className="flex justify-center mb-4">
-          <div className="relative">
+    <div className="fixed z-[120] bottom-4 right-4 left-4 sm:left-auto sm:w-80 pointer-events-none">
+      <div className="pointer-events-auto rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 p-4 animate-in fade-in slide-in-from-bottom-4">
+        <div className="flex items-center gap-3">
+          <div className="relative shrink-0">
             <span className="absolute inset-0 rounded-full bg-purple-400/40 animate-ping" />
             <Avatar
               src={invite.caller.avatarUrl ?? undefined}
               alt={invite.caller.displayName}
-              size="xl"
+              size="lg"
             />
           </div>
+          <div className="min-w-0 flex-1">
+            <h2 className="text-sm font-bold text-gray-900 truncate">
+              {invite.caller.displayName}
+            </h2>
+            <p className="text-xs text-gray-500 truncate">@{invite.caller.username}</p>
+            <p className="text-xs font-medium text-purple-600 mt-0.5 flex items-center gap-1">
+              {invite.video ? <Video size={13} /> : <Phone size={13} />}
+              Incoming {invite.group ? 'group ' : ''}
+              {invite.video ? 'video' : 'voice'} call…
+            </p>
+          </div>
         </div>
-        <h2 className="text-lg font-bold text-gray-900">{invite.caller.displayName}</h2>
-        <p className="text-sm text-gray-500 mb-1">@{invite.caller.username}</p>
-        <p className="text-sm font-medium text-purple-600 mb-6 flex items-center justify-center gap-1.5">
-          {invite.video ? <Video size={15} /> : <Phone size={15} />}
-          Incoming {invite.group ? 'group ' : ''}
-          {invite.video ? 'video call' : 'voice call'}…
-        </p>
-        <div className="flex items-center justify-center gap-6">
+
+        {soundBlocked && (
+          <button
+            onClick={enableSound}
+            className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100"
+          >
+            <Volume2 size={14} /> Tap to enable sound
+          </button>
+        )}
+
+        <div className="mt-3 grid grid-cols-2 gap-2">
           <button
             onClick={decline}
-            className="flex flex-col items-center gap-1.5"
-            title="Decline"
+            className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold"
           >
-            <span className="w-14 h-14 rounded-full bg-red-500 hover:bg-red-600 text-white flex items-center justify-center shadow-lg transition-colors">
-              <PhoneOff size={22} />
-            </span>
-            <span className="text-xs text-gray-500">Decline</span>
+            <PhoneOff size={16} /> Decline
           </button>
           <button
             onClick={accept}
-            className="flex flex-col items-center gap-1.5"
-            title="Accept"
+            className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold"
           >
-            <span className="w-14 h-14 rounded-full bg-green-500 hover:bg-green-600 text-white flex items-center justify-center shadow-lg transition-colors">
-              {invite.video ? <Video size={22} /> : <Phone size={22} />}
-            </span>
-            <span className="text-xs text-gray-500">Accept</span>
+            {invite.video ? <Video size={16} /> : <Phone size={16} />} Accept
           </button>
         </div>
       </div>

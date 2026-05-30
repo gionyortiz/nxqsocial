@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Geist } from "next/font/google";
 import "./globals.css";
 import { IncomingCallModal } from "@/components/call/IncomingCallModal";
+import { FloatingCall } from "@/components/call/FloatingCall";
 import { I18nProvider } from "@/lib/i18n";
 
 const geist = Geist({ subsets: ["latin"], variable: "--font-geist" });
@@ -18,6 +19,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <I18nProvider>
           {children}
           <IncomingCallModal />
+          <FloatingCall />
         </I18nProvider>
       </body>
     </html>

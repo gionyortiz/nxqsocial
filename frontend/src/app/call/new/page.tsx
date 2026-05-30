@@ -7,7 +7,8 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-import { startCall, callHref } from '@/lib/calls';
+import { useCallStore } from '@/store/call';
+import { startCall } from '@/lib/calls';
 
 interface UserLite {
   id: string;
@@ -19,6 +20,7 @@ interface UserLite {
 export default function NewCallPage() {
   const router = useRouter();
   const { user: me } = useAuthStore();
+  const beginCall = useCallStore((s) => s.start);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<UserLite[]>([]);
   const [selected, setSelected] = useState<UserLite[]>([]);
@@ -56,7 +58,8 @@ export default function NewCallPage() {
       video,
       group,
     });
-    router.push(callHref(room, video));
+    beginCall(room, video);
+    router.push('/feed');
   };
 
   return (
