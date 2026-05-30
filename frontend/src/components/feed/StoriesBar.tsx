@@ -1,8 +1,8 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
-import { Plus } from 'lucide-react';
+import { Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
@@ -22,6 +22,9 @@ interface StoryUser {
 export function StoriesBar() {
   const { user } = useAuthStore();
   const [people, setPeople] = useState<StoryUser[]>([]);
+  const scrollRef = useRef<HTMLDivElement | null>(null);
+  const [canLeft, setCanLeft] = useState(false);
+  const [canRight, setCanRight] = useState(false);
 
   useEffect(() => {
     api
@@ -33,9 +36,67 @@ export function StoriesBar() {
       .catch(() => {});
   }, [user?.username]);
 
+  // Track whether the row can scroll further in each direction.
+  const updateArrows = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    setCanLeft(el.scrollLeft > 4);
+    setCanRight(el.scrollLeft + el.clientWidth < el.scrollWidth - 4);
+  };
+
+  useEffect(() => {
+    updateArrows();
+    const el = scrollRef.current;
+    if (!el) return;
+    el.addEventListener('scroll', updateArrows, { passive: true });
+    window.addEventListener('resize', updateArrows);
+    return () => {
+      el.removeEventListener('scroll', updateArrows);
+      window.removeEventListener('resize', updateArrows);
+    };
+  }, [people]);
+
+  const slide = (dir: 1 | -1) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    el.scrollBy({ left: dir * el.clientWidth * 0.8, behavior: 'smooth' });
+  };
+
+  // Let a vertical mouse wheel scroll the row horizontally.
+  const onWheel = (e: React.WheelEvent<HTMLDivElement>) => {
+    const el = scrollRef.current;
+    if (!el) return;
+    if (Math.abs(e.deltaY) > Math.abs(e.deltaX)) {
+      el.scrollLeft += e.deltaY;
+    }
+  };
+
   return (
-    <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide">
+    <div className="relative bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+      {/* Left arrow */}
+      {canLeft && (
+        <button
+          type="button"
+          onClick={() => slide(-1)}
+          aria-label="Scroll left"
+          className="hidden sm:flex absolute left-1 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white shadow-md border border-gray-200 items-center justify-center text-gray-600 hover:bg-gray-50"
+        >
+          <ChevronLeft size={18} />
+        </button>
+      )}
+      {/* Right arrow */}
+      {canRight && (
+        <button
+          type="button"
+          onClick={() => slide(1)}
+          aria-label="Scroll right"
+          className="hidden sm:flex absolute right-1 top-1/2 -translate-y-1/2 z-10 w-8 h-8 rounded-full bg-white shadow-md border border-gray-200 items-center justify-center text-gray-600 hover:bg-gray-50"
+        >
+          <ChevronRight size={18} />
+        </button>
+      )}
+
+      <div ref={scrollRef} onWheel={onWheel} className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth">
         {/* Your story */}
         <Link href="/upload" className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16">
           <div className="relative">
