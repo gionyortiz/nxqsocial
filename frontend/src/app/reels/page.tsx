@@ -50,15 +50,16 @@ function ReelItem({ reel, active }: { reel: Reel; active: boolean }) {
   };
 
   return (
-    <div className="relative w-full h-full bg-black flex items-center justify-center snap-start">
+    <div className="relative w-full h-[100dvh] bg-black flex items-center justify-center snap-start snap-always shrink-0">
       {src && (
         <video
           ref={videoRef}
           src={src}
-          className="h-full w-full object-cover"
+          className="h-full w-full object-contain sm:object-cover"
           loop
           muted={muted}
           playsInline
+          onClick={() => { const v = videoRef.current; if (!v) return; v.paused ? v.play().catch(() => {}) : v.pause(); }}
           poster={firstMedia?.thumbnailUrl ?? undefined}
         />
       )}
@@ -115,29 +116,37 @@ export default function ReelsPage() {
 
   useEffect(() => {
     const el = containerRef.current;
-    if (!el) return;
-    const onScroll = () => {
-      const idx = Math.round(el.scrollTop / el.clientHeight);
-      setActiveIndex(idx);
-    };
-    el.addEventListener('scroll', onScroll, { passive: true });
-    return () => el.removeEventListener('scroll', onScroll);
-  }, []);
+    if (!el || reels.length === 0) return;
+    const items = Array.from(el.querySelectorAll('[data-reel-index]'));
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (entry.isIntersecting && entry.intersectionRatio >= 0.6) {
+            const idx = Number((entry.target as HTMLElement).dataset.reelIndex);
+            setActiveIndex(idx);
+          }
+        }
+      },
+      { root: el, threshold: [0.6] },
+    );
+    items.forEach((item) => observer.observe(item));
+    return () => observer.disconnect();
+  }, [reels]);
 
   return (
     <AppShell>
       <div
         ref={containerRef}
-        className="h-screen overflow-y-scroll snap-y snap-mandatory"
-        style={{ scrollbarWidth: 'none' }}
+        className="fixed inset-0 md:left-64 z-30 bg-black h-[100dvh] overflow-y-scroll snap-y snap-mandatory overscroll-y-contain"
+        style={{ scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}
       >
         {reels.length === 0 && (
-          <div className="h-screen flex items-center justify-center bg-black text-white">
+          <div className="h-[100dvh] flex items-center justify-center bg-black text-white">
             <p className="text-gray-400">No reels yet. Upload a video!</p>
           </div>
         )}
         {reels.map((reel, i) => (
-          <div key={reel.id} className="h-screen w-full">
+          <div key={reel.id} data-reel-index={i} className="h-[100dvh] w-full">
             <ReelItem reel={reel} active={i === activeIndex} />
           </div>
         ))}
