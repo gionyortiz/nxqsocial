@@ -5,11 +5,12 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   X, Home, Compass, Play, ShieldCheck, Settings, LogOut,
-  ShieldAlert, Image as ImageIcon, Film,
+  ShieldAlert, Image as ImageIcon, Film, Phone,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import { useAuthStore } from '@/store/auth';
+import { callsVisible } from '@/lib/calls';
 
 interface Props {
   onClose: () => void;
@@ -114,6 +115,25 @@ export function MenuPanel({ onClose }: Props) {
                   </div>
                 </button>
               ))}
+
+              {/* Call — Beta feature, gated by flag/role */}
+              {callsVisible(user?.role) && (
+                <button
+                  onClick={() => go('/call/new')}
+                  className="group flex items-start gap-3 p-3 rounded-2xl bg-white ring-1 ring-gray-100 hover:ring-purple-200 hover:shadow-md transition-all text-left"
+                >
+                  <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-purple-100 to-fuchsia-100 text-purple-600 group-hover:from-purple-600 group-hover:to-fuchsia-600 group-hover:text-white transition-colors shrink-0">
+                    <Phone size={20} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-bold text-gray-900">Call</p>
+                      <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
+                    </div>
+                    <p className="text-xs text-gray-400 leading-snug">Start a voice or video call</p>
+                  </div>
+                </button>
+              )}
             </div>
 
             {/* Admin */}

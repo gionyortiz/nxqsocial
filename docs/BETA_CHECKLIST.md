@@ -72,6 +72,25 @@ item as you verify it on the live site (`nxqsocial.com` / `api.nxqsocial.com`).
 
 ---
 
+## Calls (Beta)
+
+> Calls are gated by `NEXT_PUBLIC_CALLS_ENABLED` (default off → visible to ADMIN
+> only). Flip the flag to `true` to roll out to all beta users. The Call entry
+> carries a **Beta** badge in the nav and menu.
+
+- [ ] Call entry shows for ADMIN (and for everyone when the flag is on)
+- [ ] 1:1 voice call connects both ways
+- [ ] 1:1 video call connects both ways
+- [ ] Group video call (3+ participants) connects
+- [ ] Incoming call rings (audio + vibrate) and can be accepted / declined
+- [ ] Works in a mobile browser (iOS Safari + Android Chrome)
+- [ ] Works across Wi-Fi ↔ mobile data
+- [ ] International call test (e.g. NJ ↔ Dominican Republic)
+- [ ] Camera / microphone permission prompts behave correctly
+- [ ] Disconnect / reconnect recovers gracefully
+
+---
+
 ## Verification & moderation (admin)
 
 - [ ] Submit a verification request
@@ -97,7 +116,7 @@ item as you verify it on the live site (`nxqsocial.com` / `api.nxqsocial.com`).
 - [ ] Mobile layout looks correct (bottom nav, profile, upload)
 - [ ] Language picker switches the UI language
 - [ ] Stories / people row scrolls (arrows on desktop, swipe on mobile)
-- [ ] Incoming call rings (audio + vibrate) — note: Call entry hidden in beta nav
+- [ ] Incoming call rings (audio + vibrate) — Call is a Beta feature (see Calls section)
 - [ ] No broken images or 404s on the main pages
 - [ ] About / Privacy / Terms / Help pages load and look professional
 
