@@ -7,6 +7,7 @@ import {
   UseGuards,
   Req,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { MediaService } from './media.service';
 import { CreateUploadUrlDto, CompleteUploadDto } from './media.dto';
@@ -18,6 +19,8 @@ export class MediaController {
 
   /** Step 1: request a presigned S3 PUT URL */
   @Post('create-upload-url')
+  @UseGuards(ThrottlerGuard)
+  @Throttle({ default: { limit: 30, ttl: 3600000 } })
   createUploadUrl(@Req() req: any, @Body() dto: CreateUploadUrlDto) {
     return this.media.createUploadUrl(req.user.id, dto.mimeType, dto.size);
   }

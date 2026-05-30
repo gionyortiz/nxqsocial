@@ -2,10 +2,12 @@ import {
   Controller, Get, Post, Patch, Body, Param, UseGuards,
   Headers, Req,
 } from '@nestjs/common';
+import { Throttle, ThrottlerGuard } from '@nestjs/throttler';
 import type { RawBodyRequest } from '@nestjs/common';
 import { Request } from 'express';
 import { VerificationService } from './verification.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { AdminGuard } from '../auth/admin.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { IsString, IsIn } from 'class-validator';
 
@@ -42,26 +44,28 @@ export class VerificationController {
     return this.verificationService.getStatus(user.id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 10, ttl: 3600000 } })
   @Post('request')
   requestVerification(@CurrentUser() user: any, @Body() dto: RequestVerificationDto) {
     return this.verificationService.requestVerification(user.id, dto.tier);
   }
 
   /** Start a Stripe Identity session for ID_VERIFIED tier */
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, ThrottlerGuard)
+  @Throttle({ default: { limit: 5, ttl: 3600000 } })
   @Post('start-identity-check')
   startIdentityCheck(@CurrentUser() user: any) {
     return this.verificationService.startStripeIdentityCheck(user.id);
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @Get('admin/pending')
   getPending() {
     return this.verificationService.getPendingVerifications();
   }
 
-  @UseGuards(JwtAuthGuard)
+  @UseGuards(JwtAuthGuard, AdminGuard)
   @Patch('admin/:id/review')
   reviewVerification(@Param('id') id: string, @Body() dto: ReviewVerificationDto) {
     const approved = dto.approved === 'true' || dto.approved === '1';

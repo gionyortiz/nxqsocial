@@ -4,7 +4,7 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
-  Home, Compass, Play, Video, PlusSquare, ShieldCheck,
+  Home, Compass, Play, PlusSquare, ShieldCheck,
   Settings, LogOut, ShieldAlert, Menu as MenuIcon,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
@@ -16,11 +16,12 @@ import { useI18n } from '@/lib/i18n';
 import { MenuPanel } from './MenuPanel';
 
 // Primary destinations — every link points to a real page.
+// NOTE: the Call entry is intentionally hidden during beta until the
+// calling feature is fully implemented and tested.
 const NAV = [
   { href: '/feed',     icon: Home,        tkey: 'nav.home' },
   { href: '/search',   icon: Compass,     tkey: 'nav.explore' },
   { href: '/reels',    icon: Play,        tkey: 'nav.reels' },
-  { href: '/call/new', icon: Video,       tkey: 'nav.call' },
   { href: '/upload',   icon: PlusSquare,  tkey: 'nav.create' },
   { href: '/verify',   icon: ShieldCheck, tkey: 'nav.verify' },
 ];

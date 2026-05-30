@@ -4,7 +4,7 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
-  X, Home, Compass, Play, Video, ShieldCheck, Settings, LogOut,
+  X, Home, Compass, Play, ShieldCheck, Settings, LogOut,
   ShieldAlert, Image as ImageIcon, Film,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
@@ -19,7 +19,6 @@ const SHORTCUTS = [
   { href: '/feed',     icon: Home,        label: 'Home',     desc: 'Your main feed of posts and reels' },
   { href: '/search',   icon: Compass,     label: 'Explore',  desc: 'Discover people and content' },
   { href: '/reels',    icon: Play,        label: 'Reels',    desc: 'Full-screen short videos' },
-  { href: '/call/new', icon: Video,       label: 'Call',     desc: 'Start a voice or video call' },
   { href: '/verify',   icon: ShieldCheck, label: 'Verify',   desc: 'Get the trusted badge on your profile' },
 ];
 
