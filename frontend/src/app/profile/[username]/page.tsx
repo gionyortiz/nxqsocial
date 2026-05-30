@@ -5,10 +5,9 @@ import Image from 'next/image';
 import {
   Grid, Film, MapPin, Globe, Calendar, ShieldCheck,
   Trash2, Heart, MessageCircle, Share2, UserPlus, Settings, User,
-  Video, Phone, Ban,
+  Ban,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
-import { startCall, callHref } from '@/lib/calls';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
 import { Button } from '@/components/ui/Button';
@@ -16,7 +15,7 @@ import { TrustBadge } from '@/components/ui/TrustBadge';
 import { ProfileEditModal } from '@/components/profile/ProfileEditModal';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
-import { formatCount } from '@/lib/utils';
+import { formatCount, resolveMediaUrl } from '@/lib/utils';
 
 interface MediaAsset { id: string; url: string; mimeType: string; }
 interface Profile {
@@ -42,7 +41,7 @@ interface Post {
   _count: { likes: number; comments: number };
 }
 
-function mediaSrc(url: string) { return url; }
+function mediaSrc(url: string) { return resolveMediaUrl(url); }
 
 function formatJoinDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
@@ -86,11 +85,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       })
       .catch(() => setError('Profile not found'));
   }, [username]);
-
-  const startVideoCall = async (video: boolean) => {
-    const room = await startCall({ targets: [username], video });
-    router.push(callHref(room, video));
-  };
 
   const toggleFollow = async () => {
     const nextFollowing = !following;
@@ -234,20 +228,6 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                       <span className="flex items-center gap-1.5"><UserPlus size={14} /> Follow</span>
                     )}
                   </Button>
-                  <button
-                    onClick={() => startVideoCall(true)}
-                    className="p-2 rounded-full border-2 border-gray-200 text-purple-600 hover:bg-purple-50 hover:border-purple-200 transition-all"
-                    title={`Video call ${profile.displayName}`}
-                  >
-                    <Video size={16} />
-                  </button>
-                  <button
-                    onClick={() => startVideoCall(false)}
-                    className="p-2 rounded-full border-2 border-gray-200 text-green-600 hover:bg-green-50 hover:border-green-200 transition-all"
-                    title={`Voice call ${profile.displayName}`}
-                  >
-                    <Phone size={16} />
-                  </button>
                   <button
                     onClick={() => setConfirmBlock(true)}
                     className="p-2 rounded-full border-2 border-gray-200 text-gray-500 hover:bg-red-50 hover:text-red-600 hover:border-red-200 transition-all"

@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import Image from 'next/image';
 import { X, Camera, Trash2, Globe, MapPin, User, FileText, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
+import { resolveMediaUrl } from '@/lib/utils';
 
 interface ProfileSnapshot {
   displayName: string;
@@ -102,8 +103,8 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
       // Profile text fields
       const { data: prof } = await api.put('/users/me/profile', {
         displayName: displayName.trim() || undefined,
-        bio: bio.trim() || undefined,
-        location: location.trim() || undefined,
+        bio: bio.trim(),
+        location: location.trim(),
         website: website.trim() || undefined,
       });
       updates.displayName = prof.displayName;
@@ -120,8 +121,8 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
     }
   };
 
-  const currentAvatar = avatarPreview ?? (!doRemoveAvatar ? profile.avatarUrl : null);
-  const currentBanner = bannerPreview ?? (!doRemoveBanner ? profile.bannerUrl : null);
+  const currentAvatar = avatarPreview ?? (!doRemoveAvatar ? resolveMediaUrl(profile.avatarUrl) || null : null);
+  const currentBanner = bannerPreview ?? (!doRemoveBanner ? resolveMediaUrl(profile.bannerUrl) || null : null);
   const hasAvatar = !!(currentAvatar);
   const hasBanner = !!(profile.bannerUrl || bannerFile) && !doRemoveBanner;
 
