@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { usePathname } from 'next/navigation';
-import { Phone, Video, PhoneOff, Volume2 } from 'lucide-react';
+import { Phone, Video, PhoneOff, Bell } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useCallStore } from '@/store/call';
@@ -17,6 +17,8 @@ interface Invite {
 }
 
 const POLL_MS = 3000;
+const RINGTONE_SRC = '/sounds/incoming-call.wav';
+const VIBRATE_PATTERN = [300, 150, 300, 150, 300];
 
 export function IncomingCallModal() {
   const { user } = useAuthStore();
@@ -25,34 +27,63 @@ export function IncomingCallModal() {
   const activeRoom = useCallStore((s) => s.room);
   const [invite, setInvite] = useState<Invite | null>(null);
   const [soundBlocked, setSoundBlocked] = useState(false);
-  const audioCtxRef = useRef<AudioContext | null>(null);
-  const ringTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const vibrateTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  const ensureCtx = (): AudioContext | null => {
-    try {
-      let ctx = audioCtxRef.current;
-      if (!ctx) {
-        const Ctor =
-          window.AudioContext ||
-          (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
-        ctx = new Ctor();
-        audioCtxRef.current = ctx;
-      }
-      return ctx;
-    } catch {
-      return null;
+  // Lazily create the shared <audio> element (looping ringtone).
+  const ensureAudio = (): HTMLAudioElement | null => {
+    if (typeof window === 'undefined') return null;
+    let el = audioRef.current;
+    if (!el) {
+      el = new Audio(RINGTONE_SRC);
+      el.loop = true;
+      el.preload = 'auto';
+      el.volume = 0.7;
+      audioRef.current = el;
     }
+    return el;
   };
 
-  // Unlock audio on the first user interaction (browsers block sound until then).
+  const stopRing = () => {
+    const el = audioRef.current;
+    if (el) {
+      try {
+        el.pause();
+        el.currentTime = 0;
+      } catch {
+        /* ignore */
+      }
+    }
+    if (vibrateTimerRef.current) {
+      clearInterval(vibrateTimerRef.current);
+      vibrateTimerRef.current = null;
+    }
+    try { navigator.vibrate?.(0); } catch { /* ignore */ }
+  };
+
+  // Silently unlock/prime the ringtone on the first user interaction after login
+  // (browsers block autoplay until the user has interacted with the page).
   useEffect(() => {
     const unlock = () => {
-      const ctx = ensureCtx();
-      if (ctx?.state === 'suspended') void ctx.resume();
+      const el = ensureAudio();
+      if (!el) return;
+      // Prime quietly: play muted, then immediately pause + reset. Makes no noise
+      // but marks the element as "user-activated" so later play() succeeds.
+      const wasMuted = el.muted;
+      el.muted = true;
+      el.play()
+        .then(() => {
+          el.pause();
+          el.currentTime = 0;
+          el.muted = wasMuted;
+        })
+        .catch(() => {
+          el.muted = wasMuted;
+        });
     };
-    window.addEventListener('pointerdown', unlock);
-    window.addEventListener('keydown', unlock);
-    window.addEventListener('touchstart', unlock);
+    window.addEventListener('pointerdown', unlock, { once: true });
+    window.addEventListener('keydown', unlock, { once: true });
+    window.addEventListener('touchstart', unlock, { once: true });
     return () => {
       window.removeEventListener('pointerdown', unlock);
       window.removeEventListener('keydown', unlock);
@@ -60,55 +91,31 @@ export function IncomingCallModal() {
     };
   }, []);
 
-  // Play a ringing sound + vibrate while there is an incoming call.
+  // Loop the ringtone + vibrate while there is an incoming call.
   useEffect(() => {
     if (!invite) return;
 
-    const playRing = () => {
-      const ctx = ensureCtx();
-      if (!ctx) return;
-      if (ctx.state === 'suspended') {
-        // Couldn't auto-start audio — offer a tap-to-enable button.
-        void ctx.resume();
-        if (ctx.state === 'suspended') {
+    const el = ensureAudio();
+    if (el) {
+      el.currentTime = 0;
+      el.muted = false;
+      el.play()
+        .then(() => setSoundBlocked(false))
+        .catch(() => {
+          // Autoplay blocked — surface a "Tap to enable ringtone" button.
           setSoundBlocked(true);
-          try { navigator.vibrate?.([500, 250, 500]); } catch { /* ignore */ }
-          return;
-        }
-      }
-      setSoundBlocked(false);
-      try {
-        // Classic warbling phone ring: a ~1s burst of two alternating tones.
-        const now = ctx.currentTime;
-        const master = ctx.createGain();
-        master.gain.value = 0.0001;
-        master.connect(ctx.destination);
-        master.gain.setValueAtTime(0.0001, now);
-        master.gain.exponentialRampToValueAtTime(0.5, now + 0.05);
-        master.gain.setValueAtTime(0.5, now + 0.95);
-        master.gain.exponentialRampToValueAtTime(0.0001, now + 1.0);
+        });
+    }
 
-        const osc = ctx.createOscillator();
-        osc.type = 'sine';
-        const warbleHz = [440, 480, 440, 480, 440, 480, 440, 480];
-        warbleHz.forEach((f, i) => osc.frequency.setValueAtTime(f, now + i * 0.12));
-        osc.connect(master);
-        osc.start(now);
-        osc.stop(now + 1.05);
-      } catch {
-        /* audio not available */
-      }
-      try { navigator.vibrate?.([500, 250, 500]); } catch { /* ignore */ }
+    // Vibrate on supported devices (repeat while ringing).
+    const vibrate = () => {
+      try { navigator.vibrate?.(VIBRATE_PATTERN); } catch { /* ignore */ }
     };
-
-    playRing();
-    // North-American cadence: ring ~1s, silence ~2s.
-    ringTimerRef.current = setInterval(playRing, 3000);
+    vibrate();
+    vibrateTimerRef.current = setInterval(vibrate, 2000);
 
     return () => {
-      if (ringTimerRef.current) clearInterval(ringTimerRef.current);
-      ringTimerRef.current = null;
-      try { navigator.vibrate?.(0); } catch { /* ignore */ }
+      stopRing();
     };
   }, [invite]);
 
@@ -141,19 +148,25 @@ export function IncomingCallModal() {
   }, [user, pathname, activeRoom]);
 
   const enableSound = () => {
-    const ctx = ensureCtx();
-    if (ctx?.state === 'suspended') void ctx.resume();
-    setSoundBlocked(false);
+    const el = ensureAudio();
+    if (!el) return;
+    el.muted = false;
+    el.currentTime = 0;
+    el.play()
+      .then(() => setSoundBlocked(false))
+      .catch(() => setSoundBlocked(true));
   };
 
   const accept = () => {
     if (!invite) return;
+    stopRing();
     const { room, video } = invite;
     setInvite(null);
     startCall(room, video);
   };
 
   const decline = async () => {
+    stopRing();
     setInvite(null);
     try {
       await api.post('/calls/decline');
@@ -166,7 +179,10 @@ export function IncomingCallModal() {
 
   return (
     <div className="fixed z-[120] bottom-4 right-4 left-4 sm:left-auto sm:w-80 pointer-events-none">
-      <div className="pointer-events-auto rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 p-4 animate-in fade-in slide-in-from-bottom-4">
+      <div
+        onClick={() => { if (soundBlocked) enableSound(); }}
+        className="pointer-events-auto rounded-2xl bg-white shadow-2xl ring-1 ring-black/5 p-4 animate-in fade-in slide-in-from-bottom-4"
+      >
         <div className="flex items-center gap-3">
           <div className="relative shrink-0">
             <span className="absolute inset-0 rounded-full bg-purple-400/40 animate-ping" />
@@ -194,7 +210,7 @@ export function IncomingCallModal() {
             onClick={enableSound}
             className="mt-3 w-full flex items-center justify-center gap-1.5 py-1.5 rounded-lg bg-amber-50 text-amber-700 text-xs font-medium hover:bg-amber-100"
           >
-            <Volume2 size={14} /> Tap to enable sound
+            <Bell size={14} /> Enable ringtone
           </button>
         )}
 
