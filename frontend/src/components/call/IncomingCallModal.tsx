@@ -26,6 +26,31 @@ export function IncomingCallModal() {
   const audioCtxRef = useRef<AudioContext | null>(null);
   const ringTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // Unlock audio on the first user interaction (browsers block sound until then).
+  useEffect(() => {
+    const unlock = () => {
+      try {
+        let ctx = audioCtxRef.current;
+        if (!ctx) {
+          const Ctor = window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext;
+          ctx = new Ctor();
+          audioCtxRef.current = ctx;
+        }
+        if (ctx.state === 'suspended') void ctx.resume();
+      } catch {
+        /* ignore */
+      }
+    };
+    window.addEventListener('pointerdown', unlock);
+    window.addEventListener('keydown', unlock);
+    window.addEventListener('touchstart', unlock);
+    return () => {
+      window.removeEventListener('pointerdown', unlock);
+      window.removeEventListener('keydown', unlock);
+      window.removeEventListener('touchstart', unlock);
+    };
+  }, []);
+
   // Play a ringing sound + vibrate while there is an incoming call.
   useEffect(() => {
     if (!invite) return;
