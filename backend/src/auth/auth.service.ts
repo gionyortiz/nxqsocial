@@ -18,6 +18,10 @@ function flattenUser(user: any) {
   return { ...base, ...(profile ?? {}) };
 }
 
+// A real bcrypt hash (of a random string) used only for timing-safe dummy
+// comparisons when a login email does not exist.
+const DUMMY_PASSWORD_HASH = '$2a$12$C6UzMDM.H6dfI/f/IKcEeO6e9aQ2gqQ0iY8s9d1bq8eF1bQ7Z3pJK';
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -59,7 +63,13 @@ export class AuthService {
       where: { email: dto.email },
       select: { ...SAFE_USER_SELECT, passwordHash: true },
     });
-    if (!user) throw new UnauthorizedException('Invalid credentials');
+
+    // Timing-safe: always run a bcrypt comparison even when the user does not
+    // exist, so response time does not reveal whether an email is registered.
+    if (!user) {
+      await bcrypt.compare(dto.password, DUMMY_PASSWORD_HASH);
+      throw new UnauthorizedException('Invalid credentials');
+    }
 
     const valid = await bcrypt.compare(dto.password, user.passwordHash);
     if (!valid) throw new UnauthorizedException('Invalid credentials');

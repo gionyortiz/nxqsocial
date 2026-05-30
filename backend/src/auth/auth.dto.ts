@@ -1,4 +1,20 @@
-import { IsEmail, IsOptional, IsString, MinLength, MaxLength } from 'class-validator';
+import { IsEmail, IsOptional, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+
+// Shared strong-password rules for new and changed passwords.
+const STRONG_PASSWORD = (target: string) => [
+  MinLength(12, { message: `${target} must be at least 12 characters long.` }),
+  Matches(/[A-Z]/, { message: `${target} must contain an uppercase letter.` }),
+  Matches(/[a-z]/, { message: `${target} must contain a lowercase letter.` }),
+  Matches(/[0-9]/, { message: `${target} must contain a number.` }),
+  Matches(/[^A-Za-z0-9]/, { message: `${target} must contain a special character.` }),
+];
+
+function StrongPassword(target = 'Password') {
+  const decorators = STRONG_PASSWORD(target);
+  return function (object: object, propertyName: string) {
+    decorators.forEach((d) => d(object, propertyName));
+  };
+}
 
 export class RegisterDto {
   @IsEmail()
@@ -15,7 +31,7 @@ export class RegisterDto {
   displayName: string;
 
   @IsString()
-  @MinLength(8)
+  @StrongPassword()
   password: string;
 
   /** Required when BETA_INVITE_CODE env var is set */
@@ -42,7 +58,7 @@ export class ResetPasswordDto {
   token: string;
 
   @IsString()
-  @MinLength(8)
+  @StrongPassword()
   password: string;
 }
 
@@ -51,6 +67,6 @@ export class ChangePasswordDto {
   currentPassword: string;
 
   @IsString()
-  @MinLength(8)
+  @StrongPassword('New password')
   newPassword: string;
 }

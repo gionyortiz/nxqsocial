@@ -105,7 +105,10 @@ export default function SettingsPage() {
 
   const handleChangePassword = async () => {
     setPwError('');
-    if (newPassword.length < 8) { setPwError('New password must be at least 8 characters.'); return; }
+    if (newPassword.length < 12) { setPwError('New password must be at least 12 characters.'); return; }
+    if (!/[A-Z]/.test(newPassword) || !/[a-z]/.test(newPassword) || !/[0-9]/.test(newPassword) || !/[^A-Za-z0-9]/.test(newPassword)) {
+      setPwError('Include an uppercase letter, a lowercase letter, a number, and a special character.'); return;
+    }
     if (newPassword !== confirmPassword) { setPwError('New passwords do not match.'); return; }
     setPwSaving(true);
     try {

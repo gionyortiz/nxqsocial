@@ -16,7 +16,12 @@ const schema = z.object({
   email: z.string().email('Invalid email'),
   username: z.string().min(3, 'Min 3 chars').max(30, 'Max 30 chars').regex(/^[a-z0-9_.]+$/, 'Lowercase letters, numbers, _ and . only'),
   displayName: z.string().min(2, 'Min 2 chars').max(50, 'Max 50 chars'),
-  password: z.string().min(8, 'Min 8 characters'),
+  password: z.string()
+    .min(12, 'At least 12 characters')
+    .regex(/[A-Z]/, 'Add an uppercase letter')
+    .regex(/[a-z]/, 'Add a lowercase letter')
+    .regex(/[0-9]/, 'Add a number')
+    .regex(/[^A-Za-z0-9]/, 'Add a special character'),
   inviteCode: z.string().optional(),
 });
 type FormData = z.infer<typeof schema>;
@@ -61,7 +66,7 @@ export default function RegisterPage() {
             <Input label="Display Name" placeholder="Your Name" error={errors.displayName?.message} {...register('displayName')} />
             <Input label="Username" placeholder="username" error={errors.username?.message} {...register('username')} />
             <Input label="Email" type="email" placeholder="you@example.com" error={errors.email?.message} {...register('email')} />
-            <Input label="Password" type="password" placeholder="Min 8 characters" error={errors.password?.message} {...register('password')} />
+            <Input label="Password" type="password" placeholder="Min 12 chars, mixed case, number & symbol" error={errors.password?.message} {...register('password')} />
 
             {IS_BETA && (
               <Input label="Invite Code" placeholder="Enter your invite code" error={errors.inviteCode?.message} {...register('inviteCode')} />

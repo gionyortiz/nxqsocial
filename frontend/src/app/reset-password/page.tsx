@@ -13,7 +13,12 @@ import { Input } from '@/components/ui/Input';
 import Logo from '@/components/Logo';
 
 const schema = z.object({
-  password: z.string().min(8, 'At least 8 characters'),
+  password: z.string()
+    .min(12, 'At least 12 characters')
+    .regex(/[A-Z]/, 'Add an uppercase letter')
+    .regex(/[a-z]/, 'Add a lowercase letter')
+    .regex(/[0-9]/, 'Add a number')
+    .regex(/[^A-Za-z0-9]/, 'Add a special character'),
   confirm: z.string(),
 }).refine((d) => d.password === d.confirm, {
   message: 'Passwords do not match',
