@@ -3,6 +3,7 @@
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { AppShell } from '@/components/layout/AppShell';
 import { PostCard } from '@/components/posts/PostCard';
+import { ImmersiveVideoViewer } from '@/components/posts/ImmersiveVideoViewer';
 import { StoriesBar } from '@/components/feed/StoriesBar';
 import { RightSidebar } from '@/components/feed/RightSidebar';
 import { api } from '@/lib/api';
@@ -34,7 +35,17 @@ export default function FeedPage() {
   const [cursor, setCursor] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
+  const [viewerIndex, setViewerIndex] = useState<number | null>(null);
   const loader = useRef<HTMLDivElement | null>(null);
+
+  const isVideoPost = (p: Post) =>
+    (p.media?.[0]?.mimeType?.startsWith('video/') ?? false) || p.type === 'VIDEO' || p.type === 'SHORT_VIDEO';
+  const videoPosts = posts.filter(isVideoPost);
+
+  const openVideo = (postId: string) => {
+    const idx = videoPosts.findIndex((p) => p.id === postId);
+    if (idx >= 0) setViewerIndex(idx);
+  };
 
   const fetchPosts = useCallback(async (c?: string | null, feedMode = mode) => {
     if (loading || (!hasMore && c !== undefined)) return;
@@ -100,6 +111,7 @@ export default function FeedPage() {
           <PostCard
             key={post.id}
             post={post}
+            onOpenVideo={openVideo}
             onDelete={(id) => setPosts((prev) => prev.filter((p) => p.id !== id))}
           />
         ))}
@@ -110,6 +122,14 @@ export default function FeedPage() {
           )}
         </div>
       </div>
+
+      {viewerIndex !== null && (
+        <ImmersiveVideoViewer
+          posts={videoPosts}
+          startIndex={viewerIndex}
+          onClose={() => setViewerIndex(null)}
+        />
+      )}
     </AppShell>
   );
 }

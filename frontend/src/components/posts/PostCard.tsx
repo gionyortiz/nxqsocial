@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Trash2 } from 'lucide-react';
+import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Trash2, Play } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import { formatCount, timeAgo, cn } from '@/lib/utils';
@@ -40,6 +40,7 @@ interface PostCardProps {
   post: Post;
   onCommentClick?: (postId: string) => void;
   onDelete?: (postId: string) => void;
+  onOpenVideo?: (postId: string) => void;
 }
 
 const AI_LABEL_TEXT: Record<string, string> = {
@@ -48,7 +49,7 @@ const AI_LABEL_TEXT: Record<string, string> = {
   SOURCE_UNKNOWN: '❓ Source unverified',
 };
 
-export function PostCard({ post, onCommentClick, onDelete }: PostCardProps) {
+export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCardProps) {
   const [liked, setLiked] = useState(post.isLiked);
   const [likeCount, setLikeCount] = useState(post._count.likes);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -147,13 +148,36 @@ export function PostCard({ post, onCommentClick, onDelete }: PostCardProps) {
       {mediaSrc && (
         <div className="bg-black aspect-square relative">
           {isVideo ? (
-            <video
-              src={mediaSrc}
-              className="w-full h-full object-contain"
-              controls
-              preload="metadata"
-              poster={firstMedia?.thumbnailUrl ?? undefined}
-            />
+            onOpenVideo ? (
+              <button
+                type="button"
+                onClick={() => onOpenVideo(post.id)}
+                className="group w-full h-full relative"
+                aria-label="Play video"
+              >
+                <video
+                  src={mediaSrc}
+                  className="w-full h-full object-contain pointer-events-none"
+                  muted
+                  playsInline
+                  preload="metadata"
+                  poster={firstMedia?.thumbnailUrl ?? undefined}
+                />
+                <span className="absolute inset-0 flex items-center justify-center">
+                  <span className="w-16 h-16 rounded-full bg-black/50 group-hover:bg-black/60 flex items-center justify-center transition-colors">
+                    <Play size={28} className="text-white translate-x-0.5" fill="white" />
+                  </span>
+                </span>
+              </button>
+            ) : (
+              <video
+                src={mediaSrc}
+                className="w-full h-full object-contain"
+                controls
+                preload="metadata"
+                poster={firstMedia?.thumbnailUrl ?? undefined}
+              />
+            )
           ) : (
             <Image
               src={mediaSrc}
