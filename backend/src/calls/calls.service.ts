@@ -43,7 +43,7 @@ export class CallsService {
   async createToken(
     userId: string,
     room: string,
-    opts: { video?: boolean } = {},
+    opts: { video?: boolean; host?: boolean } = {},
   ): Promise<{ token: string; url: string; room: string; identity: string }> {
     if (!this.apiKey || !this.apiSecret) {
       throw new BadRequestException(
@@ -69,12 +69,14 @@ export class CallsService {
       ttl: '2h',
     });
 
+    // Watch-only viewers (host === false) may subscribe but not publish.
+    const canPublish = opts.host !== false;
     at.addGrant({
       roomJoin: true,
       room,
-      canPublish: true,
+      canPublish,
       canSubscribe: true,
-      canPublishData: true,
+      canPublishData: canPublish,
     });
 
     return {

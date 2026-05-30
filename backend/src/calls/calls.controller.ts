@@ -18,7 +18,10 @@ export class CallsController {
   /** Mint a LiveKit access token to join a room. */
   @Post('token')
   token(@CurrentUser() user: any, @Body() dto: CreateTokenDto) {
-    return this.calls.createToken(user.id, dto.room, { video: dto.video });
+    return this.calls.createToken(user.id, dto.room, {
+      video: dto.video,
+      host: dto.host,
+    });
   }
 
   /** Ring one or more users (creates pending invites they poll for). */

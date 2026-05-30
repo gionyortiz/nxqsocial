@@ -7,6 +7,11 @@ export class CreateTokenDto {
   @IsOptional()
   @IsBoolean()
   video?: boolean;
+
+  // For live broadcasts: false = watch-only viewer (cannot publish).
+  @IsOptional()
+  @IsBoolean()
+  host?: boolean;
 }
 
 export class RingDto {

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Compass, Play, PlusSquare, ShieldCheck,
-  Settings, LogOut, ShieldAlert, Menu as MenuIcon, Phone,
+  Settings, LogOut, ShieldAlert, Menu as MenuIcon, Phone, Radio,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
@@ -14,6 +14,7 @@ import Logo from '@/components/Logo';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/lib/i18n';
 import { callsVisible } from '@/lib/calls';
+import { liveVisible } from '@/lib/live';
 import { MenuPanel } from './MenuPanel';
 
 // Primary destinations — every link points to a real page.
@@ -107,6 +108,30 @@ export function Navbar() {
               </span>
               <span className="flex-1">Call</span>
               <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
+            </Link>
+          )}
+
+          {/* Live — Beta feature, gated by flag/role */}
+          {liveVisible(user?.role) && (
+            <Link
+              href="/live/new"
+              className={cn(
+                'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
+                isActive('/live')
+                  ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-200'
+                  : 'text-gray-600 hover:bg-rose-50 hover:text-rose-700',
+              )}
+            >
+              <span
+                className={cn(
+                  'flex items-center justify-center w-9 h-9 rounded-xl transition-colors',
+                  isActive('/live') ? 'bg-white/20' : 'bg-gray-50 group-hover:bg-white',
+                )}
+              >
+                <Radio size={20} strokeWidth={isActive('/live') ? 2.6 : 2} />
+              </span>
+              <span className="flex-1">Live</span>
+              <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
             </Link>
           )}
 

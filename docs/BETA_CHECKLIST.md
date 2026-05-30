@@ -91,6 +91,25 @@ item as you verify it on the live site (`nxqsocial.com` / `api.nxqsocial.com`).
 
 ---
 
+## Live (Beta)
+
+> Live streaming is **one broadcaster → many viewers** and is gated separately
+> from calls by `NEXT_PUBLIC_LIVE_ENABLED` (default off → visible to ADMIN only).
+> Flip the flag to `true` to roll out to all beta users. The Live entry carries a
+> **Beta** badge in the nav and menu. Do **not** mix Live with 1:1/group calls.
+
+- [ ] Live entry shows for ADMIN (and for everyone when the flag is on)
+- [ ] Host can start a broadcast (camera + mic publish)
+- [ ] Viewer can join watch-only via the shared link
+- [ ] Viewer count updates as people join / leave
+- [ ] "Live chat coming soon" placeholder shows for viewers
+- [ ] Works in a mobile browser (iOS Safari + Android Chrome)
+- [ ] Camera / microphone permission prompts behave correctly
+- [ ] Host can end the stream; viewers are returned cleanly
+- [ ] Disconnect / reconnect recovers gracefully
+
+---
+
 ## Verification & moderation (admin)
 
 - [ ] Submit a verification request

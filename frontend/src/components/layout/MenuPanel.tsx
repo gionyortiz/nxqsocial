@@ -5,12 +5,13 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import {
   X, Home, Compass, Play, ShieldCheck, Settings, LogOut,
-  ShieldAlert, Image as ImageIcon, Film, Phone,
+  ShieldAlert, Image as ImageIcon, Film, Phone, Radio,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import { useAuthStore } from '@/store/auth';
 import { callsVisible } from '@/lib/calls';
+import { liveVisible } from '@/lib/live';
 
 interface Props {
   onClose: () => void;
@@ -131,6 +132,25 @@ export function MenuPanel({ onClose }: Props) {
                       <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
                     </div>
                     <p className="text-xs text-gray-400 leading-snug">Start a voice or video call</p>
+                  </div>
+                </button>
+              )}
+
+              {/* Live — Beta feature, gated by flag/role */}
+              {liveVisible(user?.role) && (
+                <button
+                  onClick={() => go('/live/new')}
+                  className="group flex items-start gap-3 p-3 rounded-2xl bg-white ring-1 ring-gray-100 hover:ring-rose-200 hover:shadow-md transition-all text-left"
+                >
+                  <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-rose-100 to-red-100 text-rose-600 group-hover:from-rose-600 group-hover:to-red-600 group-hover:text-white transition-colors shrink-0">
+                    <Radio size={20} />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-1.5">
+                      <p className="text-sm font-bold text-gray-900">Live</p>
+                      <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
+                    </div>
+                    <p className="text-xs text-gray-400 leading-snug">Broadcast live to your followers</p>
                   </div>
                 </button>
               )}
