@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
-import { Upload, ImageIcon, Film, X, CheckCircle, Clock, Shield, AlertCircle } from 'lucide-react';
+import { Upload, ImageIcon, Film, X, CheckCircle, Clock, Shield, AlertCircle, Globe, Users, Lock, Lightbulb } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
@@ -27,6 +27,26 @@ const ALLOWED_MIME = [
 const MAX_IMAGE = 10 * 1024 * 1024;   // 10 MB
 const MAX_VIDEO = 200 * 1024 * 1024;  // 200 MB
 
+type Audience = 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+const AUDIENCES: { value: Audience; label: string; desc: string; icon: typeof Globe }[] = [
+  { value: 'PUBLIC', label: 'Public', desc: 'Anyone on NXQ', icon: Globe },
+  { value: 'FOLLOWERS', label: 'Followers', desc: 'Only your followers', icon: Users },
+  { value: 'PRIVATE', label: 'Only me', desc: 'Visible to you only', icon: Lock },
+];
+
+function formatBytes(bytes: number) {
+  if (bytes >= 1024 * 1024) return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
+  if (bytes >= 1024) return `${Math.round(bytes / 1024)} KB`;
+  return `${bytes} B`;
+}
+
+const POSTING_TIPS = [
+  'Write a clear caption — posts with context get more engagement.',
+  'Verified creators earn more trust and reach.',
+  'Family-safe content is prioritized in discovery.',
+  'High-quality images and videos perform best.',
+];
+
 export default function UploadPage() {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -34,6 +54,7 @@ export default function UploadPage() {
   const [file, setFile] = useState<File | null>(null);
   const [preview, setPreview] = useState<string | null>(null);
   const [caption, setCaption] = useState('');
+  const [audience, setAudience] = useState<Audience>('PUBLIC');
   const [phase, setPhase] = useState<Phase>('idle');
   const [progress, setProgress] = useState(0);
   const [mediaId, setMediaId] = useState<string | null>(null);
@@ -121,6 +142,7 @@ export default function UploadPage() {
         mediaId,
         caption: caption || undefined,
         type: isVideo ? 'VIDEO' : 'PHOTO',
+        visibility: audience,
       });
       setPhase('done');
       setTimeout(() => router.push('/feed'), 1500);
@@ -130,10 +152,19 @@ export default function UploadPage() {
     }
   };
 
+  const selectedAudience = AUDIENCES.find((a) => a.value === audience)!;
+
   return (
     <AppShell>
-      <div className="max-w-xl mx-auto px-4 py-8">
-        <h2 className="text-lg font-bold mb-6">New Post</h2>
+      <div className="max-w-5xl mx-auto px-4 py-6 sm:py-8">
+        <div className="mb-6">
+          <h1 className="text-2xl font-black text-gray-900">Create new post</h1>
+          <p className="text-sm text-gray-500 mt-0.5">Share a photo or video with your community.</p>
+        </div>
+
+        <div className="grid lg:grid-cols-[1fr_300px] gap-6 items-start">
+          {/* ── Main composer column ── */}
+          <div className="rounded-3xl ring-1 ring-gray-100 bg-white shadow-[0_8px_40px_-16px_rgba(124,58,237,0.2)] p-5 sm:p-6">
 
         {/* ── IDLE: file picker ── */}
         {phase === 'idle' && (
@@ -144,10 +175,12 @@ export default function UploadPage() {
               onDragOver={(e) => e.preventDefault()}
               className="border-2 border-dashed border-gray-200 rounded-2xl flex flex-col items-center justify-center gap-4 py-20 cursor-pointer hover:border-purple-400 hover:bg-purple-50/50 transition-all"
             >
-              <Upload size={40} className="text-gray-300" />
+              <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-100 to-pink-100 flex items-center justify-center">
+                <Upload size={28} className="text-purple-500" />
+              </div>
               <div className="text-center">
-                <p className="font-semibold text-gray-700">Drop photo or video here</p>
-                <p className="text-sm text-gray-400 mt-1">or click to browse</p>
+                <p className="font-semibold text-gray-700">Drag photo or video here</p>
+                <p className="text-sm text-purple-600 font-medium mt-1">or browse files</p>
                 <p className="text-xs text-gray-300 mt-3">
                   JPEG · PNG · WebP · GIF up to 10 MB<br />
                   MP4 · WebM · MOV up to 200 MB
@@ -195,6 +228,15 @@ export default function UploadPage() {
                 {isVideo ? 'Video' : 'Photo'}
               </div>
             </div>
+
+            {/* File metadata */}
+            {file && (
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-gray-500">
+                <span className="font-medium text-gray-700 truncate max-w-[55%]">{file.name}</span>
+                <span>{formatBytes(file.size)}</span>
+                <span className="uppercase">{file.type.split('/')[1]}</span>
+              </div>
+            )}
 
             {/* Progress bar (uploading / scanning) */}
             {(phase === 'uploading' || phase === 'scanning') && (
@@ -264,6 +306,37 @@ export default function UploadPage() {
               </div>
             )}
 
+            {/* Audience selector */}
+            {(phase === 'preview' || phase === 'ready' || phase === 'posting') && (
+              <div>
+                <p className="text-xs font-semibold text-gray-500 uppercase tracking-wider mb-2">Audience</p>
+                <div className="grid grid-cols-3 gap-2">
+                  {AUDIENCES.map((a) => {
+                    const Icon = a.icon;
+                    const active = audience === a.value;
+                    return (
+                      <button
+                        key={a.value}
+                        type="button"
+                        disabled={phase !== 'preview' && phase !== 'ready'}
+                        onClick={() => setAudience(a.value)}
+                        className={cn(
+                          'flex flex-col items-center gap-1 rounded-xl border-2 px-2 py-2.5 text-center transition-all disabled:opacity-60',
+                          active
+                            ? 'border-purple-500 bg-purple-50'
+                            : 'border-gray-200 hover:border-gray-300',
+                        )}
+                      >
+                        <Icon size={16} className={active ? 'text-purple-600' : 'text-gray-400'} />
+                        <span className={cn('text-xs font-semibold', active ? 'text-purple-700' : 'text-gray-600')}>{a.label}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-[11px] text-gray-400 mt-1.5">{selectedAudience.desc}</p>
+              </div>
+            )}
+
             {/* CTA buttons */}
             {phase === 'preview' && (
               <Button onClick={startUpload} size="lg" className="w-full">
@@ -287,6 +360,47 @@ export default function UploadPage() {
             )}
           </div>
         )}
+          </div>
+
+          {/* ── Sidebar: trust & safety + tips ── */}
+          <div className="space-y-4 lg:sticky lg:top-6">
+            {/* Trust & Safety */}
+            <div className="rounded-2xl ring-1 ring-gray-100 bg-white p-4">
+              <div className="flex items-center gap-2 mb-2">
+                <Shield size={15} className="text-purple-500" />
+                <h3 className="text-sm font-bold text-gray-900">Trust &amp; Safety</h3>
+              </div>
+              {phase === 'scanning' && (
+                <p className="flex items-center gap-1.5 text-xs text-amber-600"><Clock size={13} /> Scanning your media…</p>
+              )}
+              {phase === 'ready' && (
+                <p className="flex items-center gap-1.5 text-xs text-emerald-600"><CheckCircle size={13} /> Approved — ready to share</p>
+              )}
+              {phase === 'rejected' && (
+                <p className="flex items-center gap-1.5 text-xs text-red-600"><AlertCircle size={13} /> Flagged — cannot be posted</p>
+              )}
+              {phase !== 'scanning' && phase !== 'ready' && phase !== 'rejected' && (
+                <p className="text-xs text-gray-500 leading-relaxed">Every upload is automatically scanned for safety before it goes live. This keeps NXQ Social trusted and bot-free.</p>
+              )}
+            </div>
+
+            {/* Posting tips */}
+            <div className="rounded-2xl ring-1 ring-purple-100 bg-gradient-to-br from-purple-50/60 to-white p-4">
+              <div className="flex items-center gap-2 mb-2.5">
+                <Lightbulb size={15} className="text-purple-500" />
+                <h3 className="text-sm font-bold text-gray-900">Posting tips</h3>
+              </div>
+              <ul className="space-y-2">
+                {POSTING_TIPS.map((tip) => (
+                  <li key={tip} className="flex items-start gap-2 text-xs text-gray-600 leading-relaxed">
+                    <span className="mt-1 w-1.5 h-1.5 rounded-full bg-purple-400 flex-shrink-0" />
+                    {tip}
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </AppShell>
   );
