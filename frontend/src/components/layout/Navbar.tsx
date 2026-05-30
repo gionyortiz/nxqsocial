@@ -2,25 +2,40 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Play, PlusSquare, User, Search, LogOut, ShieldCheck, ShieldAlert, Video, Settings } from 'lucide-react';
+import {
+  Home, Compass, Play, Video, PlusSquare, ShieldCheck,
+  Settings, LogOut, ShieldAlert,
+} from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import Logo from '@/components/Logo';
 import { cn } from '@/lib/utils';
 
+// Primary destinations — every link points to a real page.
 const NAV = [
-  { href: '/feed',   icon: Home,        label: 'Home' },
-  { href: '/search', icon: Search,      label: 'Search' },
-  { href: '/reels',  icon: Play,        label: 'Reels' },
-  { href: '/call/new', icon: Video,     label: 'Call' },
-  { href: '/upload', icon: PlusSquare,  label: 'Upload' },
-  { href: '/verify', icon: ShieldCheck, label: 'Verify' },
+  { href: '/feed',     icon: Home,        label: 'Home' },
+  { href: '/search',   icon: Compass,     label: 'Explore' },
+  { href: '/reels',    icon: Play,        label: 'Reels' },
+  { href: '/call/new', icon: Video,       label: 'Call' },
+  { href: '/upload',   icon: PlusSquare,  label: 'Create' },
+  { href: '/verify',   icon: ShieldCheck, label: 'Verify' },
+];
+
+// Items shown on the compact mobile bar (max 5 for thumb reach).
+const MOBILE_NAV = [
+  { href: '/feed',     icon: Home,        label: 'Home' },
+  { href: '/search',   icon: Compass,     label: 'Explore' },
+  { href: '/upload',   icon: PlusSquare,  label: 'Create' },
+  { href: '/reels',    icon: Play,        label: 'Reels' },
 ];
 
 export function Navbar() {
   const pathname = usePathname();
   const { user, logout } = useAuthStore();
+
+  const isActive = (href: string) =>
+    href === '/feed' ? pathname === '/feed' : pathname === href || pathname.startsWith(href + '/');
 
   return (
     <>
@@ -35,25 +50,34 @@ export function Navbar() {
           </span>
         </Link>
 
-        {/* Nav items */}
-        {NAV.map(({ href, icon: Icon, label }) => {
-          const active = pathname === href;
-          return (
-            <Link
-              key={href}
-              href={href}
-              className={cn(
-                'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all',
-                active
-                  ? 'bg-purple-600 text-white shadow-sm shadow-purple-200'
-                  : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900',
-              )}
-            >
-              <Icon size={20} strokeWidth={active ? 2.5 : 2} />
-              {label}
-            </Link>
-          );
-        })}
+        {/* Primary nav */}
+        <div className="flex flex-col gap-1">
+          {NAV.map(({ href, icon: Icon, label }) => {
+            const active = isActive(href);
+            return (
+              <Link
+                key={href}
+                href={href}
+                className={cn(
+                  'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
+                  active
+                    ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200'
+                    : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
+                )}
+              >
+                <span
+                  className={cn(
+                    'flex items-center justify-center w-9 h-9 rounded-xl transition-colors',
+                    active ? 'bg-white/20' : 'bg-gray-50 group-hover:bg-white',
+                  )}
+                >
+                  <Icon size={20} strokeWidth={active ? 2.6 : 2} />
+                </span>
+                {label}
+              </Link>
+            );
+          })}
+        </div>
 
         {/* Bottom section */}
         <div className="mt-auto flex flex-col gap-1">
@@ -71,11 +95,40 @@ export function Navbar() {
                     : 'text-amber-700 bg-amber-50 hover:bg-amber-100',
                 )}
               >
-                <ShieldAlert size={20} strokeWidth={2} />
+                <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/40">
+                  <ShieldAlert size={20} strokeWidth={2} />
+                </span>
                 Moderation
               </Link>
             </>
           )}
+
+          {/* Settings */}
+          <Link
+            href="/settings"
+            className={cn(
+              'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
+              pathname === '/settings'
+                ? 'bg-purple-50 text-purple-700 ring-1 ring-purple-100'
+                : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
+            )}
+          >
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white">
+              <Settings size={20} />
+            </span>
+            Settings
+          </Link>
+
+          {/* Log out */}
+          <button
+            onClick={logout}
+            className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
+          >
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white">
+              <LogOut size={20} />
+            </span>
+            Log out
+          </button>
 
           {/* Profile card */}
           {user && (
@@ -84,9 +137,9 @@ export function Navbar() {
               <Link
                 href={`/profile/${user.username}`}
                 className={cn(
-                  'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all',
+                  'flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all',
                   pathname.startsWith('/profile')
-                    ? 'bg-purple-50 ring-1 ring-purple-100'
+                    ? 'bg-gradient-to-r from-purple-50 to-fuchsia-50 ring-1 ring-purple-100'
                     : 'hover:bg-gray-50',
                 )}
               >
@@ -101,62 +154,46 @@ export function Navbar() {
               </Link>
             </>
           )}
-
-          {/* Log out */}
-          <Link
-            href="/settings"
-            className={cn(
-              'flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold transition-all',
-              pathname === '/settings'
-                ? 'bg-purple-50 text-purple-600 ring-1 ring-purple-100'
-                : 'text-gray-500 hover:bg-gray-50',
-            )}
-          >
-            <Settings size={20} />
-            Settings
-          </Link>
-
-          {/* Log out */}
-          <button
-            onClick={logout}
-            className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-semibold text-gray-400 hover:bg-red-50 hover:text-red-600 transition-all"
-          >
-            <LogOut size={20} />
-            Log out
-          </button>
         </div>
       </nav>
 
       {/* ── Mobile bottom bar ────────────────────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-sm border-t border-gray-100 z-40 flex">
-        {NAV.map(({ href, icon: Icon, label }) => {
-          const active = pathname === href;
+      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 z-40 flex items-stretch pb-[env(safe-area-inset-bottom)]">
+        {MOBILE_NAV.map(({ href, icon: Icon, label }) => {
+          const active = isActive(href);
           return (
             <Link
               key={href}
               href={href}
               className={cn(
-                'flex-1 flex flex-col items-center py-2.5 gap-0.5 text-xs font-semibold transition-colors',
+                'flex-1 flex flex-col items-center py-2 gap-0.5 text-[11px] font-semibold transition-colors',
                 active ? 'text-purple-600' : 'text-gray-400 hover:text-gray-600',
               )}
             >
-              <div className={cn('p-1 rounded-lg', active ? 'bg-purple-100' : '')}>
-                <Icon size={21} strokeWidth={active ? 2.5 : 2} />
+              <div className={cn('p-1.5 rounded-xl transition-colors', active ? 'bg-purple-100' : '')}>
+                <Icon size={22} strokeWidth={active ? 2.6 : 2} />
               </div>
               {label}
             </Link>
           );
         })}
+
+        {/* Profile avatar tab */}
         {user && (
           <Link
             href={`/profile/${user.username}`}
             className={cn(
-              'flex-1 flex flex-col items-center py-2.5 gap-0.5 text-xs font-semibold transition-colors',
+              'flex-1 flex flex-col items-center py-2 gap-0.5 text-[11px] font-semibold transition-colors',
               pathname.startsWith('/profile') ? 'text-purple-600' : 'text-gray-400',
             )}
           >
-            <div className={cn('p-1 rounded-lg', pathname.startsWith('/profile') ? 'bg-purple-100' : '')}>
-              <User size={21} strokeWidth={pathname.startsWith('/profile') ? 2.5 : 2} />
+            <div
+              className={cn(
+                'p-0.5 rounded-full transition-all',
+                pathname.startsWith('/profile') ? 'ring-2 ring-purple-500' : 'ring-2 ring-transparent',
+              )}
+            >
+              <Avatar src={user.avatarUrl} alt={user.username} size="xs" />
             </div>
             Profile
           </Link>
