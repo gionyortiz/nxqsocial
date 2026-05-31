@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
   Grid, Film, MapPin, Globe, Calendar, ShieldCheck,
   Trash2, Heart, MessageCircle, Share2, UserPlus, Settings, User,
-  Ban,
+  Ban, Phone,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
@@ -15,7 +15,9 @@ import { TrustBadge } from '@/components/ui/TrustBadge';
 import { ProfileEditModal } from '@/components/profile/ProfileEditModal';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { useCallStore } from '@/store/call';
 import { fetchUserLive } from '@/lib/live';
+import { callsVisible, startCall } from '@/lib/calls';
 import { formatCount, resolveMediaUrl } from '@/lib/utils';
 
 interface MediaAsset { id: string; url: string; mimeType: string; }
@@ -86,6 +88,7 @@ function computeCompleteness(p: Profile) {
 export default function ProfilePage({ params }: { params: Promise<{ username: string }> }) {
   const { username } = use(params);
   const { user: me, updateUser } = useAuthStore();
+  const beginCall = useCallStore((s) => s.start);
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -98,6 +101,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [editOpen, setEditOpen] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [startingCall, setStartingCall] = useState(false);
   const [liveRoom, setLiveRoom] = useState<string | null>(null);
 
   useEffect(() => {
@@ -169,6 +173,21 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     setProfile((prev) => prev ? { ...prev, ...updates } : prev);
     updateUser(updates as any);
   };
+
+  const startProfileCall = async () => {
+    if (startingCall || !profile) return;
+    setStartingCall(true);
+    try {
+      const room = await startCall({ targets: [profile.username], video: true, group: false });
+      beginCall(room, true);
+      router.push('/feed');
+    } catch {
+      // Best effort; if call setup fails we simply reset button state.
+    } finally {
+      setStartingCall(false);
+    }
+  };
+
   const isMe = me?.username === username;
   const filteredPosts = posts.filter((p) =>
     tab === 'reels'
@@ -278,6 +297,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </>
               ) : (
                 <>
+                  {callsVisible(me?.role) && (
+                    <button
+                      onClick={startProfileCall}
+                      disabled={startingCall}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-full border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-60"
+                      title={`Call ${profile.displayName}`}
+                    >
+                      <Phone size={14} /> {startingCall ? 'Calling…' : 'Call'}
+                    </button>
+                  )}
                   <Button
                     variant={following ? 'secondary' : 'primary'}
                     size="sm"
