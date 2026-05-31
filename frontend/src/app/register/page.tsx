@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
@@ -33,6 +33,7 @@ export default function RegisterPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
   const [serverError, setServerError] = useState('');
+  const [retryInSec, setRetryInSec] = useState(0);
 
   const { register, handleSubmit, formState: { errors, isSubmitting } } = useForm<FormData>({
     resolver: zodResolver(schema),
@@ -40,6 +41,7 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: FormData) => {
     setServerError('');
+    if (retryInSec > 0) return;
     void trackEvent('signup_started', { source: 'register_page' }, { isPublic: true });
     try {
       const { data: res } = await api.post('/auth/register', data);
@@ -48,12 +50,19 @@ export default function RegisterPage() {
       router.push('/feed');
     } catch (err: any) {
       if (err?.response?.status === 429) {
-        setServerError('Too many attempts. Please wait a minute and try again.');
+        setServerError('Too many signup attempts. Please wait a few minutes and try again.');
+        setRetryInSec(60);
         return;
       }
       setServerError(err.response?.data?.message ?? 'Registration failed');
     }
   };
+
+  useEffect(() => {
+    if (retryInSec <= 0) return;
+    const timer = setTimeout(() => setRetryInSec((s) => Math.max(0, s - 1)), 1000);
+    return () => clearTimeout(timer);
+  }, [retryInSec]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 px-4 py-12">
@@ -90,8 +99,8 @@ export default function RegisterPage() {
               <p className="text-sm text-red-500 bg-red-50 px-4 py-2 rounded-xl">{serverError}</p>
             )}
 
-            <Button type="submit" loading={isSubmitting} size="lg" className="w-full mt-2">
-              Create Account
+            <Button type="submit" loading={isSubmitting} size="lg" className="w-full mt-2" disabled={retryInSec > 0}>
+              {retryInSec > 0 ? `Try again in ${retryInSec}s` : 'Create Account'}
             </Button>
           </form>
 

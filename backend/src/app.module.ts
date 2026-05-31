@@ -25,6 +25,7 @@ import { CallsModule } from './calls/calls.module';
 import { LiveModule } from './live/live.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { getClientIpFromRequest } from './common/network/client-ip';
 
 @Module({
   imports: [
@@ -34,6 +35,8 @@ import { FeedbackModule } from './feedback/feedback.module';
     ThrottlerModule.forRoot({
       throttlers: [{ name: 'default', ttl: 60000, limit: 60 }],
       skipIf: () => process.env.NODE_ENV === 'test',
+      getTracker: (req) => getClientIpFromRequest(req),
+      errorMessage: 'Too many signup attempts. Please wait a few minutes and try again.',
     }),
     StorageModule,
     ServeStaticModule.forRoot({ rootPath: join(__dirname, '..', 'uploads'), serveRoot: '/uploads' }),
