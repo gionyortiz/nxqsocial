@@ -31,6 +31,7 @@ import {
 import { useAuthStore } from '@/store/auth';
 import { startLiveSession, endLiveSession, liveHeartbeat } from '@/lib/live';
 import { api } from '@/lib/api';
+import { trackEvent } from '@/lib/analytics';
 
 /** Quick reactions a viewer can tap. */
 const QUICK_EMOJIS = ['❤️', '😂', '😮', '👏', '🔥', '🎉'];
@@ -121,6 +122,9 @@ export function LiveExperience({
   const [reported, setReported] = useState(false);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
+  const liveStartedAtRef = useRef<number>(Date.now());
+  const peakViewersRef = useRef<number>(0);
+  const chatCountRef = useRef<number>(0);
 
   // Viewers = everyone except the broadcaster(s) (camera publishers).
   const publishers = new Set(cameraTracks.map((t) => t.participant?.identity));
@@ -219,11 +223,15 @@ export function LiveExperience({
   const viewersRef = useRef(viewers);
   useEffect(() => {
     viewersRef.current = viewers;
+    peakViewersRef.current = Math.max(peakViewersRef.current, viewers);
   }, [viewers]);
 
   useEffect(() => {
     if (!isOwner) return;
     let stopped = false;
+    liveStartedAtRef.current = Date.now();
+    peakViewersRef.current = viewers;
+    chatCountRef.current = 0;
     void startLiveSession(room);
     const beat = () => {
       if (stopped) return;
@@ -235,6 +243,16 @@ export function LiveExperience({
       stopped = true;
       clearInterval(id);
       void endLiveSession(room);
+      const durationSec = Math.max(0, Math.round((Date.now() - liveStartedAtRef.current) / 1000));
+      const payload = {
+        room,
+        durationSec,
+        peakViewers: peakViewersRef.current,
+        chatMessages: chatCountRef.current,
+      };
+      void trackEvent('live_duration', payload);
+      void trackEvent('peak_viewers', payload);
+      void trackEvent('chat_messages', payload);
     };
   }, [isOwner, room]);
 
@@ -262,6 +280,7 @@ export function LiveExperience({
       ts: Date.now(),
     };
     setMessages((prev) => [...prev, evt].slice(-MAX_CHAT));
+    chatCountRef.current += 1;
     broadcast({ kind: 'chat', ...evt }, true);
     setDraft('');
   };

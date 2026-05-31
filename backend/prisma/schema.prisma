@@ -47,6 +47,7 @@ model User {
   blocking        Block[]        @relation("blocker")
   blockedBy       Block[]        @relation("blocked")
   liveSessions    LiveSession[]  @relation("liveHost")
+  analyticsEvents AnalyticsEvent[]
 }
 
 model Block {
@@ -389,6 +390,21 @@ model LiveSession {
 
   @@index([status])
   @@index([hostId])
+}
+
+model AnalyticsEvent {
+  id         String   @id @default(cuid())
+  name       String
+  userId     String?
+  sessionId  String?
+  properties Json?
+  createdAt  DateTime @default(now())
+
+  user User? @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([name, createdAt])
+  @@index([userId, createdAt])
+  @@index([sessionId, createdAt])
 }
 
 enum LiveStatus {

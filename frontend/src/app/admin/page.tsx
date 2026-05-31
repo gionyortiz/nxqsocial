@@ -71,6 +71,22 @@ interface TrustHistoryData {
   verifications: Verification[];
 }
 
+interface AnalyticsDashboard {
+  kpis: {
+    dau: number;
+    mau: number;
+    newRegistrations: number;
+    postsCreated: number;
+    reelsCreated: number;
+    callsStarted: number;
+    callsCompleted: number;
+    liveSessionsStarted: number;
+    liveViewersJoined: number;
+    verificationRequests: number;
+    reportsSubmitted: number;
+  };
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const REASON_LABELS: Record<string, string> = {
@@ -273,6 +289,7 @@ export default function AdminPage() {
   const [userSearch, setUserSearch] = useState('');
   const [actionReason, setActionReason] = useState('');
   const [historyUserId, setHistoryUserId] = useState<string | null>(null);
+  const [dashboard, setDashboard] = useState<AnalyticsDashboard | null>(null);
 
   const isAdmin = user?.role === 'ADMIN' || user?.role === 'MODERATOR';
 
@@ -299,6 +316,15 @@ export default function AdminPage() {
   }, [showNotice]);
 
   useEffect(() => { if (isAdmin) load(tab); }, [tab, isAdmin, load]);
+
+  useEffect(() => {
+    if (!isAdmin) return;
+    api.get('/analytics/admin/dashboard?days=30').then(({ data }) => {
+      setDashboard(data);
+    }).catch(() => {
+      setDashboard(null);
+    });
+  }, [isAdmin]);
 
   async function resolveReport(id: string, action: 'ACTION_TAKEN' | 'DISMISSED') {
     try {
@@ -354,6 +380,22 @@ export default function AdminPage() {
       {notice && (
         <div className={`px-6 py-2 text-sm font-medium ${noticeType === 'error' ? 'bg-red-700' : 'bg-green-700'}`}>
           {notice}
+        </div>
+      )}
+
+      {dashboard?.kpis && (
+        <div className="px-6 pt-4 grid grid-cols-2 sm:grid-cols-3 xl:grid-cols-6 gap-3">
+          <KpiCard label="DAU" value={dashboard.kpis.dau} />
+          <KpiCard label="MAU" value={dashboard.kpis.mau} />
+          <KpiCard label="Registrations" value={dashboard.kpis.newRegistrations} />
+          <KpiCard label="Posts" value={dashboard.kpis.postsCreated} />
+          <KpiCard label="Reels" value={dashboard.kpis.reelsCreated} />
+          <KpiCard label="Calls Started" value={dashboard.kpis.callsStarted} />
+          <KpiCard label="Calls Completed" value={dashboard.kpis.callsCompleted} />
+          <KpiCard label="Live Started" value={dashboard.kpis.liveSessionsStarted} />
+          <KpiCard label="Live Joined" value={dashboard.kpis.liveViewersJoined} />
+          <KpiCard label="Verification Requests" value={dashboard.kpis.verificationRequests} />
+          <KpiCard label="Reports Submitted" value={dashboard.kpis.reportsSubmitted} />
         </div>
       )}
 
@@ -564,6 +606,15 @@ export default function AdminPage() {
       </div>
 
       {historyUserId && <TrustHistoryModal userId={historyUserId} onClose={() => setHistoryUserId(null)} />}
+    </div>
+  );
+}
+
+function KpiCard({ label, value }: { label: string; value: number }) {
+  return (
+    <div className="rounded-xl border border-gray-800 bg-gray-900 px-3 py-2.5">
+      <p className="text-[11px] text-gray-400 uppercase tracking-wide">{label}</p>
+      <p className="text-lg font-extrabold text-white leading-tight mt-1">{value}</p>
     </div>
   );
 }

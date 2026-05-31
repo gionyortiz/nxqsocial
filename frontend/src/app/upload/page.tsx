@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { runUploadPipeline, getMediaStatus } from '@/lib/media';
+import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 type Phase =
   | 'idle'        // no file chosen
@@ -144,6 +145,15 @@ export default function UploadPage() {
         type: isVideo ? 'VIDEO' : 'PHOTO',
         visibility: audience,
       });
+
+      if (isVideo) {
+        void trackEvent('reel_created', { visibility: audience });
+        void trackFirstEvent('first_reel_created', 'first_reel_created', { visibility: audience });
+      } else {
+        void trackEvent('post_created', { visibility: audience });
+        void trackFirstEvent('first_post_created', 'first_post_created', { visibility: audience });
+      }
+
       setPhase('done');
       setTimeout(() => router.push('/feed'), 1500);
     } catch (err: any) {

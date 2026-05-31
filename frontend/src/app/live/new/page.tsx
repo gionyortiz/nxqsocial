@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { Radio, Video, Mic, Users, MessageSquare, ArrowRight } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { newLiveId, liveHref } from '@/lib/live';
+import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 export default function NewLivePage() {
   const router = useRouter();
@@ -14,6 +15,11 @@ export default function NewLivePage() {
     if (starting) return;
     setStarting(true);
     const room = newLiveId();
+    void trackEvent('live_started', { room, source: 'live_new_page' });
+    void trackFirstEvent('first_live_started', 'first_live_started', {
+      room,
+      source: 'live_new_page',
+    });
     router.push(liveHref(room, true));
   };
 

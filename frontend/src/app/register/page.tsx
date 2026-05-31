@@ -11,6 +11,7 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import Logo from '@/components/Logo';
+import { trackEvent } from '@/lib/analytics';
 
 const schema = z.object({
   email: z.string().email('Invalid email'),
@@ -39,9 +40,11 @@ export default function RegisterPage() {
 
   const onSubmit = async (data: FormData) => {
     setServerError('');
+    void trackEvent('signup_started', { source: 'register_page' }, { isPublic: true });
     try {
       const { data: res } = await api.post('/auth/register', data);
       setAuth(res.user, res.access_token);
+      void trackEvent('signup_completed', { source: 'register_page' }, { isPublic: true });
       router.push('/feed');
     } catch (err: any) {
       setServerError(err.response?.data?.message ?? 'Registration failed');

@@ -5,6 +5,7 @@ import Image from 'next/image';
 import { X, Camera, Trash2, Globe, MapPin, User, FileText, Loader2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/utils';
+import { trackFirstEvent } from '@/lib/analytics';
 
 interface ProfileSnapshot {
   displayName: string;
@@ -111,6 +112,28 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
       updates.bio = prof.bio;
       updates.location = prof.location;
       updates.website = prof.website;
+
+      const finalAvatar = updates.avatarUrl !== undefined ? updates.avatarUrl : profile.avatarUrl;
+      const finalBanner = updates.bannerUrl !== undefined ? updates.bannerUrl : profile.bannerUrl;
+      const finalBio = updates.bio !== undefined ? updates.bio : profile.bio;
+      const finalWebsite = updates.website !== undefined ? updates.website : profile.website;
+
+      if (!profile.avatarUrl && !!finalAvatar) {
+        void trackFirstEvent('avatar_added', 'avatar_added');
+      }
+      if (!profile.bannerUrl && !!finalBanner) {
+        void trackFirstEvent('banner_added', 'banner_added');
+      }
+      if (!profile.bio?.trim() && !!finalBio?.trim()) {
+        void trackFirstEvent('bio_added', 'bio_added');
+      }
+      if (!profile.website?.trim() && !!finalWebsite?.trim()) {
+        void trackFirstEvent('website_added', 'website_added');
+      }
+
+      if (!!finalAvatar && !!finalBanner && !!finalBio?.trim() && !!finalWebsite?.trim()) {
+        void trackFirstEvent('profile_completed', 'profile_completed');
+      }
 
       onSaved(updates);
       onClose();

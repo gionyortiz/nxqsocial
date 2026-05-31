@@ -7,6 +7,7 @@ import '@livekit/components-styles';
 import { Radio } from 'lucide-react';
 import { api } from '@/lib/api';
 import { LiveExperience } from '@/components/live/LiveExperience';
+import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 export default function LiveRoomPage() {
   const params = useParams();
@@ -35,6 +36,12 @@ export default function LiveRoomPage() {
         if (!data.url) {
           setError('Live streaming is not configured yet. Add your LiveKit keys on the server.');
           return;
+        }
+        if (host) {
+          void trackEvent('live_started', { room, source: 'live_room_page' });
+        } else {
+          void trackEvent('live_joined', { room });
+          void trackFirstEvent('first_live_joined', 'first_live_joined', { room });
         }
         setToken(data.token);
         setServerUrl(data.url);

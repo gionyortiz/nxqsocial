@@ -9,6 +9,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useCallStore } from '@/store/call';
 import { startCall } from '@/lib/calls';
+import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 interface UserLite {
   id: string;
@@ -53,6 +54,12 @@ export default function NewCallPage() {
     if (selected.length === 0 || starting) return;
     setStarting(true);
     const group = selected.length > 1;
+    void trackEvent('call_started', { video, group, targetCount: selected.length });
+    void trackFirstEvent('first_call_started', 'first_call_started', {
+      video,
+      group,
+      targetCount: selected.length,
+    });
     const room = await startCall({
       targets: selected.map((s) => s.username),
       video,

@@ -12,6 +12,7 @@ import '@livekit/components-styles';
 import { Minimize2, Maximize2, Square, PhoneOff, GripHorizontal } from 'lucide-react';
 import { api } from '@/lib/api';
 import { useCallStore } from '@/store/call';
+import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 const RINGBACK_SRC = '/sounds/outgoing-ring.wav';
 
@@ -25,7 +26,15 @@ interface DragPos {
  * while they are alone (waiting for the other person to answer), and ends the
  * call automatically once the other party leaves the room.
  */
-function CallRoomInner({ onEnd }: { onEnd: () => void }) {
+function CallRoomInner({
+  onEnd,
+  onConnected,
+  onCompleted,
+}: {
+  onEnd: () => void;
+  onConnected: () => void;
+  onCompleted: () => void;
+}) {
   const participants = useParticipants();
   const remoteCount = participants.filter((p) => !p.isLocal).length;
   const joinedRef = useRef(false);
@@ -56,14 +65,16 @@ function CallRoomInner({ onEnd }: { onEnd: () => void }) {
   // Track whether the other party ever joined, and auto-end when they leave.
   useEffect(() => {
     if (remoteCount > 0) {
+      if (!joinedRef.current) onConnected();
       joinedRef.current = true;
       return;
     }
     if (joinedRef.current && remoteCount === 0) {
       // The other participant hung up — close our window too.
+      onCompleted();
       onEnd();
     }
-  }, [remoteCount, onEnd]);
+  }, [remoteCount, onEnd, onConnected, onCompleted]);
 
   // Stop the ringback on unmount.
   useEffect(() => {
@@ -94,6 +105,8 @@ export function FloatingCall() {
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [pos, setPos] = useState<DragPos | null>(null);
+  const [connectedAt, setConnectedAt] = useState<number | null>(null);
+  const endedRef = useRef(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(
@@ -107,6 +120,8 @@ export function FloatingCall() {
       setServerUrl(null);
       setError(null);
       setPos(null);
+      setConnectedAt(null);
+      endedRef.current = false;
       return;
     }
     let cancelled = false;
@@ -137,6 +152,36 @@ export function FloatingCall() {
       cancelled = true;
     };
   }, [room, video]);
+
+  const markConnected = useCallback(() => {
+    if (connectedAt) return;
+    const now = Date.now();
+    setConnectedAt(now);
+    void trackEvent('call_connected', { room, video });
+  }, [connectedAt, room, video]);
+
+  const emitCallEnd = useCallback(
+    (reason: string) => {
+      if (endedRef.current) return;
+      endedRef.current = true;
+      const durationSec = connectedAt ? Math.max(0, Math.round((Date.now() - connectedAt) / 1000)) : 0;
+      const payload = { reason, room, video, durationSec, connected: !!connectedAt };
+      void trackEvent('call_ended', payload);
+      if (connectedAt) {
+        void trackEvent('call_completed', payload);
+        void trackFirstEvent('first_call_completed', 'first_call_completed', payload);
+      }
+    },
+    [connectedAt, room, video],
+  );
+
+  const endCall = useCallback(
+    (reason: string) => {
+      emitCallEnd(reason);
+      end();
+    },
+    [emitCallEnd, end],
+  );
 
   // Request browser fullscreen when entering full mode (best-effort).
   useEffect(() => {
@@ -242,7 +287,7 @@ export function FloatingCall() {
           <Maximize2 size={15} />
         </button>
         <button
-          onClick={end}
+          onClick={() => endCall('manual_end')}
           title="Leave call"
           className="p-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white ml-1"
         >
@@ -275,10 +320,14 @@ export function FloatingCall() {
             connect
             video={video}
             audio
-            onDisconnected={end}
+            onDisconnected={() => endCall('disconnect')}
             style={{ height: '100%' }}
           >
-            <CallRoomInner onEnd={end} />
+            <CallRoomInner
+              onConnected={markConnected}
+              onCompleted={() => emitCallEnd('remote_left')}
+              onEnd={() => endCall('remote_left')}
+            />
             <VideoConference chatMessageFormatter={formatChatMessageLinks} />
             <RoomAudioRenderer />
           </LiveKitRoom>

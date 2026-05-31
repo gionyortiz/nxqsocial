@@ -6,6 +6,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 interface VerificationStatus {
   verificationStatus: string;
@@ -58,10 +59,19 @@ export default function VerifyPage() {
     api.get('/verification/status').then(({ data }) => setStatus(data)).catch(() => {});
   }, [user, router]);
 
+  useEffect(() => {
+    const tier = status?.verificationStatus;
+    if (!tier) return;
+    if (['HUMAN_VERIFIED', 'ID_VERIFIED', 'BUSINESS_VERIFIED'].includes(tier)) {
+      void trackFirstEvent('verification_completed', 'verification_completed', { tier });
+    }
+  }, [status?.verificationStatus]);
+
   const request = async (tier: string) => {
     setRequesting(tier);
     setError('');
     try {
+      void trackEvent('verification_started', { tier });
       if (tier === 'ID_VERIFIED') {
         // Use Stripe Identity — redirect to Stripe-hosted verification page
         const { data } = await api.post('/verification/start-identity-check');
