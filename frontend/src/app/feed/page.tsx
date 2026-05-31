@@ -6,6 +6,7 @@ import { PostCard } from '@/components/posts/PostCard';
 import { ImmersiveVideoViewer } from '@/components/posts/ImmersiveVideoViewer';
 import { StoriesBar } from '@/components/feed/StoriesBar';
 import { RightSidebar } from '@/components/feed/RightSidebar';
+import { LiveRail } from '@/components/live/LiveRail';
 import { api } from '@/lib/api';
 
 const FEED_MODES = [
@@ -80,6 +81,9 @@ export default function FeedPage() {
   return (
     <AppShell aside={<RightSidebar />}>
       <div className="px-4 py-6 flex flex-col gap-4">
+        {/* Live now */}
+        <LiveRail />
+
         {/* Stories */}
         <StoriesBar />
 

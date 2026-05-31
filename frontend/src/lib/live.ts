@@ -4,6 +4,68 @@
  * Live is a one-broadcaster → many-viewers feature, distinct from 1:1/group
  * calls. It is gated separately from calls so it can be rolled out on its own.
  */
+import { api } from '@/lib/api';
+
+export interface ActiveLive {
+  room: string;
+  title: string | null;
+  viewerCount: number;
+  startedAt: string;
+  host: {
+    id: string;
+    username: string;
+    displayName: string;
+    avatarUrl?: string | null;
+    verificationStatus: string;
+  };
+}
+
+/** Tell the server a broadcast has started (creates the live session record). */
+export async function startLiveSession(room: string, title?: string): Promise<void> {
+  try {
+    await api.post('/live/start', { room, title });
+  } catch {
+    /* best-effort: the broadcast still works without the record */
+  }
+}
+
+/** Tell the server a broadcast has ended. */
+export async function endLiveSession(room: string): Promise<void> {
+  try {
+    await api.post(`/live/${encodeURIComponent(room)}/end`);
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Host keepalive — refreshes the live record and reports the viewer count. */
+export async function liveHeartbeat(room: string, viewerCount: number): Promise<void> {
+  try {
+    await api.post(`/live/${encodeURIComponent(room)}/heartbeat`, { viewerCount });
+  } catch {
+    /* ignore */
+  }
+}
+
+/** Fetch all currently-live broadcasts. */
+export async function fetchActiveLives(): Promise<ActiveLive[]> {
+  try {
+    const { data } = await api.get('/live/active');
+    return Array.isArray(data) ? data : [];
+  } catch {
+    return [];
+  }
+}
+
+/** Whether a given username is live right now (for profile badge). */
+export async function fetchUserLive(username: string): Promise<{ room: string } | null> {
+  try {
+    const { data } = await api.get(`/live/user/${encodeURIComponent(username)}`);
+    return data ?? null;
+  } catch {
+    return null;
+  }
+}
 
 /** Build a unique room id for a live broadcast. */
 export function newLiveId(): string {

@@ -15,6 +15,11 @@ export default function LiveRoomPage() {
 
   const room = decodeURIComponent(String(params.room ?? ''));
   const host = search.get('host') === '1';
+  // A guest co-host publishes media but does NOT own the live session
+  // (so they get a "Leave" button instead of "End", and never create/own the
+  // server-side live record).
+  const guest = search.get('guest') === '1';
+  const isOwner = host && !guest;
 
   const [token, setToken] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
@@ -84,7 +89,7 @@ export default function LiveRoomPage() {
         onDisconnected={leave}
         style={{ height: '100%' }}
       >
-        <LiveExperience host={host} room={room} onLeave={leave} />
+        <LiveExperience host={host} isOwner={isOwner} room={room} onLeave={leave} />
       </LiveKitRoom>
     </div>
   );

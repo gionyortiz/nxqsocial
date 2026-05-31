@@ -46,6 +46,7 @@ model User {
   passwordResets  PasswordResetToken[]
   blocking        Block[]        @relation("blocker")
   blockedBy       Block[]        @relation("blocked")
+  liveSessions    LiveSession[]  @relation("liveHost")
 }
 
 model Block {
@@ -367,5 +368,31 @@ enum FeedMode {
   LEARNING
   LOCAL
   FAMILY_SAFE
+}
+
+// ─────────────────────────
+// Live streaming (Beta)
+// ─────────────────────────
+model LiveSession {
+  id          String     @id @default(cuid())
+  room        String     @unique
+  hostId      String
+  title       String?
+  status      LiveStatus @default(LIVE)
+  viewerCount Int        @default(0)
+  peakViewers Int        @default(0)
+  startedAt   DateTime   @default(now())
+  endedAt     DateTime?
+  updatedAt   DateTime   @updatedAt
+
+  host User @relation("liveHost", fields: [hostId], references: [id], onDelete: Cascade)
+
+  @@index([status])
+  @@index([hostId])
+}
+
+enum LiveStatus {
+  LIVE
+  ENDED
 }
 

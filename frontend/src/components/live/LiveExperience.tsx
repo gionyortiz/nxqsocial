@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   RoomAudioRenderer,
   GridLayout,
@@ -22,12 +23,21 @@ import {
   Video,
   Mic,
   MonitorUp,
+  Gift,
+  Flag,
+  Hand,
+  UserPlus,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
+import { startLiveSession, endLiveSession, liveHeartbeat } from '@/lib/live';
+import { api } from '@/lib/api';
 
 /** Quick reactions a viewer can tap. */
 const QUICK_EMOJIS = ['❤️', '😂', '😮', '👏', '🔥', '🎉'];
+/** Gift "stickers" — bigger center-screen bursts. */
+const GIFTS = ['🎁', '🌹', '💎', '👑', '🚀', '🦄'];
 const MAX_CHAT = 60;
+const HEARTBEAT_MS = 15_000;
 
 type LiveEvent =
   | {
@@ -35,19 +45,21 @@ type LiveEvent =
       id: string;
       name: string;
       username: string;
-      avatar?: string | null;
       text: string;
       ts: number;
     }
-  | { kind: 'reaction'; id: string; emoji: string; ts: number };
+  | { kind: 'reaction'; id: string; emoji: string; ts: number }
+  | { kind: 'gift'; id: string; emoji: string; name: string; ts: number }
+  | { kind: 'guest-request'; id: string; userId: string; name: string; ts: number }
+  | { kind: 'guest-approve'; id: string; userId: string; ts: number };
 
 interface ChatMessage {
   id: string;
   name: string;
   username: string;
-  avatar?: string | null;
   text: string;
   ts: number;
+  gift?: string;
 }
 
 interface FloatReaction {
@@ -55,6 +67,17 @@ interface FloatReaction {
   emoji: string;
   left: number;
   drift: number;
+}
+
+interface GiftBurst {
+  id: string;
+  emoji: string;
+  name: string;
+}
+
+interface GuestRequest {
+  userId: string;
+  name: string;
 }
 
 const encoder = new TextEncoder();
@@ -66,14 +89,17 @@ function randomId() {
 
 export function LiveExperience({
   host,
+  isOwner,
   room,
   onLeave,
 }: {
   host: boolean;
+  isOwner: boolean;
   room: string;
   onLeave: () => void;
 }) {
   const { user } = useAuthStore();
+  const router = useRouter();
   const participants = useParticipants();
   const cameraTracks = useTracks(
     [
@@ -86,28 +112,95 @@ export function LiveExperience({
   const [copied, setCopied] = useState(false);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [reactions, setReactions] = useState<FloatReaction[]>([]);
+  const [gifts, setGifts] = useState<GiftBurst[]>([]);
   const [draft, setDraft] = useState('');
+  const [showGifts, setShowGifts] = useState(false);
+  const [guestRequests, setGuestRequests] = useState<GuestRequest[]>([]);
+  const [requestedToJoin, setRequestedToJoin] = useState(false);
+  const [reporting, setReporting] = useState(false);
+  const [reported, setReported] = useState(false);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
 
-  // Viewers = everyone except the broadcaster.
-  const viewers = Math.max(0, participants.length - 1);
+  // Viewers = everyone except the broadcaster(s) (camera publishers).
+  const publishers = new Set(cameraTracks.map((t) => t.participant?.identity));
+  const viewers = Math.max(0, participants.length - Math.max(1, publishers.size));
+
+  // The owner's identity = the participant publishing the primary camera.
+  const hostIdentity = cameraTracks[0]?.participant?.identity ?? null;
+
+  // ---- Reaction / gift visuals -------------------------------------------
+  const addFloatingReaction = useCallback((emoji: string) => {
+    const item: FloatReaction = {
+      id: randomId(),
+      emoji,
+      left: 4 + Math.random() * 16,
+      drift: Math.random() * 40 - 20,
+    };
+    setReactions((prev) => [...prev, item].slice(-40));
+    setTimeout(() => {
+      setReactions((prev) => prev.filter((r) => r.id !== item.id));
+    }, 3200);
+  }, []);
+
+  const addGiftBurst = useCallback((emoji: string, name: string) => {
+    const item: GiftBurst = { id: randomId(), emoji, name };
+    setGifts((prev) => [...prev, item].slice(-6));
+    setTimeout(() => {
+      setGifts((prev) => prev.filter((g) => g.id !== item.id));
+    }, 3500);
+  }, []);
 
   // ---- Realtime over the LiveKit data channel ----------------------------
-  const handleData = useCallback((msg: { payload: Uint8Array }) => {
-    let evt: LiveEvent;
-    try {
-      evt = JSON.parse(decoder.decode(msg.payload)) as LiveEvent;
-    } catch {
-      return;
-    }
-    if (evt.kind === 'chat') {
-      setMessages((prev) => [...prev, evt].slice(-MAX_CHAT));
-    } else if (evt.kind === 'reaction') {
-      addFloatingReaction(evt.emoji);
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  const handleData = useCallback(
+    (msg: { payload: Uint8Array }) => {
+      let evt: LiveEvent;
+      try {
+        evt = JSON.parse(decoder.decode(msg.payload)) as LiveEvent;
+      } catch {
+        return;
+      }
+      switch (evt.kind) {
+        case 'chat':
+          setMessages((prev) => [...prev, evt].slice(-MAX_CHAT));
+          break;
+        case 'reaction':
+          addFloatingReaction(evt.emoji);
+          break;
+        case 'gift':
+          addGiftBurst(evt.emoji, evt.name);
+          setMessages((prev) =>
+            [
+              ...prev,
+              {
+                id: evt.id,
+                name: evt.name,
+                username: '',
+                text: `sent a ${evt.emoji}`,
+                ts: evt.ts,
+                gift: evt.emoji,
+              },
+            ].slice(-MAX_CHAT),
+          );
+          break;
+        case 'guest-request':
+          if (isOwner) {
+            setGuestRequests((prev) =>
+              prev.some((r) => r.userId === evt.userId)
+                ? prev
+                : [...prev, { userId: evt.userId, name: evt.name }],
+            );
+          }
+          break;
+        case 'guest-approve':
+          if (!host && evt.userId === user?.id) {
+            router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
+          }
+          break;
+      }
+    },
+    [addFloatingReaction, addGiftBurst, isOwner, host, user?.id, room, router],
+  );
 
   const { send } = useDataChannel(handleData);
 
@@ -122,22 +215,40 @@ export function LiveExperience({
     [send],
   );
 
-  const addFloatingReaction = (emoji: string) => {
-    const item: FloatReaction = {
-      id: randomId(),
-      emoji,
-      left: 4 + Math.random() * 16, // % from right edge area
-      drift: Math.random() * 40 - 20,
+  // ---- Owner lifecycle: register live session + heartbeat ----------------
+  const viewersRef = useRef(viewers);
+  useEffect(() => {
+    viewersRef.current = viewers;
+  }, [viewers]);
+
+  useEffect(() => {
+    if (!isOwner) return;
+    let stopped = false;
+    void startLiveSession(room);
+    const beat = () => {
+      if (stopped) return;
+      void liveHeartbeat(room, viewersRef.current);
     };
-    setReactions((prev) => [...prev, item].slice(-40));
-    setTimeout(() => {
-      setReactions((prev) => prev.filter((r) => r.id !== item.id));
-    }, 3200);
+    beat();
+    const id = setInterval(beat, HEARTBEAT_MS);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+      void endLiveSession(room);
+    };
+  }, [isOwner, room]);
+
+  // ---- Actions -----------------------------------------------------------
+  const sendReaction = (emoji: string) => {
+    addFloatingReaction(emoji);
+    broadcast({ kind: 'reaction', id: randomId(), emoji, ts: Date.now() }, false);
   };
 
-  const sendReaction = (emoji: string) => {
-    addFloatingReaction(emoji); // optimistic / show our own
-    broadcast({ kind: 'reaction', id: randomId(), emoji, ts: Date.now() }, false);
+  const sendGift = (emoji: string) => {
+    const name = user?.displayName ?? user?.username ?? 'Someone';
+    addGiftBurst(emoji, name);
+    broadcast({ kind: 'gift', id: randomId(), emoji, name, ts: Date.now() }, true);
+    setShowGifts(false);
   };
 
   const sendChat = () => {
@@ -147,13 +258,49 @@ export function LiveExperience({
       id: randomId(),
       name: user?.displayName ?? user?.username ?? 'You',
       username: user?.username ?? 'you',
-      avatar: user?.avatarUrl ?? null,
       text: text.slice(0, 300),
       ts: Date.now(),
     };
     setMessages((prev) => [...prev, evt].slice(-MAX_CHAT));
     broadcast({ kind: 'chat', ...evt }, true);
     setDraft('');
+  };
+
+  const requestToJoin = () => {
+    if (!user) return;
+    setRequestedToJoin(true);
+    broadcast(
+      {
+        kind: 'guest-request',
+        id: randomId(),
+        userId: user.id,
+        name: user.displayName ?? user.username,
+        ts: Date.now(),
+      },
+      true,
+    );
+  };
+
+  const approveGuest = (g: GuestRequest) => {
+    broadcast({ kind: 'guest-approve', id: randomId(), userId: g.userId, ts: Date.now() }, true);
+    setGuestRequests((prev) => prev.filter((r) => r.userId !== g.userId));
+  };
+
+  const reportLive = async () => {
+    if (!hostIdentity || hostIdentity === user?.id) return;
+    setReporting(true);
+    try {
+      await api.post('/reports', {
+        reason: 'OTHER',
+        description: `Reported live broadcast in room ${room}`,
+        reportedUserId: hostIdentity,
+      });
+      setReported(true);
+    } catch {
+      /* ignore */
+    } finally {
+      setReporting(false);
+    }
   };
 
   // Auto-scroll chat to the newest message.
@@ -185,6 +332,12 @@ export function LiveExperience({
     @keyframes nxqChatIn {
       from { opacity: 0; transform: translateY(8px); }
       to   { opacity: 1; transform: translateY(0); }
+    }
+    @keyframes nxqGiftPop {
+      0%   { transform: scale(0.3); opacity: 0; }
+      20%  { transform: scale(1.15); opacity: 1; }
+      80%  { transform: scale(1); opacity: 1; }
+      100% { transform: scale(0.9) translateY(-30px); opacity: 0; }
     }
   `,
     [],
@@ -223,6 +376,17 @@ export function LiveExperience({
             <Users size={15} /> {viewers}
           </span>
           <div className="flex-1" />
+          {!host && (
+            <button
+              onClick={reportLive}
+              disabled={reporting || reported}
+              title="Report this live"
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-xs font-medium disabled:opacity-60"
+            >
+              <Flag size={13} />
+              <span className="hidden sm:inline">{reported ? 'Reported' : 'Report'}</span>
+            </button>
+          )}
           <button
             onClick={copyLink}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-white/15 hover:bg-white/25 backdrop-blur text-xs font-medium"
@@ -234,13 +398,60 @@ export function LiveExperience({
             onClick={onLeave}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500 hover:bg-rose-600 text-xs font-semibold"
           >
-            <X size={14} /> {host ? 'End' : 'Leave'}
+            <X size={14} /> {isOwner ? 'End' : 'Leave'}
           </button>
         </div>
+
+        {/* Owner: pending guest join requests */}
+        {isOwner && guestRequests.length > 0 && (
+          <div className="px-3 pb-2 flex flex-col gap-1.5">
+            {guestRequests.map((g) => (
+              <div
+                key={g.userId}
+                className="flex items-center gap-2 bg-black/50 backdrop-blur rounded-xl px-3 py-2"
+              >
+                <Hand size={15} className="text-amber-300 shrink-0" />
+                <span className="text-xs text-white flex-1 truncate">
+                  <b>{g.name}</b> wants to join your live
+                </span>
+                <button
+                  onClick={() => approveGuest(g)}
+                  className="flex items-center gap-1 px-2.5 py-1 rounded-lg bg-green-500 hover:bg-green-600 text-white text-xs font-semibold"
+                >
+                  <UserPlus size={13} /> Add
+                </button>
+                <button
+                  onClick={() =>
+                    setGuestRequests((prev) => prev.filter((r) => r.userId !== g.userId))
+                  }
+                  className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs"
+                >
+                  Dismiss
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Gift bursts (center) */}
+      <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-2">
+        {gifts.map((g) => (
+          <div
+            key={g.id}
+            className="flex flex-col items-center"
+            style={{ animation: 'nxqGiftPop 3.5s ease-out forwards' }}
+          >
+            <span className="text-7xl drop-shadow-lg">{g.emoji}</span>
+            <span className="text-xs text-white bg-black/50 rounded-full px-3 py-1 mt-1">
+              {g.name} sent a gift
+            </span>
+          </div>
+        ))}
       </div>
 
       {/* Floating reactions layer */}
-      <div className="pointer-events-none absolute bottom-24 right-2 z-20 w-24 h-72">
+      <div className="pointer-events-none absolute bottom-28 right-2 z-20 w-24 h-72">
         {reactions.map((r) => (
           <span
             key={r.id}
@@ -257,7 +468,7 @@ export function LiveExperience({
       </div>
 
       {/* Chat overlay */}
-      <div className="absolute bottom-20 left-0 right-0 z-20 px-3 pointer-events-none">
+      <div className="absolute bottom-24 left-0 right-0 z-20 px-3 pointer-events-none">
         <div
           ref={chatScrollRef}
           className="max-h-48 sm:max-h-60 overflow-y-auto flex flex-col gap-1.5 pr-1 no-scrollbar"
@@ -265,7 +476,9 @@ export function LiveExperience({
           {messages.map((m) => (
             <div
               key={m.id}
-              className="self-start max-w-[85%] flex items-start gap-2 bg-black/45 backdrop-blur-sm rounded-2xl px-2.5 py-1.5"
+              className={`self-start max-w-[85%] flex items-start gap-2 backdrop-blur-sm rounded-2xl px-2.5 py-1.5 ${
+                m.gift ? 'bg-amber-500/30' : 'bg-black/45'
+              }`}
               style={{ animation: 'nxqChatIn 0.18s ease-out' }}
             >
               <span className="text-xs font-bold text-rose-300 shrink-0">{m.name}</span>
@@ -279,6 +492,23 @@ export function LiveExperience({
           )}
         </div>
       </div>
+
+      {/* Gift tray */}
+      {showGifts && (
+        <div className="absolute bottom-20 left-0 right-0 z-30 px-3">
+          <div className="mx-auto max-w-sm bg-black/70 backdrop-blur rounded-2xl p-3 grid grid-cols-6 gap-2">
+            {GIFTS.map((g) => (
+              <button
+                key={g}
+                onClick={() => sendGift(g)}
+                className="aspect-square rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 transition text-2xl flex items-center justify-center"
+              >
+                {g}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Bottom control bar */}
       <div className="absolute bottom-0 inset-x-0 z-30 bg-gradient-to-t from-black/80 to-transparent">
@@ -330,6 +560,27 @@ export function LiveExperience({
               </TrackToggle>
             </div>
           )}
+
+          {/* Viewer: ask to join the live */}
+          {!host && (
+            <button
+              onClick={requestToJoin}
+              disabled={requestedToJoin}
+              title="Ask to join the live"
+              className="flex items-center justify-center w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-60 text-white shrink-0"
+            >
+              <Hand size={19} />
+            </button>
+          )}
+
+          {/* Gift button (everyone) */}
+          <button
+            onClick={() => setShowGifts((s) => !s)}
+            title="Send a gift"
+            className="flex items-center justify-center w-11 h-11 rounded-full bg-amber-400 hover:bg-amber-500 active:scale-90 transition text-black shrink-0 shadow-lg"
+          >
+            <Gift size={20} />
+          </button>
 
           {/* Heart / reaction button (everyone) */}
           <button

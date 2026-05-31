@@ -15,6 +15,7 @@ import { TrustBadge } from '@/components/ui/TrustBadge';
 import { ProfileEditModal } from '@/components/profile/ProfileEditModal';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { fetchUserLive } from '@/lib/live';
 import { formatCount, resolveMediaUrl } from '@/lib/utils';
 
 interface MediaAsset { id: string; url: string; mimeType: string; }
@@ -97,6 +98,21 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [editOpen, setEditOpen] = useState(false);
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [blocking, setBlocking] = useState(false);
+  const [liveRoom, setLiveRoom] = useState<string | null>(null);
+
+  useEffect(() => {
+    let active = true;
+    const check = async () => {
+      const live = await fetchUserLive(username);
+      if (active) setLiveRoom(live?.room ?? null);
+    };
+    check();
+    const id = setInterval(check, 20_000);
+    return () => {
+      active = false;
+      clearInterval(id);
+    };
+  }, [username]);
 
   useEffect(() => {
     Promise.all([
@@ -213,9 +229,24 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
           {/* Avatar + action buttons row */}
           <div className="flex items-end justify-between -mt-14 sm:-mt-16 mb-4">
             <div className="relative">
-              <div className="w-28 h-28 sm:w-32 sm:h-32 rounded-full ring-4 ring-white bg-white overflow-hidden shadow-[0_8px_30px_-6px_rgba(124,58,237,0.45)]">
-                <Avatar src={profile.avatarUrl} alt={profile.username} size="xl" className="w-full h-full" />
-              </div>
+              <button
+                type={liveRoom ? 'button' : undefined}
+                onClick={liveRoom ? () => router.push(`/live/${encodeURIComponent(liveRoom)}`) : undefined}
+                className={`w-28 h-28 sm:w-32 sm:h-32 rounded-full overflow-hidden block ${
+                  liveRoom
+                    ? 'p-[3px] bg-gradient-to-tr from-rose-500 to-red-600 cursor-pointer'
+                    : 'ring-4 ring-white bg-white shadow-[0_8px_30px_-6px_rgba(124,58,237,0.45)]'
+                }`}
+              >
+                <div className={`w-full h-full rounded-full overflow-hidden ${liveRoom ? 'ring-2 ring-white bg-white' : ''}`}>
+                  <Avatar src={profile.avatarUrl} alt={profile.username} size="xl" className="w-full h-full" />
+                </div>
+              </button>
+              {liveRoom && (
+                <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 px-2 py-[2px] rounded-full bg-rose-600 text-white text-[9px] font-bold uppercase tracking-wide ring-2 ring-white">
+                  Live
+                </span>
+              )}
               {VERIFIED_STATUSES.includes(profile.verificationStatus) && (
                 <div className="absolute bottom-1 right-1 w-7 h-7 rounded-full bg-gradient-to-br from-purple-600 to-pink-500 ring-4 ring-white flex items-center justify-center shadow-lg">
                   <ShieldCheck size={14} className="text-white" strokeWidth={2.5} />

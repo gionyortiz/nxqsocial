@@ -22,6 +22,7 @@ import { MediaModule } from './media/media.module';
 import { AdminModule } from './admin/admin.module';
 import { HealthModule } from './health/health.module';
 import { CallsModule } from './calls/calls.module';
+import { LiveModule } from './live/live.module';
 
 @Module({
   imports: [
@@ -52,6 +53,7 @@ import { CallsModule } from './calls/calls.module';
     AdminModule,
     HealthModule,
     CallsModule,
+    LiveModule,
   ],
 })
 export class AppModule {}
