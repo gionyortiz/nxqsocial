@@ -48,6 +48,23 @@ body {
   background-clip: text;
 }
 
+/* LiveKit full mode polish: keep the main participant truly full-screen. */
+.nxq-call-full .lk-video-conference,
+.nxq-call-full .lk-focus-layout,
+.nxq-call-full .lk-focus-layout-container,
+.nxq-call-full .lk-grid-layout,
+.nxq-call-full .lk-participant-tile {
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+}
+
+.nxq-call-full .lk-participant-media-video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Smooth image loading */
 img {
   transition: opacity 0.2s ease;

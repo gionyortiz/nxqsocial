@@ -192,6 +192,18 @@ export function FloatingCall() {
     }
   }, [mode]);
 
+  // If the user exits browser fullscreen (Esc/back gesture), keep the call alive
+  // and fall back to compact floating mode instead of leaving the call UI.
+  useEffect(() => {
+    const onFullscreenChange = () => {
+      if (mode === 'full' && !document.fullscreenElement) {
+        setMode('compact');
+      }
+    };
+    document.addEventListener('fullscreenchange', onFullscreenChange);
+    return () => document.removeEventListener('fullscreenchange', onFullscreenChange);
+  }, [mode, setMode]);
+
   const onDragPointerDown = useCallback(
     (e: React.PointerEvent) => {
       if (mode === 'full') return;
@@ -296,7 +308,7 @@ export function FloatingCall() {
       </div>
 
       {/* Body */}
-      <div className="flex-1 min-h-0 relative">
+      <div className={`flex-1 min-h-0 relative ${mode === 'full' ? 'nxq-call-full' : ''}`}>
         {error ? (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 text-white">
             <PhoneOff size={28} className="text-red-500 mb-3" />
@@ -322,6 +334,7 @@ export function FloatingCall() {
             audio
             onDisconnected={() => endCall('disconnect')}
             style={{ height: '100%' }}
+            className="h-full w-full"
           >
             <CallRoomInner
               onConnected={markConnected}
