@@ -47,6 +47,10 @@ export default function RegisterPage() {
       void trackEvent('signup_completed', { source: 'register_page' }, { isPublic: true });
       router.push('/feed');
     } catch (err: any) {
+      if (err?.response?.status === 429) {
+        setServerError('Too many attempts. Please wait a minute and try again.');
+        return;
+      }
       setServerError(err.response?.data?.message ?? 'Registration failed');
     }
   };
