@@ -67,7 +67,14 @@ export default function RegisterPage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <Input label="Display Name" placeholder="Your Name" error={errors.displayName?.message} {...register('displayName')} />
-            <Input label="Username" placeholder="username" error={errors.username?.message} {...register('username')} />
+            <Input
+              label="Username"
+              placeholder="username"
+              error={errors.username?.message}
+              {...register('username', {
+                setValueAs: (value) => (typeof value === 'string' ? value.trim().toLowerCase() : value),
+              })}
+            />
             <Input label="Email" type="email" placeholder="you@example.com" error={errors.email?.message} {...register('email')} />
             <Input label="Password" type="password" placeholder="Min 12 chars, mixed case, number & symbol" error={errors.password?.message} {...register('password')} />
 

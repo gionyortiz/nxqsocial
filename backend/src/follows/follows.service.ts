@@ -5,8 +5,14 @@ import { PrismaService } from '../prisma/prisma.service';
 export class FollowsService {
   constructor(private prisma: PrismaService) {}
 
+  private findUserByUsername(username: string) {
+    return this.prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
+    });
+  }
+
   async toggle(followerId: string, targetUsername: string) {
-    const target = await this.prisma.user.findUnique({ where: { username: targetUsername } });
+    const target = await this.findUserByUsername(targetUsername);
     if (!target) throw new NotFoundException('User not found');
     if (target.id === followerId) return { following: false };
 
@@ -24,7 +30,7 @@ export class FollowsService {
   }
 
   async getFollowers(username: string) {
-    const user = await this.prisma.user.findUnique({ where: { username } });
+    const user = await this.findUserByUsername(username);
     if (!user) throw new NotFoundException('User not found');
 
     return this.prisma.follow.findMany({
@@ -37,7 +43,7 @@ export class FollowsService {
   }
 
   async getFollowing(username: string) {
-    const user = await this.prisma.user.findUnique({ where: { username } });
+    const user = await this.findUserByUsername(username);
     if (!user) throw new NotFoundException('User not found');
 
     return this.prisma.follow.findMany({

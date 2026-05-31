@@ -41,8 +41,15 @@ export class AuthService {
       }
     }
 
+    const normalizedUsername = dto.username.trim().toLowerCase();
+
     const existing = await this.prisma.user.findFirst({
-      where: { OR: [{ email: dto.email }, { username: dto.username }] },
+      where: {
+        OR: [
+          { email: dto.email },
+          { username: { equals: normalizedUsername, mode: 'insensitive' } },
+        ],
+      },
     });
     if (existing) throw new ConflictException('Email or username already taken');
 
@@ -50,7 +57,7 @@ export class AuthService {
     const user = await this.prisma.user.create({
       data: {
         email: dto.email,
-        username: dto.username,
+        username: normalizedUsername,
         passwordHash,
         verificationStatus: 'BASIC',
         trustScore: 10,

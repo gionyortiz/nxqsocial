@@ -22,9 +22,15 @@ export class UsersService {
     private audit: AuditService,
   ) {}
 
+  private findUserByUsername(username: string) {
+    return this.prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
+    });
+  }
+
   async findByUsername(username: string, currentUserId?: string) {
-    const user = await this.prisma.user.findUnique({
-      where: { username },
+    const user = await this.prisma.user.findFirst({
+      where: { username: { equals: username, mode: 'insensitive' } },
       select: USER_PUBLIC_SELECT,
     });
     if (!user) throw new NotFoundException('User not found');
@@ -113,10 +119,7 @@ export class UsersService {
   // ── Self: blocking ──────────────────────────────────────────────────────────
 
   async blockUser(userId: string, targetUsername: string) {
-    const target = await this.prisma.user.findUnique({
-      where: { username: targetUsername },
-      select: { id: true },
-    });
+    const target = await this.findUserByUsername(targetUsername);
     if (!target) throw new NotFoundException('User not found');
     if (target.id === userId) throw new BadRequestException('You cannot block yourself');
 
@@ -138,10 +141,7 @@ export class UsersService {
   }
 
   async unblockUser(userId: string, targetUsername: string) {
-    const target = await this.prisma.user.findUnique({
-      where: { username: targetUsername },
-      select: { id: true },
-    });
+    const target = await this.findUserByUsername(targetUsername);
     if (!target) throw new NotFoundException('User not found');
 
     await this.prisma.block.deleteMany({
