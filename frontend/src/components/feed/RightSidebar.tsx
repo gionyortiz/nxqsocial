@@ -6,6 +6,8 @@ import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
+import { formatCount } from '@/lib/utils';
+import { Camera, Clapperboard, PenSquare, ShieldCheck } from 'lucide-react';
 
 interface SuggestedUser {
   id: string;
@@ -32,6 +34,25 @@ export function RightSidebar() {
   const { user } = useAuthStore();
   const [suggested, setSuggested] = useState<SuggestedUser[]>([]);
   const [followed, setFollowed] = useState<Record<string, boolean>>({});
+  const [profileStats, setProfileStats] = useState<{ followers: number; posts: number } | null>(null);
+
+  useEffect(() => {
+    if (!user?.username) {
+      setProfileStats(null);
+      return;
+    }
+    api
+      .get(`/users/${user.username}`)
+      .then(({ data }) => {
+        setProfileStats({
+          followers: data?._count?.followers ?? 0,
+          posts: data?._count?.posts ?? 0,
+        });
+      })
+      .catch(() => {
+        setProfileStats(null);
+      });
+  }, [user?.username]);
 
   useEffect(() => {
     api
@@ -53,22 +74,63 @@ export function RightSidebar() {
   };
 
   return (
-    <div className="flex flex-col gap-5 sticky top-6">
+    <div className="flex flex-col gap-4 sticky top-4">
       {/* Profile mini-card */}
       {user && (
-        <Link
-          href={`/profile/${user.username}`}
-          className="flex items-center gap-3 bg-white rounded-2xl shadow-sm border border-gray-100 p-4 hover:bg-gray-50 transition-colors"
-        >
-          <Avatar src={user.avatarUrl} alt={user.username} size="lg" />
-          <div className="min-w-0">
-            <div className="flex items-center gap-1">
-              <span className="font-semibold text-sm text-gray-900 truncate">{user.displayName}</span>
-              <TrustBadge status={user.verificationStatus} />
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-4">
+          <Link
+            href={`/profile/${user.username}`}
+            className="flex items-center gap-3 hover:bg-gray-50 transition-colors rounded-xl p-1"
+          >
+            <Avatar src={user.avatarUrl} alt={user.username} size="lg" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-1">
+                <span className="font-semibold text-sm text-gray-900 truncate">{user.displayName}</span>
+                <TrustBadge status={user.verificationStatus} />
+              </div>
+              <p className="text-xs text-gray-400 truncate">@{user.username}</p>
             </div>
-            <p className="text-xs text-gray-400 truncate">@{user.username}</p>
+          </Link>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-xl bg-purple-50 px-2 py-2 text-center">
+              <p className="text-[11px] text-gray-500">Trust</p>
+              <p className="text-sm font-bold text-purple-700">{Math.round(user.trustScore ?? 0)}</p>
+            </div>
+            <div className="rounded-xl bg-gray-50 px-2 py-2 text-center">
+              <p className="text-[11px] text-gray-500">Followers</p>
+              <p className="text-sm font-bold text-gray-900">{formatCount(profileStats?.followers ?? 0)}</p>
+            </div>
+            <div className="rounded-xl bg-gray-50 px-2 py-2 text-center">
+              <p className="text-[11px] text-gray-500">Posts</p>
+              <p className="text-sm font-bold text-gray-900">{formatCount(profileStats?.posts ?? 0)}</p>
+            </div>
           </div>
-        </Link>
+
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <Link
+              href="/upload"
+              className="flex flex-col items-center justify-center rounded-xl border border-gray-200 py-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              <PenSquare size={15} className="mb-1 text-purple-600" />
+              Post
+            </Link>
+            <Link
+              href="/upload"
+              className="flex flex-col items-center justify-center rounded-xl border border-gray-200 py-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              <Camera size={15} className="mb-1 text-purple-600" />
+              Photo
+            </Link>
+            <Link
+              href="/upload"
+              className="flex flex-col items-center justify-center rounded-xl border border-gray-200 py-2 text-[11px] font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              <Clapperboard size={15} className="mb-1 text-purple-600" />
+              Reel
+            </Link>
+          </div>
+        </div>
       )}
 
       {/* Suggested for you */}
@@ -120,6 +182,13 @@ export function RightSidebar() {
               <span className="text-xs text-gray-400">{t.posts} posts</span>
             </Link>
           ))}
+        </div>
+        <div className="mt-3 rounded-xl bg-gradient-to-r from-indigo-50 to-purple-50 border border-purple-100 px-3 py-2.5">
+          <div className="flex items-center gap-2">
+            <ShieldCheck size={14} className="text-purple-600" />
+            <p className="text-xs font-semibold text-purple-800">Trust-first ranking active</p>
+          </div>
+          <p className="text-[11px] text-purple-700 mt-1">Verified humans and safe content are boosted in your feed.</p>
         </div>
       </div>
 

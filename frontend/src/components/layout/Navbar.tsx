@@ -1,11 +1,11 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Compass, Play, PlusSquare, ShieldCheck,
-  Settings, LogOut, ShieldAlert, Menu as MenuIcon, Phone, Radio,
+  Settings, LogOut, ShieldAlert, Menu as MenuIcon, Phone, Radio, ChevronsLeftRight,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
@@ -41,6 +41,20 @@ export function Navbar() {
   const { user, logout } = useAuthStore();
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
+  const [compact, setCompact] = useState(false);
+
+  useEffect(() => {
+    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('nxq_nav_compact') : null;
+    if (saved === '1') setCompact(true);
+  }, []);
+
+  const toggleCompact = () => {
+    setCompact((prev) => {
+      const next = !prev;
+      window.localStorage.setItem('nxq_nav_compact', next ? '1' : '0');
+      return next;
+    });
+  };
 
   const isActive = (href: string) =>
     href === '/feed' ? pathname === '/feed' : pathname === href || pathname.startsWith(href + '/');
@@ -48,15 +62,27 @@ export function Navbar() {
   return (
     <>
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
-      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-100 px-3 py-6 gap-1 z-40">
+      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-100 px-2.5 py-6 gap-1 z-40">
 
         {/* Logo */}
-        <Link href="/feed" className="mb-6 px-3 flex items-center gap-2">
-          <Logo size={34} />
-          <span className="text-xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent tracking-tight">
-            NXQ Social
-          </span>
-        </Link>
+        <div className="mb-6 px-2.5 flex items-center justify-between">
+          <Link href="/feed" className="flex items-center gap-2 min-w-0">
+            <Logo size={34} />
+            {!compact && (
+              <span className="text-xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent tracking-tight truncate">
+                NXQ Social
+              </span>
+            )}
+          </Link>
+          <button
+            onClick={toggleCompact}
+            className="hidden xl:flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+            title={compact ? 'Expand sidebar' : 'Compact sidebar'}
+            aria-label={compact ? 'Expand sidebar' : 'Compact sidebar'}
+          >
+            <ChevronsLeftRight size={16} />
+          </button>
+        </div>
 
         {/* Primary nav */}
         <div className="flex flex-col gap-1">
@@ -70,9 +96,10 @@ export function Navbar() {
                 className={cn(
                   'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
                   active
-                    ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200'
+                    ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200 ring-1 ring-purple-300/60'
                     : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
                 )}
+                title={compact ? label : undefined}
               >
                 <span
                   className={cn(
@@ -82,7 +109,7 @@ export function Navbar() {
                 >
                   <Icon size={20} strokeWidth={active ? 2.6 : 2} />
                 </span>
-                {label}
+                {!compact && label}
               </Link>
             );
           })}
@@ -94,9 +121,10 @@ export function Navbar() {
               className={cn(
                 'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
                 isActive('/call')
-                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200'
+                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200 ring-1 ring-purple-300/60'
                   : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
               )}
+              title={compact ? 'Call' : undefined}
             >
               <span
                 className={cn(
@@ -106,8 +134,8 @@ export function Navbar() {
               >
                 <Phone size={20} strokeWidth={isActive('/call') ? 2.6 : 2} />
               </span>
-              <span className="flex-1">Call</span>
-              <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
+              {!compact && <span className="flex-1">Call</span>}
+              {!compact && <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>}
             </Link>
           )}
 
@@ -118,9 +146,10 @@ export function Navbar() {
               className={cn(
                 'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
                 isActive('/live')
-                  ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-200'
+                  ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-200 ring-1 ring-rose-300/60'
                   : 'text-gray-600 hover:bg-rose-50 hover:text-rose-700',
               )}
+              title={compact ? 'Live' : undefined}
             >
               <span
                 className={cn(
@@ -130,8 +159,8 @@ export function Navbar() {
               >
                 <Radio size={20} strokeWidth={isActive('/live') ? 2.6 : 2} />
               </span>
-              <span className="flex-1">Live</span>
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
+              {!compact && <span className="flex-1">Live</span>}
+              {!compact && <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>}
             </Link>
           )}
 
@@ -143,7 +172,7 @@ export function Navbar() {
             <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white transition-colors">
               <MenuIcon size={20} strokeWidth={2} />
             </span>
-            {t('nav.menu')}
+            {!compact && t('nav.menu')}
           </button>
         </div>
 
@@ -166,7 +195,7 @@ export function Navbar() {
                 <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/40">
                   <ShieldAlert size={20} strokeWidth={2} />
                 </span>
-                {t('nav.moderation')}
+                {!compact && t('nav.moderation')}
               </Link>
             </>
           )}
@@ -184,7 +213,7 @@ export function Navbar() {
             <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white">
               <Settings size={20} />
             </span>
-            {t('nav.settings')}
+            {!compact && t('nav.settings')}
           </Link>
 
           {/* Log out */}
@@ -195,11 +224,11 @@ export function Navbar() {
             <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white">
               <LogOut size={20} />
             </span>
-            {t('nav.logout')}
+            {!compact && t('nav.logout')}
           </button>
 
           {/* Profile card */}
-          {user && (
+          {user && !compact && (
             <>
               <div className="h-px bg-gray-100 mx-2 my-1" />
               <Link

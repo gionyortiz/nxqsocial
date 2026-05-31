@@ -84,6 +84,11 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
   const mediaSrc = firstMedia
     ? (firstMedia.url.startsWith('http') ? firstMedia.url : `${mediaBase}${firstMedia.url}`)
     : null;
+  const thumbnailSrc = firstMedia?.thumbnailUrl
+    ? (firstMedia.thumbnailUrl.startsWith('http')
+        ? firstMedia.thumbnailUrl
+        : `${mediaBase}${firstMedia.thumbnailUrl}`)
+    : null;
   const isVideo = (firstMedia?.mimeType?.startsWith('video/') ?? false) || post.type === 'VIDEO' || post.type === 'SHORT_VIDEO';
 
   const toggleLike = async () => {
@@ -111,7 +116,7 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
       )}
 
       {/* Header */}
-      <div className="flex items-center gap-3 p-4">
+      <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <Link href={`/profile/${post.author.username}`}>
           <Avatar src={post.author.avatarUrl} alt={post.author.username} size="md" />
         </Link>
@@ -146,7 +151,16 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
 
       {/* Media */}
       {mediaSrc && (
-        <div className="bg-black aspect-square relative">
+        <div className={cn('bg-black relative overflow-hidden', isVideo ? 'aspect-[4/5] md:aspect-[5/4]' : 'aspect-[4/5]')}>
+          {thumbnailSrc && (
+            <Image
+              src={thumbnailSrc}
+              alt={post.caption ?? 'Post background'}
+              fill
+              className="object-cover scale-110 blur-2xl opacity-35"
+              sizes="(max-width: 640px) 100vw, 800px"
+            />
+          )}
           {isVideo ? (
             onOpenVideo ? (
               <button
@@ -157,11 +171,11 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
               >
                 <video
                   src={mediaSrc}
-                  className="w-full h-full object-contain pointer-events-none"
+                  className="w-full h-full object-contain md:object-cover pointer-events-none"
                   muted
                   playsInline
                   preload="metadata"
-                  poster={firstMedia?.thumbnailUrl ?? undefined}
+                  poster={thumbnailSrc ?? undefined}
                 />
                 <span className="absolute inset-0 flex items-center justify-center">
                   <span className="w-16 h-16 rounded-full bg-black/50 group-hover:bg-black/60 flex items-center justify-center transition-colors">
@@ -172,10 +186,10 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
             ) : (
               <video
                 src={mediaSrc}
-                className="w-full h-full object-contain"
+                className="w-full h-full object-contain md:object-cover"
                 controls
                 preload="metadata"
-                poster={firstMedia?.thumbnailUrl ?? undefined}
+                poster={thumbnailSrc ?? undefined}
               />
             )
           ) : (
@@ -183,51 +197,51 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
               src={mediaSrc}
               alt={post.caption ?? 'Post'}
               fill
-              className="object-contain"
-              sizes="(max-width: 640px) 100vw, 600px"
+              className="object-cover"
+              sizes="(max-width: 640px) 100vw, 800px"
             />
           )}
         </div>
       )}
 
       {/* Actions */}
-      <div className="px-4 pt-3 pb-1 flex items-center gap-4">
+      <div className="px-4 pt-3 pb-2 flex items-center gap-1.5">
         <button
           onClick={toggleLike}
           className={cn(
-            'flex items-center gap-1.5 text-sm font-medium transition-colors',
-            liked ? 'text-red-500' : 'text-gray-500 hover:text-red-400',
+            'h-10 px-3 rounded-full flex items-center gap-2 text-sm font-semibold transition-colors',
+            liked ? 'text-red-500 bg-red-50' : 'text-gray-600 hover:text-red-400 hover:bg-red-50/70',
           )}
         >
-          <Heart size={22} fill={liked ? 'currentColor' : 'none'} />
+          <Heart size={20} fill={liked ? 'currentColor' : 'none'} />
           <span>{formatCount(likeCount)}</span>
         </button>
 
         <button
           onClick={() => onCommentClick?.(post.id)}
-          className="flex items-center gap-1.5 text-sm font-medium text-gray-500 hover:text-purple-500 transition-colors"
+          className="h-10 px-3 rounded-full flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors"
         >
-          <MessageCircle size={22} />
+          <MessageCircle size={20} />
           <span>{formatCount(post._count.comments)}</span>
         </button>
 
-        <button onClick={toggleSave} className="text-gray-400 hover:text-yellow-500 transition-colors" title="Save post">
-          <Bookmark size={20} />
+        <button onClick={toggleSave} className="h-10 w-10 rounded-full flex items-center justify-center text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 transition-colors" title="Save post">
+          <Bookmark size={19} />
         </button>
 
-        <button className="ml-auto text-gray-400 hover:text-gray-600 transition-colors" title="Share">
-          <Share2 size={20} />
+        <button className="ml-auto h-10 w-10 rounded-full flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Share">
+          <Share2 size={19} />
         </button>
       </div>
 
       {/* Caption */}
       {post.caption && (
-        <div className="px-4 pb-4 pt-1">
-          <p className="text-sm text-gray-800">
-            <Link href={`/profile/${post.author.username}`} className="font-semibold mr-1">
+        <div className="px-4 pb-4 pt-0.5">
+          <p className="text-[15px] leading-6 text-gray-800">
+            <Link href={`/profile/${post.author.username}`} className="font-semibold mr-1.5 text-gray-900">
               {post.author.username}
             </Link>
-            {post.caption}
+            <span className="break-words">{post.caption}</span>
           </p>
         </div>
       )}
