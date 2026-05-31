@@ -2,10 +2,11 @@
 
 import { useEffect } from 'react';
 import Link from 'next/link';
+import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import {
   X, Home, Compass, Play, ShieldCheck, Settings, LogOut,
-  ShieldAlert, Image as ImageIcon, Film, Phone, Radio,
+  ShieldAlert, Image as ImageIcon, Film, Phone, Radio, MessageSquare,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
@@ -42,6 +43,7 @@ const FOOTER_LINKS = [
 ];
 
 export function MenuPanel({ onClose }: Props) {
+  const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
 
@@ -178,6 +180,15 @@ export function MenuPanel({ onClose }: Props) {
             {/* Account */}
             <SectionLabel>Account</SectionLabel>
             <div className="grid sm:grid-cols-2 gap-2">
+              <button
+                onClick={() => go(`/feedback?from=${encodeURIComponent(pathname)}`)}
+                className="group flex items-center gap-3 p-3 rounded-2xl bg-white ring-1 ring-gray-100 hover:ring-purple-200 hover:shadow-md transition-all text-left"
+              >
+                <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-gray-100 text-gray-600 group-hover:bg-purple-600 group-hover:text-white transition-colors shrink-0">
+                  <MessageSquare size={20} />
+                </span>
+                <p className="text-sm font-bold text-gray-900">Feedback</p>
+              </button>
               <button
                 onClick={() => go('/settings')}
                 className="group flex items-center gap-3 p-3 rounded-2xl bg-white ring-1 ring-gray-100 hover:ring-purple-200 hover:shadow-md transition-all text-left"

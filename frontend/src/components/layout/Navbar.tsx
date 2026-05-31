@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Compass, Play, PlusSquare, ShieldCheck,
-  Settings, LogOut, ShieldAlert, Menu as MenuIcon, Phone, Radio, ChevronsLeftRight,
+  Settings, LogOut, ShieldAlert, Menu as MenuIcon, Phone, Radio, ChevronsLeftRight, MessageSquare,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
@@ -163,6 +163,27 @@ export function Navbar() {
               {!compact && <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>}
             </Link>
           )}
+
+          <Link
+            href={`/feedback?from=${encodeURIComponent(pathname)}`}
+            className={cn(
+              'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
+              isActive('/feedback')
+                ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200 ring-1 ring-purple-300/60'
+                : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
+            )}
+            title={compact ? t('nav.feedback') : undefined}
+          >
+            <span
+              className={cn(
+                'flex items-center justify-center w-9 h-9 rounded-xl transition-colors',
+                isActive('/feedback') ? 'bg-white/20' : 'bg-gray-50 group-hover:bg-white',
+              )}
+            >
+              <MessageSquare size={20} strokeWidth={isActive('/feedback') ? 2.6 : 2} />
+            </span>
+            {!compact && t('nav.feedback')}
+          </Link>
 
           {/* Menu button — opens the full panel */}
           <button

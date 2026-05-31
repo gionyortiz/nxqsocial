@@ -8,6 +8,7 @@
     "db:down": "docker-compose down",
     "db:migrate": "cd backend && npx prisma migrate dev",
     "db:studio": "cd backend && npx prisma studio",
-    "install:all": "cd backend && npm install && cd ../frontend && npm install"
+    "install:all": "cd backend && npm install && cd ../frontend && npm install",
+    "ops:verify": "node scripts/prod-verify.js"
   }
 }

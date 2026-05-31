@@ -48,6 +48,7 @@ model User {
   blockedBy       Block[]        @relation("blocked")
   liveSessions    LiveSession[]  @relation("liveHost")
   analyticsEvents AnalyticsEvent[]
+  betaFeedbacks   BetaFeedback[]
 }
 
 model Block {
@@ -407,8 +408,61 @@ model AnalyticsEvent {
   @@index([sessionId, createdAt])
 }
 
+model BetaFeedback {
+  id            String               @id @default(cuid())
+  userId        String
+  type          BetaFeedbackType
+  severity      BetaFeedbackSeverity
+  route         String
+  deviceType    BetaDeviceType
+  browser       String
+  description   String
+  screenshotUrl String?
+  status        BetaFeedbackStatus   @default(OPEN)
+  createdAt     DateTime             @default(now())
+  updatedAt     DateTime             @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([status, createdAt])
+  @@index([severity, createdAt])
+  @@index([type, createdAt])
+  @@index([userId, createdAt])
+}
+
 enum LiveStatus {
   LIVE
   ENDED
+}
+
+enum BetaFeedbackType {
+  BUG
+  UI_PROBLEM
+  UPLOAD_PROBLEM
+  CALL_PROBLEM
+  LIVE_PROBLEM
+  VERIFICATION_PROBLEM
+  SUGGESTION
+}
+
+enum BetaFeedbackSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  BLOCKING
+}
+
+enum BetaDeviceType {
+  MOBILE
+  DESKTOP
+  TABLET
+}
+
+enum BetaFeedbackStatus {
+  OPEN
+  TRIAGED
+  IN_PROGRESS
+  RESOLVED
+  WONT_FIX
 }
 

@@ -6,8 +6,10 @@ import {
   User, Lock, Bell, ShieldOff, LogOut, Trash2, ChevronRight,
   Loader2, CheckCircle2, ArrowLeft, Eye, EyeOff, Globe, Check,
   ShieldCheck, Calendar, Sparkles, ArrowRight, Pencil, UserCircle, AlertTriangle,
+  MessageSquare,
 } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
+import { usePathname } from 'next/navigation';
 import { Avatar } from '@/components/ui/Avatar';
 import { ProfileEditModal } from '@/components/profile/ProfileEditModal';
 import { api } from '@/lib/api';
@@ -57,6 +59,7 @@ function computeCompleteness(u: {
 
 export default function SettingsPage() {
   const router = useRouter();
+  const pathname = usePathname();
   const { user, updateUser, logout } = useAuthStore();
   const { t, lang, setLang } = useI18n();
 
@@ -276,6 +279,13 @@ export default function SettingsPage() {
                 label={t('settings.language')}
                 desc={LANGUAGES.find((l) => l.code === lang)?.native ?? 'English'}
                 onClick={() => setLangOpen(true)}
+              />
+              <Divider />
+              <Row
+                icon={<MessageSquare size={18} />}
+                label="Feedback"
+                desc="Tell us what broke or what to improve"
+                onClick={() => router.push(`/feedback?from=${encodeURIComponent(pathname)}`)}
               />
             </div>
 

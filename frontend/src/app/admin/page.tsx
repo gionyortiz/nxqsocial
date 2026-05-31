@@ -87,6 +87,34 @@ interface AnalyticsDashboard {
   };
 }
 
+interface BetaFeedbackItem {
+  id: string;
+  type: string;
+  severity: string;
+  route: string;
+  deviceType: string;
+  browser: string;
+  description: string;
+  screenshotUrl?: string;
+  status: 'OPEN' | 'TRIAGED' | 'IN_PROGRESS' | 'RESOLVED' | 'WONT_FIX';
+  createdAt: string;
+  user: {
+    id: string;
+    username: string;
+    email: string;
+    profile?: {
+      displayName: string;
+    };
+  };
+}
+
+interface BetaFeedbackStats {
+  open: number;
+  blocking: number;
+  high: number;
+  resolved: number;
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const REASON_LABELS: Record<string, string> = {
@@ -271,7 +299,7 @@ function TrustHistoryModal({ userId, onClose }: { userId: string; onClose: () =>
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'reports' | 'verifications' | 'safety' | 'audit' | 'users';
+type Tab = 'reports' | 'verifications' | 'safety' | 'audit' | 'users' | 'feedback';
 
 export default function AdminPage() {
   const user = useAuthStore((s) => s.user);
@@ -286,6 +314,8 @@ export default function AdminPage() {
   const [safetyFlags, setSafetyFlags] = useState<SafetyFlag[]>([]);
   const [auditLogs, setAuditLogs] = useState<AuditLog[]>([]);
   const [adminUsers, setAdminUsers] = useState<AdminUser[]>([]);
+  const [betaFeedback, setBetaFeedback] = useState<BetaFeedbackItem[]>([]);
+  const [feedbackStats, setFeedbackStats] = useState<BetaFeedbackStats | null>(null);
   const [userSearch, setUserSearch] = useState('');
   const [actionReason, setActionReason] = useState('');
   const [historyUserId, setHistoryUserId] = useState<string | null>(null);
@@ -311,6 +341,14 @@ export default function AdminPage() {
       else if (t === 'safety') { const { data } = await api.get('/safety/flags'); setSafetyFlags(data); }
       else if (t === 'audit') { const { data } = await api.get('/audit/logs'); setAuditLogs(data); }
       else if (t === 'users') { const { data } = await api.get('/users/admin/list'); setAdminUsers(data.data); }
+      else if (t === 'feedback') {
+        const [{ data: list }, { data: stats }] = await Promise.all([
+          api.get('/feedback/admin?take=120'),
+          api.get('/feedback/admin/stats'),
+        ]);
+        setBetaFeedback(list);
+        setFeedbackStats(stats);
+      }
     } catch { showNotice('Failed to load data', 'error'); }
     finally { setLoading(false); }
   }, [showNotice]);
@@ -357,6 +395,18 @@ export default function AdminPage() {
       setActionReason('');
       load('users');
     } catch { showNotice('Failed', 'error'); }
+  }
+
+  async function updateFeedbackStatus(id: string, status: BetaFeedbackItem['status']) {
+    try {
+      await api.patch(`/feedback/admin/${id}/status`, { status });
+      setBetaFeedback((prev) => prev.map((item) => (item.id === id ? { ...item, status } : item)));
+      const { data } = await api.get('/feedback/admin/stats');
+      setFeedbackStats(data);
+      showNotice('Feedback status updated');
+    } catch {
+      showNotice('Failed', 'error');
+    }
   }
 
   async function searchUsers() {
@@ -407,6 +457,7 @@ export default function AdminPage() {
           <TabBtn active={tab === 'safety'} onClick={() => setTab('safety')} badge={safetyFlags.length}>Safety Flags</TabBtn>
           <TabBtn active={tab === 'audit'} onClick={() => setTab('audit')}>Audit Log</TabBtn>
           <TabBtn active={tab === 'users'} onClick={() => setTab('users')}>User Management</TabBtn>
+          <TabBtn active={tab === 'feedback'} onClick={() => setTab('feedback')} badge={feedbackStats?.open ?? 0}>Beta Feedback</TabBtn>
         </div>
       </div>
 
@@ -596,6 +647,66 @@ export default function AdminPage() {
                           >Ban</button>
                         )}
                       </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+
+        {tab === 'feedback' && !loading && (
+          <div className="space-y-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+              <KpiCard label="Open" value={feedbackStats?.open ?? 0} />
+              <KpiCard label="Blocking" value={feedbackStats?.blocking ?? 0} />
+              <KpiCard label="High" value={feedbackStats?.high ?? 0} />
+              <KpiCard label="Resolved" value={feedbackStats?.resolved ?? 0} />
+            </div>
+
+            {betaFeedback.length === 0 ? (
+              <p className="text-gray-500">No beta feedback yet.</p>
+            ) : (
+              <div className="space-y-3">
+                {betaFeedback.map((item) => (
+                  <div key={item.id} className="rounded-xl border border-gray-700 bg-gray-900 p-4">
+                    <div className="flex flex-wrap gap-2 items-center mb-2">
+                      <span className="rounded bg-indigo-900 px-2 py-0.5 text-xs font-bold text-indigo-200">{item.type.replaceAll('_', ' ')}</span>
+                      <span className={`rounded px-2 py-0.5 text-xs font-bold ${item.severity === 'BLOCKING' ? 'bg-red-900 text-red-200' : item.severity === 'HIGH' ? 'bg-orange-900 text-orange-200' : item.severity === 'MEDIUM' ? 'bg-yellow-900 text-yellow-200' : 'bg-gray-700 text-gray-200'}`}>
+                        {item.severity}
+                      </span>
+                      <span className="rounded bg-gray-800 px-2 py-0.5 text-xs text-gray-300">{item.deviceType}</span>
+                      <span className="text-xs text-gray-500">{new Date(item.createdAt).toLocaleString()}</span>
+                    </div>
+
+                    <p className="text-sm text-gray-200 mb-2">{item.description}</p>
+
+                    <div className="grid grid-cols-1 lg:grid-cols-4 gap-2 text-xs text-gray-400 mb-3">
+                      <div>user: <span className="text-gray-200">@{item.user.username}</span></div>
+                      <div>route: <span className="text-gray-200">{item.route}</span></div>
+                      <div className="truncate">device: <span className="text-gray-200">{item.deviceType}</span></div>
+                      <div className="truncate">browser: <span className="text-gray-200">{item.browser}</span></div>
+                    </div>
+
+                    {item.screenshotUrl && (
+                      <a href={item.screenshotUrl} target="_blank" rel="noreferrer" className="text-xs text-blue-400 hover:underline">
+                        Screenshot URL
+                      </a>
+                    )}
+
+                    <div className="mt-3 flex flex-wrap items-center gap-2">
+                      <label className="text-xs text-gray-400">Status</label>
+                      <select
+                        value={item.status}
+                        onChange={(e) => updateFeedbackStatus(item.id, e.target.value as BetaFeedbackItem['status'])}
+                        className="rounded border border-gray-700 bg-gray-800 px-2.5 py-1.5 text-xs text-white focus:outline-none focus:border-blue-500"
+                      >
+                        <option value="OPEN">OPEN</option>
+                        <option value="TRIAGED">TRIAGED</option>
+                        <option value="IN_PROGRESS">IN_PROGRESS</option>
+                        <option value="RESOLVED">RESOLVED</option>
+                        <option value="WONT_FIX">WONT_FIX</option>
+                      </select>
                     </div>
                   </div>
                 ))}
