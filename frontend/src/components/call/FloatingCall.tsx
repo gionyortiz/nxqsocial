@@ -155,8 +155,10 @@ function VoiceCallPanel({
 
 function OneToOneVideoStage({
   peerName,
+  peerAvatar,
 }: {
   peerName: string;
+  peerAvatar?: string | null;
 }) {
   const cameraTracks = useTracks(
     [{ source: Track.Source.Camera, withPlaceholder: true }],
@@ -165,6 +167,8 @@ function OneToOneVideoStage({
   const remoteTrack = cameraTracks.find((t) => !t.participant.isLocal) ?? null;
   const localTrack = cameraTracks.find((t) => t.participant.isLocal) ?? null;
   const [pipCorner, setPipCorner] = useState<'top-right' | 'bottom-right'>('bottom-right');
+  const remoteDisplayName =
+    remoteTrack?.participant.name || remoteTrack?.participant.identity || peerName;
 
   return (
     <div className="relative h-full w-full bg-black overflow-hidden">
@@ -173,22 +177,32 @@ function OneToOneVideoStage({
           <ParticipantTile trackRef={remoteTrack} className="h-full w-full" />
         ) : (
           <div className="h-full w-full flex flex-col items-center justify-center text-white bg-gradient-to-br from-slate-900 to-slate-700">
-            <Avatar src={undefined} alt={peerName} size="xl" className="ring-4 ring-white/20" />
+            <Avatar src={peerAvatar} alt={peerName} size="xl" className="ring-4 ring-white/20" />
             <p className="mt-3 text-sm font-semibold">Waiting for {peerName}</p>
           </div>
         )}
+      </div>
+
+      <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-black/45 border border-white/25 backdrop-blur text-white text-xs font-semibold">
+        {remoteDisplayName}
       </div>
 
       {localTrack && (
         <button
           type="button"
           onClick={() => setPipCorner((prev) => (prev === 'bottom-right' ? 'top-right' : 'bottom-right'))}
-          className={`absolute z-10 w-24 h-36 md:w-28 md:h-40 rounded-xl overflow-hidden border-2 border-white/70 shadow-2xl bg-black ${
-            pipCorner === 'bottom-right' ? 'bottom-3 right-3' : 'top-3 right-3'
-          }`}
+          className="absolute z-10 w-24 h-32 sm:w-28 sm:h-36 md:w-32 md:h-44 rounded-2xl overflow-hidden border border-white/60 shadow-2xl bg-black"
+          style={
+            pipCorner === 'bottom-right'
+              ? { right: 12, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }
+              : { right: 12, top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }
+          }
           title="Move self preview"
         >
           <ParticipantTile trackRef={localTrack} className="h-full w-full" />
+          <span className="absolute left-2 bottom-2 px-2 py-0.5 rounded-full bg-black/55 text-white text-[11px] font-semibold border border-white/30">
+            You
+          </span>
         </button>
       )}
     </div>
@@ -197,15 +211,17 @@ function OneToOneVideoStage({
 
 function VideoCallStage({
   peerName,
+  peerAvatar,
 }: {
   peerName: string;
+  peerAvatar?: string | null;
 }) {
   const participants = useParticipants();
   const remoteCount = participants.filter((p) => !p.isLocal).length;
   const isOneToOne = remoteCount <= 1;
 
   if (isOneToOne) {
-    return <OneToOneVideoStage peerName={peerName} />;
+    return <OneToOneVideoStage peerName={peerName} peerAvatar={peerAvatar} />;
   }
 
   // Group calls (3+ total participants) keep the standard conference layout.
@@ -531,7 +547,10 @@ export function FloatingCall() {
                 onEnd={() => endCall('manual_end')}
               />
             ) : (
-              <VideoCallStage peerName={peer?.displayName ?? peer?.username ?? 'Participant'} />
+              <VideoCallStage
+                peerName={peer?.displayName ?? peer?.username ?? 'Participant'}
+                peerAvatar={peer?.avatarUrl}
+              />
             )}
             <RoomAudioRenderer />
           </LiveKitRoom>
