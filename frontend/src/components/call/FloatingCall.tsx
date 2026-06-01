@@ -233,15 +233,18 @@ function CallRoomInner({
   onEnd,
   onConnected,
   onCompleted,
+  backgrounded,
 }: {
   onEnd: () => void;
   onConnected: () => void;
   onCompleted: () => void;
+  backgrounded: boolean;
 }) {
   const participants = useParticipants();
   const remoteCount = participants.filter((p) => !p.isLocal).length;
   const joinedRef = useRef(false);
   const ringbackRef = useRef<HTMLAudioElement | null>(null);
+  const remoteLeftTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (typeof window === 'undefined') return;
@@ -266,15 +269,24 @@ function CallRoomInner({
 
   useEffect(() => {
     if (remoteCount > 0) {
+      if (remoteLeftTimerRef.current) {
+        window.clearTimeout(remoteLeftTimerRef.current);
+        remoteLeftTimerRef.current = null;
+      }
       if (!joinedRef.current) onConnected();
       joinedRef.current = true;
       return;
     }
-    if (joinedRef.current && remoteCount === 0) {
-      onCompleted();
-      onEnd();
+    if (joinedRef.current && remoteCount === 0 && !backgrounded) {
+      if (remoteLeftTimerRef.current) return;
+      // On mobile Safari, participant subscriptions can briefly flap while app is backgrounded.
+      remoteLeftTimerRef.current = window.setTimeout(() => {
+        remoteLeftTimerRef.current = null;
+        onCompleted();
+        onEnd();
+      }, 15_000);
     }
-  }, [remoteCount, onEnd, onConnected, onCompleted]);
+  }, [remoteCount, onEnd, onConnected, onCompleted, backgrounded]);
 
   useEffect(() => {
     return () => {
@@ -286,6 +298,10 @@ function CallRoomInner({
         } catch {
           // ignore
         }
+      }
+      if (remoteLeftTimerRef.current) {
+        window.clearTimeout(remoteLeftTimerRef.current);
+        remoteLeftTimerRef.current = null;
       }
     };
   }, []);
@@ -308,10 +324,13 @@ export function FloatingCall() {
   const [error, setError] = useState<string | null>(null);
   const [pos, setPos] = useState<DragPos | null>(null);
   const [connectedAt, setConnectedAt] = useState<number | null>(null);
+  const [appBackgrounded, setAppBackgrounded] = useState(false);
+  const [showReturnBanner, setShowReturnBanner] = useState(false);
   const endedRef = useRef(false);
 
   const containerRef = useRef<HTMLDivElement | null>(null);
   const dragState = useRef<{ startX: number; startY: number; baseX: number; baseY: number } | null>(null);
+  const returnBannerTimerRef = useRef<number | null>(null);
 
   useEffect(() => {
     if (!room) {
@@ -320,6 +339,8 @@ export function FloatingCall() {
       setError(null);
       setPos(null);
       setConnectedAt(null);
+      setAppBackgrounded(false);
+      setShowReturnBanner(false);
       endedRef.current = false;
       return;
     }
@@ -385,6 +406,58 @@ export function FloatingCall() {
     setMediaMode('video', true);
     setMode('medium');
   }, [setMediaMode, setMode]);
+
+  useEffect(() => {
+    const tryEnterPictureInPicture = async () => {
+      const root = containerRef.current;
+      if (!root) return;
+      const videoEl = root.querySelector('video') as HTMLVideoElement | null;
+      if (!videoEl) return;
+      const docWithPip = document as Document & {
+        pictureInPictureEnabled?: boolean;
+        pictureInPictureElement?: Element | null;
+        exitPictureInPicture?: () => Promise<void>;
+      };
+      if (!docWithPip.pictureInPictureEnabled || docWithPip.pictureInPictureElement) return;
+      if ((videoEl as HTMLVideoElement & { disablePictureInPicture?: boolean }).disablePictureInPicture)
+        return;
+      try {
+        await videoEl.requestPictureInPicture?.();
+      } catch {
+        // ignore: PiP support differs by iOS/Safari/browser mode.
+      }
+    };
+
+    const onVisibilityChange = () => {
+      const state = document.visibilityState;
+      const hidden = state !== 'visible';
+      setAppBackgrounded(hidden);
+      void trackEvent('call_visibility_change', { room, callType, state, mode });
+      if (hidden) {
+        setMode('compact');
+        setShowReturnBanner(false);
+        void tryEnterPictureInPicture();
+        return;
+      }
+      setShowReturnBanner(true);
+      if (returnBannerTimerRef.current) {
+        window.clearTimeout(returnBannerTimerRef.current);
+      }
+      returnBannerTimerRef.current = window.setTimeout(() => {
+        setShowReturnBanner(false);
+        returnBannerTimerRef.current = null;
+      }, 8000);
+    };
+
+    document.addEventListener('visibilitychange', onVisibilityChange);
+    return () => {
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+      if (returnBannerTimerRef.current) {
+        window.clearTimeout(returnBannerTimerRef.current);
+        returnBannerTimerRef.current = null;
+      }
+    };
+  }, [room, callType, mode, setMode]);
 
   useEffect(() => {
     if (mode === 'full' && containerRef.current?.requestFullscreen) {
@@ -456,107 +529,122 @@ export function FloatingCall() {
   const callLabel = isVoiceMode ? 'Voice call' : 'Video call';
 
   return (
-    <div
-      ref={containerRef}
-      style={positionStyle}
-      className={`fixed ${zClass} ${sizeClass} overflow-hidden bg-black shadow-2xl ring-1 ring-white/10 flex flex-col`}
-      data-lk-theme="default"
-    >
-      <div
-        onPointerDown={onDragPointerDown}
-        onPointerMove={onDragPointerMove}
-        onPointerUp={onDragPointerUp}
-        className={`flex items-center gap-1 px-2.5 py-1.5 bg-gray-900/95 text-white select-none ${
-          !isVoiceMode && mode === 'full' ? '' : 'cursor-move'
-        }`}
-      >
-        {(isVoiceMode || mode !== 'full') && <GripHorizontal size={15} className="text-gray-500 shrink-0" />}
-        <span className="text-xs font-semibold flex-1 truncate">{callLabel}</span>
+    <>
+      {showReturnBanner && !appBackgrounded && mode === 'compact' && (
         <button
-          onClick={() => setMode('compact')}
-          title="Compact"
-          className={`p-1.5 rounded-md hover:bg-white/10 ${mode === 'compact' ? 'text-purple-400' : 'text-gray-300'}`}
+          onClick={() => {
+            setMode(isVoiceMode ? 'medium' : 'full');
+            setShowReturnBanner(false);
+          }}
+          className="fixed left-1/2 -translate-x-1/2 bottom-24 z-[210] px-4 py-2 rounded-full bg-black/85 text-white text-sm font-semibold ring-1 ring-white/20 shadow-2xl"
         >
-          <Minimize2 size={15} />
+          Return to call
         </button>
-        {!isVoiceMode && (
-          <>
-            <button
-              onClick={() => setMode('medium')}
-              title="Medium window"
-              className={`p-1.5 rounded-md hover:bg-white/10 ${mode === 'medium' ? 'text-purple-400' : 'text-gray-300'}`}
-            >
-              <Square size={14} />
-            </button>
-            <button
-              onClick={() => setMode('full')}
-              title="Fullscreen"
-              className={`p-1.5 rounded-md hover:bg-white/10 ${mode === 'full' ? 'text-purple-400' : 'text-gray-300'}`}
-            >
-              <Maximize2 size={15} />
-            </button>
-          </>
-        )}
-        <button
-          onClick={() => endCall('manual_end')}
-          title="Leave call"
-          className="p-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white ml-1"
-        >
-          <PhoneOff size={15} />
-        </button>
-      </div>
+      )}
 
-      <div className={`flex-1 min-h-0 relative ${!isVoiceMode && mode === 'full' ? 'nxq-call-full' : ''}`}>
-        {error ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 text-white">
-            <PhoneOff size={28} className="text-red-500 mb-3" />
-            <p className="text-xs text-gray-300 mb-4">{error}</p>
-            <button
-              onClick={end}
-              className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium"
-            >
-              Close
-            </button>
-          </div>
-        ) : !token || !serverUrl ? (
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
-            <div className="w-7 h-7 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mb-3" />
-            <p className="text-gray-400 text-xs">Connecting...</p>
-          </div>
-        ) : (
-          <LiveKitRoom
-            token={token}
-            serverUrl={serverUrl}
-            connect
-            video={video}
-            audio
-            onDisconnected={() => endCall('disconnect')}
-            style={{ height: '100%' }}
-            className="h-full w-full"
+      <div
+        ref={containerRef}
+        style={positionStyle}
+        className={`fixed ${zClass} ${sizeClass} overflow-hidden bg-black shadow-2xl ring-1 ring-white/10 flex flex-col`}
+        data-lk-theme="default"
+      >
+        <div
+          onPointerDown={onDragPointerDown}
+          onPointerMove={onDragPointerMove}
+          onPointerUp={onDragPointerUp}
+          className={`flex items-center gap-1 px-2.5 py-1.5 bg-gray-900/95 text-white select-none ${
+            !isVoiceMode && mode === 'full' ? '' : 'cursor-move'
+          }`}
+        >
+          {(isVoiceMode || mode !== 'full') && <GripHorizontal size={15} className="text-gray-500 shrink-0" />}
+          <span className="text-xs font-semibold flex-1 truncate">{callLabel}</span>
+          <button
+            onClick={() => setMode('compact')}
+            title="Compact"
+            className={`p-1.5 rounded-md hover:bg-white/10 ${mode === 'compact' ? 'text-purple-400' : 'text-gray-300'}`}
           >
-            <CallRoomInner
-              onConnected={markConnected}
-              onCompleted={() => emitCallEnd('remote_left')}
-              onEnd={() => endCall('remote_left')}
-            />
-            {isVoiceMode ? (
-              <VoiceCallPanel
-                peerName={peer?.displayName ?? peer?.username ?? 'Voice call'}
-                peerAvatar={peer?.avatarUrl}
-                connectedAt={connectedAt}
-                onUpgradeVideo={onUpgradeVideo}
-                onEnd={() => endCall('manual_end')}
+            <Minimize2 size={15} />
+          </button>
+          {!isVoiceMode && (
+            <>
+              <button
+                onClick={() => setMode('medium')}
+                title="Medium window"
+                className={`p-1.5 rounded-md hover:bg-white/10 ${mode === 'medium' ? 'text-purple-400' : 'text-gray-300'}`}
+              >
+                <Square size={14} />
+              </button>
+              <button
+                onClick={() => setMode('full')}
+                title="Fullscreen"
+                className={`p-1.5 rounded-md hover:bg-white/10 ${mode === 'full' ? 'text-purple-400' : 'text-gray-300'}`}
+              >
+                <Maximize2 size={15} />
+              </button>
+            </>
+          )}
+          <button
+            onClick={() => endCall('manual_end')}
+            title="Leave call"
+            className="p-1.5 rounded-md bg-red-500 hover:bg-red-600 text-white ml-1"
+          >
+            <PhoneOff size={15} />
+          </button>
+        </div>
+
+        <div className={`flex-1 min-h-0 relative ${!isVoiceMode && mode === 'full' ? 'nxq-call-full' : ''}`}>
+          {error ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-center px-4 text-white">
+              <PhoneOff size={28} className="text-red-500 mb-3" />
+              <p className="text-xs text-gray-300 mb-4">{error}</p>
+              <button
+                onClick={end}
+                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/20 text-xs font-medium"
+              >
+                Close
+              </button>
+            </div>
+          ) : !token || !serverUrl ? (
+            <div className="absolute inset-0 flex flex-col items-center justify-center text-white">
+              <div className="w-7 h-7 border-2 border-purple-400 border-t-transparent rounded-full animate-spin mb-3" />
+              <p className="text-gray-400 text-xs">Connecting...</p>
+            </div>
+          ) : (
+            <LiveKitRoom
+              token={token}
+              serverUrl={serverUrl}
+              connect
+              video={video}
+              audio
+              onDisconnected={() => endCall('disconnect')}
+              style={{ height: '100%' }}
+              className="h-full w-full"
+            >
+              <CallRoomInner
+                onConnected={markConnected}
+                onCompleted={() => emitCallEnd('remote_left')}
+                onEnd={() => endCall('remote_left')}
+                backgrounded={appBackgrounded}
               />
-            ) : (
-              <VideoCallStage
-                peerName={peer?.displayName ?? peer?.username ?? 'Participant'}
-                peerAvatar={peer?.avatarUrl}
-              />
-            )}
-            <RoomAudioRenderer />
-          </LiveKitRoom>
-        )}
+              {isVoiceMode ? (
+                <VoiceCallPanel
+                  peerName={peer?.displayName ?? peer?.username ?? 'Voice call'}
+                  peerAvatar={peer?.avatarUrl}
+                  connectedAt={connectedAt}
+                  onUpgradeVideo={onUpgradeVideo}
+                  onEnd={() => endCall('manual_end')}
+                />
+              ) : (
+                <VideoCallStage
+                  peerName={peer?.displayName ?? peer?.username ?? 'Participant'}
+                  peerAvatar={peer?.avatarUrl}
+                />
+              )}
+              <RoomAudioRenderer />
+            </LiveKitRoom>
+          )}
+        </div>
       </div>
-    </div>
+    </>
   );
 }
