@@ -7,6 +7,10 @@ import { api } from '@/lib/api';
 import { resolveMediaUrl } from '@/lib/utils';
 import { trackFirstEvent } from '@/lib/analytics';
 
+const ALLOWED_PROFILE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+const MAX_BANNER_SIZE = 8 * 1024 * 1024;
+
 interface ProfileSnapshot {
   displayName: string;
   bio?: string;
@@ -44,9 +48,29 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
   const avatarInputRef = useRef<HTMLInputElement>(null);
   const bannerInputRef = useRef<HTMLInputElement>(null);
 
+  const validateImage = (file: File, kind: 'avatar' | 'banner') => {
+    if (!ALLOWED_PROFILE_IMAGE_TYPES.includes(file.type)) {
+      return `${kind === 'avatar' ? 'Profile photo' : 'Banner image'} must be JPG, PNG, WEBP or GIF.`;
+    }
+
+    const sizeLimit = kind === 'avatar' ? MAX_AVATAR_SIZE : MAX_BANNER_SIZE;
+    if (file.size > sizeLimit) {
+      return `${kind === 'avatar' ? 'Profile photo' : 'Banner image'} must be smaller than ${Math.round(sizeLimit / 1024 / 1024)} MB.`;
+    }
+
+    return null;
+  };
+
   const pickAvatar = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const validationError = validateImage(file, 'avatar');
+    if (validationError) {
+      setError(validationError);
+      e.target.value = '';
+      return;
+    }
+    setError('');
     setAvatarFile(file);
     setAvatarPreview(URL.createObjectURL(file));
     setDoRemoveAvatar(false);
@@ -56,6 +80,13 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
   const pickBanner = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    const validationError = validateImage(file, 'banner');
+    if (validationError) {
+      setError(validationError);
+      e.target.value = '';
+      return;
+    }
+    setError('');
     setBannerFile(file);
     setBannerPreview(URL.createObjectURL(file));
     setDoRemoveBanner(false);
@@ -190,7 +221,7 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
               </button>
             )}
           </div>
-          <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pickBanner} />
+          <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={pickBanner} />
         </div>
 
         {/* Avatar + action buttons */}
@@ -198,9 +229,9 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
           <div className="flex items-end gap-4">
             {/* Avatar circle */}
             <div className="relative w-20 h-20 group flex-shrink-0">
-              <div className="w-20 h-20 rounded-full ring-4 ring-white bg-gray-100 overflow-hidden shadow-lg">
+              <div className="relative w-20 h-20 rounded-full ring-4 ring-white bg-gray-100 overflow-hidden shadow-lg">
                 {currentAvatar ? (
-                  <Image src={currentAvatar} alt="avatar" fill className="object-cover" sizes="80px" />
+                  <Image src={currentAvatar} alt="avatar" fill className="object-cover" sizes="80px" unoptimized />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-purple-100 to-pink-100">
                     <User size={28} className="text-purple-400" />
@@ -215,7 +246,7 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
               >
                 <Camera size={18} className="text-white" />
               </button>
-              <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp" className="hidden" onChange={pickAvatar} />
+              <input ref={avatarInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={pickAvatar} />
             </div>
 
             {/* Avatar action links */}
