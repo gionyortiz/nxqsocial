@@ -166,15 +166,20 @@ function OneToOneVideoStage({
   );
   const remoteTrack = cameraTracks.find((t) => !t.participant.isLocal) ?? null;
   const localTrack = cameraTracks.find((t) => t.participant.isLocal) ?? null;
-  const [pipCorner, setPipCorner] = useState<'top-right' | 'bottom-right'>('bottom-right');
+  const [localMain, setLocalMain] = useState(false);
+
+  const mainTrack = localMain ? localTrack : remoteTrack;
+  const pipTrack = localMain ? remoteTrack : localTrack;
+  const mainLabel = localMain ? 'You' : (remoteTrack?.participant.name || remoteTrack?.participant.identity || peerName);
+  const pipLabel = localMain ? (remoteTrack?.participant.name || remoteTrack?.participant.identity || peerName) : 'You';
   const remoteDisplayName =
     remoteTrack?.participant.name || remoteTrack?.participant.identity || peerName;
 
   return (
     <div className="relative h-full w-full bg-black overflow-hidden">
       <div className="absolute inset-0">
-        {remoteTrack ? (
-          <ParticipantTile trackRef={remoteTrack} className="h-full w-full" />
+        {mainTrack ? (
+          <ParticipantTile trackRef={mainTrack} className="h-full w-full" />
         ) : (
           <div className="h-full w-full flex flex-col items-center justify-center text-white bg-gradient-to-br from-slate-900 to-slate-700">
             <Avatar src={peerAvatar} alt={peerName} size="xl" className="ring-4 ring-white/20" />
@@ -184,24 +189,20 @@ function OneToOneVideoStage({
       </div>
 
       <div className="absolute top-3 left-3 z-10 px-2.5 py-1 rounded-full bg-black/45 border border-white/25 backdrop-blur text-white text-xs font-semibold">
-        {remoteDisplayName}
+        {mainLabel}
       </div>
 
-      {localTrack && (
+      {pipTrack && (
         <button
           type="button"
-          onClick={() => setPipCorner((prev) => (prev === 'bottom-right' ? 'top-right' : 'bottom-right'))}
+          onClick={() => setLocalMain((v) => !v)}
           className="absolute z-10 w-24 h-32 sm:w-28 sm:h-36 md:w-32 md:h-44 rounded-2xl overflow-hidden border border-white/60 shadow-2xl bg-black"
-          style={
-            pipCorner === 'bottom-right'
-              ? { right: 12, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }
-              : { right: 12, top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }
-          }
-          title="Move self preview"
+          style={{ right: 12, bottom: 'calc(env(safe-area-inset-bottom, 0px) + 12px)' }}
+          title="Swap videos"
         >
-          <ParticipantTile trackRef={localTrack} className="h-full w-full" />
+          <ParticipantTile trackRef={pipTrack} className="h-full w-full" />
           <span className="absolute left-2 bottom-2 px-2 py-0.5 rounded-full bg-black/55 text-white text-[11px] font-semibold border border-white/30">
-            You
+            {pipLabel}
           </span>
         </button>
       )}
