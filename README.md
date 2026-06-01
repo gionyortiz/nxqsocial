@@ -11,7 +11,7 @@ A trust-first social platform for verified humans — safer feeds, creator-first
 | Frontend | Next.js 15 (App Router), TypeScript, Tailwind CSS |
 | Backend | NestJS, TypeScript |
 | Database | PostgreSQL + Prisma ORM |
-| Auth | JWT + beta invite gate |
+| Auth | JWT + configurable invite gate |
 | File storage | AWS S3 signed uploads |
 | Safety | Text scan + AWS Rekognition media scan |
 | Verification | Stripe Identity + email/phone OTP |
@@ -21,7 +21,7 @@ A trust-first social platform for verified humans — safer feeds, creator-first
 
 NXQ Social is built around verified human identity from day one:
 
-- **Beta invite gating** — closed registration via invite codes
+- **Configurable invite gating** — switch between closed beta and open registration via env flag
 - **Email & phone OTP verification** — required before full access
 - **Stripe Identity verification** — government ID check for verified badge
 - **Trust score system** — progressive trust based on verification level
@@ -36,7 +36,7 @@ NXQ Social is built around verified human identity from day one:
 
 | Feature | Status |
 |---|---|
-| Registration + invite gate | ✅ Live |
+| Registration + configurable invite gate | ✅ Live |
 | Email / phone OTP | ✅ Live |
 | JWT auth | ✅ Live |
 | User profiles + follow/unfollow | ✅ Live |
@@ -109,7 +109,7 @@ See [DEPLOY.md](./DEPLOY.md) for the full production runbook covering:
 ### Auth & Registration
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | /api/auth/register | Invite code | Register with invite |
+| POST | /api/auth/register | Optional or required (config) | Register user |
 | POST | /api/auth/login | - | Login |
 | GET | /api/auth/me | JWT | Current user |
 

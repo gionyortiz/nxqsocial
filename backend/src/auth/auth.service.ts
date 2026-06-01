@@ -22,6 +22,14 @@ function flattenUser(user: any) {
 // comparisons when a login email does not exist.
 const DUMMY_PASSWORD_HASH = '$2a$12$C6UzMDM.H6dfI/f/IKcEeO6e9aQ2gqQ0iY8s9d1bq8eF1bQ7Z3pJK';
 
+function envBool(value: string | undefined): boolean | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return undefined;
+}
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -31,15 +39,30 @@ export class AuthService {
   ) {}
 
   async register(dto: RegisterDto) {
+    const normalize = (s?: string) => (s ?? '').trim().toUpperCase();
     const requiredCode = process.env.BETA_INVITE_CODE;
-    if (requiredCode) {
-      // Normalize both sides so copy-paste whitespace and casing don't cause
-      // spurious "invalid invite code" failures.
-      const normalize = (s?: string) => (s ?? '').trim().toUpperCase();
+
+    // Backward compatibility:
+    // - If REQUIRE_INVITE_CODE is not set, keep previous behavior and require
+    //   invite only when BETA_INVITE_CODE is configured.
+    const requireInviteConfigured = envBool(process.env.REQUIRE_INVITE_CODE);
+    const requireInvite = requireInviteConfigured ?? !!requiredCode;
+
+    if (requireInvite) {
+      if (!requiredCode) {
+        throw new ForbiddenException('Registration is invite-only, but invite code is not configured');
+      }
       if (normalize(dto.inviteCode) !== normalize(requiredCode)) {
         throw new ForbiddenException('Invalid invite code — this is a closed beta');
       }
     }
+
+    const signupSource =
+      normalize(dto.inviteCode) && requiredCode && normalize(dto.inviteCode) === normalize(requiredCode)
+        ? 'invite_code'
+        : requireInvite
+          ? 'invite_code'
+          : 'open_registration';
 
     const normalizedUsername = dto.username.trim().toLowerCase();
 
@@ -67,6 +90,18 @@ export class AuthService {
     });
 
     const token = this.jwtService.sign({ sub: user.id, email: user.email });
+
+    await this.prisma.analyticsEvent.create({
+      data: {
+        name: 'signup_completed',
+        userId: user.id,
+        properties: {
+          source: signupSource,
+          requireInvite,
+        } as any,
+      },
+    });
+
     return { access_token: token, user: flattenUser(user) };
   }
 

@@ -83,15 +83,20 @@ describe('Auth E2E', () => {
 
   describe('POST /api/auth/register — beta invite code gating', () => {
     const ORIGINAL = process.env.BETA_INVITE_CODE;
+    const ORIGINAL_REQUIRE = process.env.REQUIRE_INVITE_CODE;
 
     afterEach(() => {
       // Restore env so other tests are unaffected
       if (ORIGINAL === undefined) delete process.env.BETA_INVITE_CODE;
       else process.env.BETA_INVITE_CODE = ORIGINAL;
+
+      if (ORIGINAL_REQUIRE === undefined) delete process.env.REQUIRE_INVITE_CODE;
+      else process.env.REQUIRE_INVITE_CODE = ORIGINAL_REQUIRE;
     });
 
     it('allows registration when no invite code is configured', async () => {
       delete process.env.BETA_INVITE_CODE;
+      delete process.env.REQUIRE_INVITE_CODE;
       const id = uid();
       await request(app.getHttpServer())
         .post('/api/auth/register')
@@ -106,6 +111,7 @@ describe('Auth E2E', () => {
 
     it('blocks registration with 403 when wrong invite code is sent', async () => {
       process.env.BETA_INVITE_CODE = 'correct-code';
+      process.env.REQUIRE_INVITE_CODE = 'true';
       const id = uid();
       await request(app.getHttpServer())
         .post('/api/auth/register')
@@ -121,6 +127,7 @@ describe('Auth E2E', () => {
 
     it('blocks registration with 403 when invite code is required but omitted', async () => {
       process.env.BETA_INVITE_CODE = 'correct-code';
+      process.env.REQUIRE_INVITE_CODE = 'true';
       const id = uid();
       await request(app.getHttpServer())
         .post('/api/auth/register')
@@ -135,6 +142,7 @@ describe('Auth E2E', () => {
 
     it('allows registration with the correct invite code', async () => {
       process.env.BETA_INVITE_CODE = 'correct-code';
+      process.env.REQUIRE_INVITE_CODE = 'true';
       const id = uid();
       const { status } = await request(app.getHttpServer())
         .post('/api/auth/register')
@@ -146,6 +154,36 @@ describe('Auth E2E', () => {
           inviteCode: 'correct-code',
         });
       expect(status).toBe(201);
+    });
+
+    it('allows open registration when REQUIRE_INVITE_CODE=false', async () => {
+      process.env.BETA_INVITE_CODE = 'correct-code';
+      process.env.REQUIRE_INVITE_CODE = 'false';
+      const id = uid();
+      await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          email: `open_${id}@nexasocial.test`,
+          username: `open_${id}`,
+          password: 'P@ssw0rd_Test!',
+          displayName: 'Open Signup',
+        })
+        .expect(201);
+    });
+
+    it('blocks registration when REQUIRE_INVITE_CODE=true but invite secret missing', async () => {
+      delete process.env.BETA_INVITE_CODE;
+      process.env.REQUIRE_INVITE_CODE = 'true';
+      const id = uid();
+      await request(app.getHttpServer())
+        .post('/api/auth/register')
+        .send({
+          email: `misconfig_${id}@nexasocial.test`,
+          username: `misconfig_${id}`,
+          password: 'P@ssw0rd_Test!',
+          displayName: 'Misconfigured Gate',
+        })
+        .expect(403);
     });
   });
 

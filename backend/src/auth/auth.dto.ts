@@ -34,7 +34,7 @@ export class RegisterDto {
   @StrongPassword()
   password: string;
 
-  /** Required when BETA_INVITE_CODE env var is set */
+  /** Required when invite gating is enabled (REQUIRE_INVITE_CODE=true). */
   @IsOptional()
   @IsString()
   inviteCode?: string;
