@@ -7,7 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { runUploadPipeline, getMediaStatus, removeMedia } from '@/lib/media';
+import { runUploadPipeline, getMediaStatus } from '@/lib/media';
 import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 type Phase =
@@ -153,7 +153,7 @@ export default function UploadPage() {
       return;
     }
     try {
-      await removeMedia(mediaId);
+      await api.delete(`/media/${mediaId}`);
       reset();
     } catch (err: any) {
       setError(err.response?.data?.message ?? 'Unable to remove video');
