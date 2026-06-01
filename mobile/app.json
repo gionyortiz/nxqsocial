@@ -9,11 +9,11 @@
     "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "com.nxqsocial.app",
+      "bundleIdentifier": "com.gionyortiz.nxqsocial",
       "buildNumber": "1"
     },
     "android": {
-      "package": "com.nxqsocial.app",
+      "package": "com.gionyortiz.nxqsocial",
       "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
