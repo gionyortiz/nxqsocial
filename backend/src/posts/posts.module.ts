@@ -7,5 +7,6 @@ import { SafetyModule } from '../safety/safety.module';
   imports: [SafetyModule],
   providers: [PostsService],
   controllers: [PostsController],
+  exports: [PostsService],
 })
 export class PostsModule {}

@@ -25,6 +25,7 @@ import { CallsModule } from './calls/calls.module';
 import { LiveModule } from './live/live.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { FeedbackModule } from './feedback/feedback.module';
+import { FeedModule } from './feed/feed.module';
 import { getClientIpFromRequest } from './common/network/client-ip';
 
 @Module({
@@ -61,6 +62,7 @@ import { getClientIpFromRequest } from './common/network/client-ip';
     LiveModule,
     AnalyticsModule,
     FeedbackModule,
+    FeedModule,
   ],
 })
 export class AppModule {}

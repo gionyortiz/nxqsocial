@@ -41,6 +41,15 @@ function mapPost(p: any) {
   };
 }
 
+interface StoryCandidate {
+  id: string;
+  username: string;
+  displayName: string;
+  avatarUrl: string | null;
+  isLive: boolean;
+  hasRecentPost: boolean;
+}
+
 @Injectable()
 export class PostsService {
   private readonly logger = new Logger(PostsService.name);
@@ -191,6 +200,140 @@ export class PostsService {
     const hasMore = posts.length > take;
     const data = posts.slice(0, take).map(mapPost);
     return { data, nextCursor: hasMore ? data[data.length - 1].id : null, mode };
+  }
+
+  async getStoryCandidates(userId: string, take = 20) {
+    const recentPostCutoff = new Date(Date.now() - 1000 * 60 * 60 * 48);
+    const liveCutoff = new Date(Date.now() - 45_000);
+
+    const [currentUser, followingRows, liveSessions] = await Promise.all([
+      this.prisma.user.findUnique({
+        where: { id: userId },
+        select: {
+          id: true,
+          username: true,
+          profile: { select: { displayName: true, avatarUrl: true } },
+        },
+      }),
+      this.prisma.follow.findMany({
+        where: { followerId: userId },
+        orderBy: { createdAt: 'desc' },
+        select: {
+          following: {
+            select: {
+              id: true,
+              username: true,
+              profile: { select: { displayName: true, avatarUrl: true } },
+            },
+          },
+        },
+      }),
+      this.prisma.liveSession.findMany({
+        where: { status: 'LIVE', updatedAt: { gte: liveCutoff } },
+        include: {
+          host: {
+            select: {
+              id: true,
+              username: true,
+              profile: { select: { displayName: true, avatarUrl: true } },
+            },
+          },
+        },
+        orderBy: { viewerCount: 'desc' },
+      }),
+    ]);
+
+    const followingUsers = followingRows.map((row) => row.following);
+    const followingIds = followingUsers.map((user) => user.id);
+
+    const recentPostRows = followingIds.length
+      ? await this.prisma.post.findMany({
+          where: {
+            status: 'PUBLISHED',
+            visibility: 'PUBLIC',
+            authorId: { in: followingIds },
+            createdAt: { gte: recentPostCutoff },
+          },
+          select: { authorId: true },
+          orderBy: { createdAt: 'desc' },
+          distinct: ['authorId'],
+        })
+      : [];
+
+    const recentAuthorIds = new Set(recentPostRows.map((row) => row.authorId));
+
+    const candidates = new Map<string, StoryCandidate>();
+
+    for (const person of followingUsers) {
+      candidates.set(person.id, {
+        id: person.id,
+        username: person.username,
+        displayName: person.profile?.displayName ?? person.username,
+        avatarUrl: person.profile?.avatarUrl ?? null,
+        isLive: false,
+        hasRecentPost: recentAuthorIds.has(person.id),
+      });
+    }
+
+    for (const session of liveSessions) {
+      const host = session.host;
+      if (!host || host.id === userId) continue;
+      const existing = candidates.get(host.id);
+      if (existing) {
+        existing.isLive = true;
+      } else {
+        candidates.set(host.id, {
+          id: host.id,
+          username: host.username,
+          displayName: host.profile?.displayName ?? host.username,
+          avatarUrl: host.profile?.avatarUrl ?? null,
+          isLive: true,
+          hasRecentPost: false,
+        });
+      }
+    }
+
+    const storyCandidates = Array.from(candidates.values())
+      .sort((left, right) => {
+        if (left.isLive !== right.isLive) return Number(right.isLive) - Number(left.isLive);
+        if (left.hasRecentPost !== right.hasRecentPost) return Number(right.hasRecentPost) - Number(left.hasRecentPost);
+        return left.username.localeCompare(right.username);
+      })
+      .slice(0, take);
+
+    const suggestedCreators = followingUsers.length
+      ? []
+      : await this.prisma.user.findMany({
+          where: {
+            id: { not: userId },
+            posts: { some: { status: 'PUBLISHED', visibility: 'PUBLIC' } },
+          },
+          take: 5,
+          orderBy: { createdAt: 'desc' },
+          select: {
+            id: true,
+            username: true,
+            profile: { select: { displayName: true, avatarUrl: true } },
+          },
+        }).then((rows) => rows.map((row) => ({
+          id: row.id,
+          username: row.username,
+          displayName: row.profile?.displayName ?? row.username,
+          avatarUrl: row.profile?.avatarUrl ?? null,
+        })));
+
+    return {
+      currentUser: currentUser
+        ? {
+            id: currentUser.id,
+            username: currentUser.username,
+            displayName: currentUser.profile?.displayName ?? currentUser.username,
+            avatarUrl: currentUser.profile?.avatarUrl ?? null,
+          }
+        : null,
+      storyCandidates,
+      suggestedCreators,
+    };
   }
 
   async getReels(userId: string, cursor?: string, take = 10) {

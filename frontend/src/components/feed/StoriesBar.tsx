@@ -12,6 +12,13 @@ interface StoryUser {
   username: string;
   displayName: string;
   avatarUrl?: string;
+  isLive?: boolean;
+  hasRecentPost?: boolean;
+}
+
+interface StoriesResponse {
+  storyCandidates: StoryUser[];
+  suggestedCreators: Array<Pick<StoryUser, 'id' | 'username' | 'displayName' | 'avatarUrl'>>;
 }
 
 /**
@@ -22,18 +29,29 @@ interface StoryUser {
 export function StoriesBar() {
   const { user } = useAuthStore();
   const [people, setPeople] = useState<StoryUser[]>([]);
+  const [suggested, setSuggested] = useState<Array<Pick<StoryUser, 'id' | 'username' | 'displayName' | 'avatarUrl'>>>([]);
   const scrollRef = useRef<HTMLDivElement | null>(null);
   const [canLeft, setCanLeft] = useState(false);
   const [canRight, setCanRight] = useState(false);
 
   useEffect(() => {
+    if (!user?.username) {
+      setPeople([]);
+      setSuggested([]);
+      return;
+    }
+
     api
-      .get('/users/search', { params: { q: '' } })
+      .get('/feed/stories', { params: { take: 15 } })
       .then(({ data }) => {
-        const list: StoryUser[] = Array.isArray(data) ? data : [];
-        setPeople(list.filter((u) => u.username !== user?.username).slice(0, 15));
+        const payload = (data ?? {}) as StoriesResponse;
+        setPeople(Array.isArray(payload.storyCandidates) ? payload.storyCandidates : []);
+        setSuggested(Array.isArray(payload.suggestedCreators) ? payload.suggestedCreators : []);
       })
-      .catch(() => {});
+      .catch(() => {
+        setPeople([]);
+        setSuggested([]);
+      });
   }, [user?.username]);
 
   // Track whether the row can scroll further in each direction.
@@ -108,22 +126,48 @@ export function StoriesBar() {
           <span className="text-[11px] text-gray-600 truncate w-full text-center">Your story</span>
         </Link>
 
-        {/* Other people */}
+        {/* Following activity */}
         {people.map((p) => (
           <Link
             key={p.id}
             href={`/profile/${p.username}`}
             className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16"
           >
-            <div className="p-[2px] rounded-full bg-gradient-to-tr from-purple-500 via-fuchsia-500 to-amber-400">
+            <div className={`p-[2px] rounded-full ${p.isLive ? 'bg-gradient-to-tr from-rose-500 via-fuchsia-500 to-amber-400' : 'bg-gradient-to-tr from-purple-500 via-fuchsia-500 to-amber-400'}`}>
               <div className="p-[2px] bg-white rounded-full">
                 <Avatar src={p.avatarUrl} alt={p.username} size="lg" />
               </div>
             </div>
             <span className="text-[11px] text-gray-600 truncate w-full text-center">{p.username}</span>
+            <span className={`-mt-1 text-[10px] font-semibold ${p.isLive ? 'text-rose-500' : 'text-purple-600'}`}>
+              {p.isLive ? 'LIVE' : 'NEW'}
+            </span>
           </Link>
         ))}
+
+        {people.length === 0 && (
+          <div className="flex min-h-[78px] items-center px-2 text-sm text-gray-500">
+            Follow more people to see live sessions and new posts here.
+          </div>
+        )}
       </div>
+
+      {people.length === 0 && suggested.length > 0 && (
+        <div className="mt-3 border-t border-gray-100 pt-3">
+          <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-gray-500">Suggested creators</p>
+          <div className="flex gap-3 overflow-x-auto scrollbar-hide">
+            {suggested.map((p) => (
+              <Link key={p.id} href={`/profile/${p.username}`} className="flex min-w-[150px] items-center gap-2 rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 hover:bg-gray-100">
+                <Avatar src={p.avatarUrl} alt={p.username} size="sm" />
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-gray-800">{p.displayName}</p>
+                  <p className="truncate text-xs text-gray-500">@{p.username}</p>
+                </div>
+              </Link>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }
