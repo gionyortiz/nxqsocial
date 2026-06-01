@@ -3,7 +3,16 @@
 import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
-import { Heart, MessageCircle, Share2, Bookmark, MoreHorizontal, Trash2, Play } from 'lucide-react';
+import {
+  Heart,
+  MessageCircle,
+  Bookmark,
+  MoreHorizontal,
+  Trash2,
+  Play,
+  Repeat2,
+  Send,
+} from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import { formatCount, timeAgo, cn } from '@/lib/utils';
@@ -52,6 +61,10 @@ const AI_LABEL_TEXT: Record<string, string> = {
 export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCardProps) {
   const [liked, setLiked] = useState(post.isLiked);
   const [likeCount, setLikeCount] = useState(post._count.likes);
+  const [saved, setSaved] = useState(false);
+  const [reposted, setReposted] = useState(false);
+  const [repostCount, setRepostCount] = useState(0);
+  const [captionExpanded, setCaptionExpanded] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -79,6 +92,7 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
       setConfirmDelete(false);
     }
   };
+
   const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
   const firstMedia = post.media?.[0];
   const mediaSrc = firstMedia
@@ -89,33 +103,74 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
         ? firstMedia.thumbnailUrl
         : `${mediaBase}${firstMedia.thumbnailUrl}`)
     : null;
-  const isVideo = (firstMedia?.mimeType?.startsWith('video/') ?? false) || post.type === 'VIDEO' || post.type === 'SHORT_VIDEO';
+  const isVideo =
+    (firstMedia?.mimeType?.startsWith('video/') ?? false) ||
+    post.type === 'VIDEO' ||
+    post.type === 'SHORT_VIDEO';
+  const commentCount = post._count.comments ?? 0;
+  const caption = post.caption?.trim() ?? '';
+  const shouldTruncateCaption = caption.length > 140;
+  const captionText = shouldTruncateCaption && !captionExpanded ? `${caption.slice(0, 140).trim()}...` : caption;
 
   const toggleLike = async () => {
     try {
       setLiked((p) => !p);
-      setLikeCount((c) => liked ? c - 1 : c + 1);
+      setLikeCount((c) => (liked ? c - 1 : c + 1));
       const { data } = await api.post(`/posts/${post.id}/likes`);
       setLiked(data.liked);
       setLikeCount(data.count);
     } catch {
       setLiked((p) => !p);
-      setLikeCount((c) => liked ? c + 1 : c - 1);
+      setLikeCount((c) => (liked ? c + 1 : c - 1));
     }
   };
 
-  const toggleSave = () => api.post(`/posts/${post.id}/save`).catch(() => null);
+  const toggleSave = async () => {
+    const previous = saved;
+    setSaved((p) => !p);
+    try {
+      const { data } = await api.post(`/posts/${post.id}/save`);
+      setSaved(!!data?.saved);
+    } catch {
+      setSaved(previous);
+    }
+  };
+
+  const toggleRepost = () => {
+    setReposted((prev) => {
+      setRepostCount((count) => (prev ? Math.max(0, count - 1) : count + 1));
+      return !prev;
+    });
+  };
+
+  const sharePost = async () => {
+    const postUrl =
+      typeof window !== 'undefined'
+        ? `${window.location.origin}/feed?post=${post.id}`
+        : `/feed?post=${post.id}`;
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: `${post.author.username} on NXQ Social`,
+          text: post.caption ?? 'Check out this post on NXQ Social',
+          url: postUrl,
+        });
+        return;
+      }
+      await navigator.clipboard.writeText(postUrl);
+    } catch {
+      // no-op
+    }
+  };
 
   return (
     <article className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
-      {/* AI label warning */}
       {post.aiLabel && AI_LABEL_TEXT[post.aiLabel] && (
         <div className="bg-amber-50 border-b border-amber-100 px-4 py-1.5 text-xs text-amber-700">
           {AI_LABEL_TEXT[post.aiLabel]}
         </div>
       )}
 
-      {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-4 pb-3">
         <Link href={`/profile/${post.author.username}`}>
           <Avatar src={post.author.avatarUrl} alt={post.author.username} size="md" />
@@ -138,7 +193,10 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
             {menuOpen && (
               <div className="absolute right-0 top-8 z-20 w-40 bg-white rounded-xl shadow-lg border border-gray-100 overflow-hidden">
                 <button
-                  onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
+                  onClick={() => {
+                    setMenuOpen(false);
+                    setConfirmDelete(true);
+                  }}
                   className="flex items-center gap-2 w-full px-4 py-2.5 text-sm text-red-500 hover:bg-red-50 transition-colors"
                 >
                   <Trash2 size={15} /> Delete post
@@ -149,7 +207,6 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
         )}
       </div>
 
-      {/* Media */}
       {mediaSrc && (
         <div className={cn('bg-black relative overflow-hidden', isVideo ? 'aspect-[4/5] md:aspect-[5/4]' : 'aspect-[4/5]')}>
           {thumbnailSrc && (
@@ -204,49 +261,92 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
         </div>
       )}
 
-      {/* Actions */}
-      <div className="px-4 pt-3 pb-2 flex items-center gap-1.5">
-        <button
-          onClick={toggleLike}
-          className={cn(
-            'h-10 px-3 rounded-full flex items-center gap-2 text-sm font-semibold transition-colors',
-            liked ? 'text-red-500 bg-red-50' : 'text-gray-600 hover:text-red-400 hover:bg-red-50/70',
-          )}
-        >
-          <Heart size={20} fill={liked ? 'currentColor' : 'none'} />
-          <span>{formatCount(likeCount)}</span>
-        </button>
+      <div className="px-4 pt-3 pb-1.5">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-1">
+            <button
+              onClick={toggleLike}
+              className={cn(
+                'h-11 w-11 rounded-full flex items-center justify-center transition-colors',
+                liked ? 'text-red-500 bg-red-50' : 'text-gray-700 hover:text-red-500 hover:bg-red-50/80',
+              )}
+              title="Like"
+              aria-label="Like"
+            >
+              <Heart size={24} fill={liked ? 'currentColor' : 'none'} />
+            </button>
 
-        <button
-          onClick={() => onCommentClick?.(post.id)}
-          className="h-10 px-3 rounded-full flex items-center gap-2 text-sm font-semibold text-gray-600 hover:text-purple-600 hover:bg-purple-50 transition-colors"
-        >
-          <MessageCircle size={20} />
-          <span>{formatCount(post._count.comments)}</span>
-        </button>
+            <button
+              onClick={() => onCommentClick?.(post.id)}
+              className="h-11 w-11 rounded-full flex items-center justify-center text-gray-700 hover:text-purple-600 hover:bg-purple-50 transition-colors"
+              title="Comment"
+              aria-label="Comment"
+            >
+              <MessageCircle size={24} />
+            </button>
 
-        <button onClick={toggleSave} className="h-10 w-10 rounded-full flex items-center justify-center text-gray-500 hover:text-yellow-600 hover:bg-yellow-50 transition-colors" title="Save post">
-          <Bookmark size={19} />
-        </button>
+            <button
+              onClick={toggleRepost}
+              className={cn(
+                'h-11 w-11 rounded-full flex items-center justify-center transition-colors',
+                reposted ? 'text-indigo-600 bg-indigo-50' : 'text-gray-700 hover:text-indigo-600 hover:bg-indigo-50',
+              )}
+              title="Repost"
+              aria-label="Repost"
+            >
+              <Repeat2 size={24} />
+            </button>
 
-        <button className="ml-auto h-10 w-10 rounded-full flex items-center justify-center text-gray-500 hover:text-indigo-600 hover:bg-indigo-50 transition-colors" title="Share">
-          <Share2 size={19} />
-        </button>
+            <button
+              onClick={sharePost}
+              className="h-11 w-11 rounded-full flex items-center justify-center text-gray-700 hover:text-cyan-600 hover:bg-cyan-50 transition-colors"
+              title="Send"
+              aria-label="Send"
+            >
+              <Send size={24} />
+            </button>
+          </div>
+
+          <button
+            onClick={toggleSave}
+            className={cn(
+              'h-11 w-11 rounded-full flex items-center justify-center transition-colors',
+              saved ? 'text-amber-600 bg-amber-50' : 'text-gray-700 hover:text-amber-600 hover:bg-amber-50',
+            )}
+            title="Save"
+            aria-label="Save"
+          >
+            <Bookmark size={24} fill={saved ? 'currentColor' : 'none'} />
+          </button>
+        </div>
+
+        <div className="mt-1.5 text-sm text-gray-700 font-medium flex items-center gap-3">
+          <span>{formatCount(likeCount)} likes</span>
+          <span>{formatCount(commentCount)} comments</span>
+          <span>{formatCount(repostCount)} reposts</span>
+        </div>
       </div>
 
-      {/* Caption */}
-      {post.caption && (
+      {caption && (
         <div className="px-4 pb-4 pt-0.5">
           <p className="text-[15px] leading-6 text-gray-800">
             <Link href={`/profile/${post.author.username}`} className="font-semibold mr-1.5 text-gray-900">
               {post.author.username}
             </Link>
-            <span className="break-words">{post.caption}</span>
+            <span className="break-words">{captionText}</span>
+            {shouldTruncateCaption && !captionExpanded && (
+              <button
+                type="button"
+                onClick={() => setCaptionExpanded(true)}
+                className="ml-1.5 text-gray-500 hover:text-gray-700 font-medium"
+              >
+                more
+              </button>
+            )}
           </p>
         </div>
       )}
 
-      {/* Delete confirm modal */}
       {confirmDelete && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl w-full max-w-sm p-6 text-center">
