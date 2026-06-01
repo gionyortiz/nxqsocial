@@ -104,6 +104,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [startingCall, setStartingCall] = useState(false);
   const [callPickerOpen, setCallPickerOpen] = useState(false);
   const [liveRoom, setLiveRoom] = useState<string | null>(null);
+  const [lightboxPost, setLightboxPost] = useState<Post | null>(null);
+
+  useEffect(() => {
+    if (!lightboxPost) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setLightboxPost(null);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightboxPost]);
 
   useEffect(() => {
     let active = true;
@@ -505,7 +515,20 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 const thumbnail = first?.thumbnailUrl ? mediaSrc(first.thumbnailUrl) : null;
                 const isVideo = first?.mimeType?.startsWith('video/');
                 return (
-                  <div key={post.id} className="group relative aspect-square bg-gray-100 overflow-hidden">
+                  <div
+                    key={post.id}
+                    role="button"
+                    tabIndex={0}
+                    onClick={() => setLightboxPost(post)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setLightboxPost(post);
+                      }
+                    }}
+                    className="group relative aspect-square bg-gray-100 overflow-hidden text-left cursor-zoom-in outline-none"
+                    aria-label={`Open post by ${profile.username}`}
+                  >
                     {src && (isVideo ? (
                       <>
                         {thumbnail ? (
@@ -570,6 +593,62 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
         </div>
         </div>
       </div>
+
+      {/* ── Lightbox preview ─────────────────────────────────────────────── */}
+      {lightboxPost && (() => {
+        const first = lightboxPost.media?.[0];
+        const src = first ? mediaSrc(first.url) : null;
+        const thumbnail = first?.thumbnailUrl ? mediaSrc(first.thumbnailUrl) : null;
+        const isVideo = first?.mimeType?.startsWith('video/');
+        return (
+          <div className="fixed inset-0 z-[80] flex items-center justify-center bg-black/85 backdrop-blur-sm p-4">
+            <button
+              type="button"
+              onClick={() => setLightboxPost(null)}
+              className="absolute inset-0 w-full h-full cursor-zoom-out"
+              aria-label="Close preview"
+            />
+            <div className="relative z-10 w-full max-w-5xl rounded-3xl overflow-hidden bg-black shadow-2xl ring-1 ring-white/10">
+              <div className="flex items-center justify-between px-4 py-3 bg-black/70 text-white border-b border-white/10">
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold truncate">@{profile.username}</p>
+                  {lightboxPost.caption ? <p className="text-xs text-white/70 truncate">{lightboxPost.caption}</p> : null}
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setLightboxPost(null)}
+                  className="p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+                  aria-label="Close preview"
+                >
+                  <X size={18} />
+                </button>
+              </div>
+              <div className="relative bg-black flex items-center justify-center max-h-[82vh]">
+                {src && isVideo ? (
+                  <video
+                    src={src}
+                    controls
+                    autoPlay
+                    muted
+                    playsInline
+                    className="max-h-[82vh] w-full object-contain bg-black"
+                    poster={thumbnail ?? undefined}
+                  />
+                ) : src ? (
+                  <Image
+                    src={src}
+                    alt={lightboxPost.caption ?? 'Post preview'}
+                    width={1600}
+                    height={1200}
+                    className="w-full h-auto max-h-[82vh] object-contain"
+                    priority
+                  />
+                ) : null}
+              </div>
+            </div>
+          </div>
+        );
+      })()}
 
       {/* ── Edit profile modal ─────────────────────────────────────────────── */}
       {editOpen && (
