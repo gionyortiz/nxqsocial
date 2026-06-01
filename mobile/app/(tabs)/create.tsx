@@ -39,6 +39,24 @@ export default function CreateScreen() {
     setAssetType(a.type === 'video' ? 'video' : 'image');
   };
 
+  const captureMedia = async () => {
+    const perms = await ImagePicker.requestCameraPermissionsAsync();
+    if (!perms.granted) {
+      Alert.alert('Permission needed', 'Enable camera access to capture media.');
+      return;
+    }
+
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ['images', 'videos'],
+      quality: 1,
+    });
+
+    if (result.canceled || !result.assets?.length) return;
+    const a = result.assets[0];
+    setAssetUri(a.uri);
+    setAssetType(a.type === 'video' ? 'video' : 'image');
+  };
+
   const submit = async () => {
     if (!token || !assetUri || !assetType) return;
     setPosting(true);
@@ -82,11 +100,16 @@ export default function CreateScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
       <View style={{ flex: 1, padding: 14, gap: 12 }}>
         <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>Create Post</Text>
-        <Text style={{ color: '#93a1bd' }}>Native picker for photo/video uploads.</Text>
+        <Text style={{ color: '#93a1bd' }}>Use camera or library for photo/video uploads.</Text>
 
-        <Pressable onPress={pickMedia} style={{ backgroundColor: '#111827', borderRadius: 12, padding: 14 }}>
-          <Text style={{ color: '#c7d2fe', fontWeight: '700' }}>{assetUri ? 'Change media' : 'Pick photo or video'}</Text>
-        </Pressable>
+        <View style={{ flexDirection: 'row', gap: 10 }}>
+          <Pressable onPress={captureMedia} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 12, padding: 14 }}>
+            <Text style={{ color: '#c7d2fe', fontWeight: '700', textAlign: 'center' }}>Open camera</Text>
+          </Pressable>
+          <Pressable onPress={pickMedia} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 12, padding: 14 }}>
+            <Text style={{ color: '#c7d2fe', fontWeight: '700', textAlign: 'center' }}>{assetUri ? 'Change media' : 'Pick from library'}</Text>
+          </Pressable>
+        </View>
 
         {assetUri && assetType === 'image' ? (
           <Image source={{ uri: assetUri }} style={{ width: '100%', height: 260, borderRadius: 12 }} resizeMode="cover" />

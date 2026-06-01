@@ -8,9 +8,13 @@
     "scheme": "nxqsocial",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "supportsTablet": true
+      "supportsTablet": true,
+      "bundleIdentifier": "com.nxqsocial.app",
+      "buildNumber": "1"
     },
     "android": {
+      "package": "com.nxqsocial.app",
+      "versionCode": 1,
       "adaptiveIcon": {
         "backgroundColor": "#E6F4FE",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
@@ -37,6 +41,12 @@
     ],
     "experiments": {
       "typedRoutes": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "a4f27391-f0b4-4b73-9a2d-a1f87f68c77c"
+      }
     }
   }
 }

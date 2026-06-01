@@ -38,6 +38,43 @@ Open on device:
 - iPhone: Expo Go + QR code
 - Android: Expo Go + QR code
 
+## Build Real App Binaries (APK/IPA)
+
+This project is configured to produce installable mobile apps (not just Expo Go previews).
+
+1. Install EAS CLI:
+
+```bash
+npm install -g eas-cli
+```
+
+2. Login to Expo account:
+
+```bash
+eas login
+```
+
+3. Build internal test binaries:
+
+```bash
+cd mobile
+npm run build:android
+npm run build:ios
+```
+
+4. Build production binaries for stores:
+
+```bash
+cd mobile
+npm run build:prod:android
+npm run build:prod:ios
+```
+
+Configured identifiers:
+
+- iOS bundle ID: `com.nxqsocial.app`
+- Android package: `com.nxqsocial.app`
+
 ## Notes
 
 - This app reuses the existing NXQ backend.
