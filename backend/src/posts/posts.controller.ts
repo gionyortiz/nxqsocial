@@ -19,8 +19,11 @@ export class PostsController {
     FileInterceptor('media', {
       storage: memoryStorage(),
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.match(/^(image\/(jpeg|png|webp)|video\/(mp4|webm|quicktime))$/)) {
-          return cb(new BadRequestException('Unsupported file type'), false);
+        if (!file.mimetype.match(/^(image\/(jpeg|png|webp)|video\/mp4)$/)) {
+          return cb(
+            new BadRequestException('Unsupported file type. Videos must be MP4 (H.264/AAC).'),
+            false,
+          );
         }
         cb(null, true);
       },

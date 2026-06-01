@@ -30,13 +30,20 @@ function ViewerItem({ post, active, muted, onToggleMute }: {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [liked, setLiked] = useState(post.isLiked);
   const [likeCount, setLikeCount] = useState(post._count.likes);
+  const [playbackError, setPlaybackError] = useState(false);
   const firstMedia = post.media?.[0];
   const src = resolveSrc(firstMedia?.url);
 
   useEffect(() => {
     const v = videoRef.current;
     if (!v) return;
-    if (active) { v.currentTime = 0; v.play().catch(() => {}); }
+    if (active) {
+      v.currentTime = 0;
+      v.play().catch(() => {
+        // iPhone Safari can fail playback for incompatible codecs.
+        setPlaybackError(true);
+      });
+    }
     else v.pause();
   }, [active]);
 
@@ -63,9 +70,26 @@ function ViewerItem({ post, active, muted, onToggleMute }: {
           loop
           muted={muted}
           playsInline
+          preload="metadata"
+          onLoadedData={() => setPlaybackError(false)}
+          onError={() => setPlaybackError(true)}
           onClick={() => { const v = videoRef.current; if (!v) return; v.paused ? v.play().catch(() => {}) : v.pause(); }}
           poster={firstMedia?.thumbnailUrl ?? undefined}
         />
+      )}
+
+      {playbackError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/70 px-6 text-center text-white">
+          <p className="text-sm font-semibold">This video format is not supported on this device.</p>
+          <a
+            href={src}
+            target="_blank"
+            rel="noreferrer"
+            className="px-3 py-2 rounded-lg bg-white/15 hover:bg-white/25 text-xs font-semibold"
+          >
+            Open original video
+          </a>
+        </div>
       )}
 
       {/* Mute toggle */}

@@ -7,7 +7,7 @@ import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { runUploadPipeline, getMediaStatus } from '@/lib/media';
+import { runUploadPipeline, getMediaStatus, removeMedia } from '@/lib/media';
 import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 type Phase =
@@ -23,7 +23,7 @@ type Phase =
 
 const ALLOWED_MIME = [
   'image/jpeg', 'image/png', 'image/webp', 'image/gif',
-  'video/mp4', 'video/webm', 'video/quicktime',
+  'video/mp4',
 ];
 const MAX_IMAGE = 10 * 1024 * 1024;   // 10 MB
 const MAX_VIDEO = 200 * 1024 * 1024;  // 200 MB
@@ -60,12 +60,15 @@ export default function UploadPage() {
   const [progress, setProgress] = useState(0);
   const [mediaId, setMediaId] = useState<string | null>(null);
   const [error, setError] = useState('');
+  const [statusMessage, setStatusMessage] = useState('');
+  const [moderationStatus, setModerationStatus] = useState<string | null>(null);
+  const [scanTimedOut, setScanTimedOut] = useState(false);
 
   const isVideo = file?.type.startsWith('video/');
 
   const pickFile = useCallback((f: File) => {
     if (!ALLOWED_MIME.includes(f.type)) {
-      setError('Unsupported file type. Use JPEG, PNG, WebP, GIF, MP4, WebM or MOV.');
+      setError('Unsupported file type. Use JPEG, PNG, WebP, GIF, or MP4 (H.264/AAC).');
       return;
     }
     const limit = f.type.startsWith('video/') ? MAX_VIDEO : MAX_IMAGE;
@@ -94,6 +97,9 @@ export default function UploadPage() {
     setMediaId(null);
     setError('');
     setCaption('');
+    setStatusMessage('');
+    setModerationStatus(null);
+    setScanTimedOut(false);
   }, []);
 
   const pollUntilReady = useCallback(async (id: string) => {
@@ -101,29 +107,79 @@ export default function UploadPage() {
       await new Promise((r) => setTimeout(r, 3000));
       try {
         const status = await getMediaStatus(id);
-        if (status.uploadStatus === 'PUBLISHED') { setPhase('ready'); return; }
-        if (status.uploadStatus === 'REJECTED') { setPhase('rejected'); return; }
+        setModerationStatus(status.moderationStatus ?? null);
+        setStatusMessage(status.message ?? '');
+        if (status.uploadStatus === 'PUBLISHED') {
+          setScanTimedOut(false);
+          setPhase('ready');
+          return;
+        }
+        if (status.uploadStatus === 'REJECTED') {
+          setError(status.message ?? 'This video could not be processed. Please upload MP4/H.264.');
+          setPhase('rejected');
+          return;
+        }
       } catch { /* keep polling */ }
     }
-    // Timeout — treat as ready (scan continues server-side)
-    setPhase('ready');
+    setScanTimedOut(true);
+    setStatusMessage('Still processing. You can leave this page and refresh later while safety review finishes in the background.');
   }, []);
+
+  const refreshStatus = useCallback(async () => {
+    if (!mediaId) return;
+    try {
+      const status = await getMediaStatus(mediaId);
+      setModerationStatus(status.moderationStatus ?? null);
+      setStatusMessage(status.message ?? '');
+      if (status.uploadStatus === 'PUBLISHED') {
+        setScanTimedOut(false);
+        setPhase('ready');
+        return;
+      }
+      if (status.uploadStatus === 'REJECTED') {
+        setError(status.message ?? 'This video could not be processed. Please upload MP4/H.264.');
+        setPhase('rejected');
+        return;
+      }
+      setPhase('scanning');
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? 'Unable to refresh video status');
+    }
+  }, [mediaId]);
+
+  const removeUploadedMedia = useCallback(async () => {
+    if (!mediaId) {
+      reset();
+      return;
+    }
+    try {
+      await removeMedia(mediaId);
+      reset();
+    } catch (err: any) {
+      setError(err.response?.data?.message ?? 'Unable to remove video');
+    }
+  }, [mediaId, reset]);
 
   const startUpload = async () => {
     if (!file) return;
     setError('');
     setPhase('uploading');
     setProgress(0);
+    setStatusMessage('');
+    setModerationStatus(null);
+    setScanTimedOut(false);
     try {
       const result = await runUploadPipeline(file, (pct) => setProgress(pct));
       setMediaId(result.id);
 
       if (result.uploadStatus === 'REJECTED') {
+        setError(result.message ?? 'This video could not be processed. Please upload MP4/H.264.');
         setPhase('rejected');
         return;
       }
       if (result.uploadStatus === 'SCANNING') {
         setPhase('scanning');
+        setStatusMessage('Processing video…');
         await pollUntilReady(result.id);
         return;
       }
@@ -193,7 +249,7 @@ export default function UploadPage() {
                 <p className="text-sm text-purple-600 font-medium mt-1">or browse files</p>
                 <p className="text-xs text-gray-300 mt-3">
                   JPEG · PNG · WebP · GIF up to 10 MB<br />
-                  MP4 · WebM · MOV up to 200 MB
+                  MP4 (H.264/AAC) up to 200 MB
                 </p>
               </div>
             </div>
@@ -271,20 +327,39 @@ export default function UploadPage() {
 
             {/* Status messages */}
             {phase === 'ready' && (
-              <div className="flex items-center gap-2 text-sm text-green-600 font-medium">
-                <CheckCircle size={16} /> Ready to post
+              <div className={cn(
+                'flex items-center gap-2 text-sm font-medium',
+                moderationStatus === 'FLAGGED' ? 'text-amber-600' : 'text-green-600',
+              )}>
+                {moderationStatus === 'FLAGGED' ? <Clock size={16} /> : <CheckCircle size={16} />}
+                {statusMessage || (moderationStatus === 'FLAGGED' ? 'Uploaded. Safety review is still running in the background.' : 'Ready to post')}
               </div>
             )}
             {phase === 'scanning' && (
-              <div className="flex items-center gap-2 text-sm text-amber-600">
-                <Clock size={16} /> Processing video…
+              <div className="space-y-3">
+                <div className="flex items-center gap-2 text-sm text-amber-600">
+                  <Clock size={16} /> {scanTimedOut ? 'Still processing…' : 'Processing video…'}
+                </div>
+                {statusMessage && (
+                  <p className="text-xs text-gray-500 leading-relaxed">{statusMessage}</p>
+                )}
+                {scanTimedOut && (
+                  <div className="flex flex-wrap gap-2">
+                    <Button onClick={refreshStatus} size="sm" variant="secondary">
+                      Refresh status
+                    </Button>
+                    <Button onClick={removeUploadedMedia} size="sm" variant="ghost">
+                      Remove video
+                    </Button>
+                  </div>
+                )}
               </div>
             )}
             {phase === 'rejected' && (
               <div className="flex items-center gap-2 text-sm text-red-600">
                 <Shield size={16} />
-                This media was flagged and cannot be posted.
-                <button onClick={reset} className="underline ml-1 hover:text-red-700">
+                {error || 'This media was flagged and cannot be posted.'}
+                <button onClick={removeUploadedMedia} className="underline ml-1 hover:text-red-700">
                   Try another file
                 </button>
               </div>
@@ -381,10 +456,13 @@ export default function UploadPage() {
                 <h3 className="text-sm font-bold text-gray-900">Trust &amp; Safety</h3>
               </div>
               {phase === 'scanning' && (
-                <p className="flex items-center gap-1.5 text-xs text-amber-600"><Clock size={13} /> Scanning your media…</p>
+                <p className="flex items-center gap-1.5 text-xs text-amber-600"><Clock size={13} /> {scanTimedOut ? 'Still processing in the background' : 'Scanning your media…'}</p>
               )}
               {phase === 'ready' && (
-                <p className="flex items-center gap-1.5 text-xs text-emerald-600"><CheckCircle size={13} /> Approved — ready to share</p>
+                <p className={cn('flex items-center gap-1.5 text-xs', moderationStatus === 'FLAGGED' ? 'text-amber-600' : 'text-emerald-600')}>
+                  {moderationStatus === 'FLAGGED' ? <Clock size={13} /> : <CheckCircle size={13} />}
+                  {moderationStatus === 'FLAGGED' ? 'Uploaded — manual review may still be needed' : 'Approved — ready to share'}
+                </p>
               )}
               {phase === 'rejected' && (
                 <p className="flex items-center gap-1.5 text-xs text-red-600"><AlertCircle size={13} /> Flagged — cannot be posted</p>
