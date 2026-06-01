@@ -33,6 +33,7 @@ export function Avatar({ src, alt, size = 'md', className }: AvatarProps) {
           width={px}
           height={px}
           className="w-full h-full object-cover"
+          unoptimized
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-white font-bold" style={{ fontSize: px * 0.35 }}>
