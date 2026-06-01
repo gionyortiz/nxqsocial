@@ -6,7 +6,7 @@ import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import {
   X, Home, Compass, Play, ShieldCheck, Settings, LogOut,
-  ShieldAlert, Image as ImageIcon, Film, Phone, Radio, MessageSquare,
+  ShieldAlert, Image as ImageIcon, Film, Phone, Radio, MessageSquare, Bell, BookOpen,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
@@ -20,6 +20,8 @@ interface Props {
 
 const SHORTCUTS = [
   { href: '/feed',     icon: Home,        label: 'Home',     desc: 'Your main feed of posts and reels' },
+  { href: '/messages', icon: MessageSquare, label: 'Messages', desc: 'Your inbox and chat threads' },
+  { href: '/notifications', icon: Bell,    label: 'Notifications', desc: 'Likes, comments and follow activity' },
   { href: '/search',   icon: Compass,     label: 'Explore',  desc: 'Discover people and content' },
   { href: '/reels',    icon: Play,        label: 'Reels',    desc: 'Full-screen short videos' },
   { href: '/verify',   icon: ShieldCheck, label: 'Verify',   desc: 'Get the trusted badge on your profile' },
@@ -39,6 +41,7 @@ const FOOTER_LINKS = [
   { href: '/terms',    label: 'Terms' },
   { href: '/settings', label: 'Language' },
   { href: '/verify',   label: 'NXQ Verified' },
+  { href: '/pages',    label: 'My Pages' },
   { href: '/contact',  label: 'Contact' },
 ];
 
@@ -157,6 +160,20 @@ export function MenuPanel({ onClose }: Props) {
                 </button>
               )}
             </div>
+
+            <SectionLabel>Pages</SectionLabel>
+            <button
+              onClick={() => go('/pages')}
+              className="group flex items-center gap-3 p-3 rounded-2xl bg-white ring-1 ring-gray-100 hover:ring-purple-200 hover:shadow-md transition-all text-left"
+            >
+              <span className="flex items-center justify-center w-11 h-11 rounded-xl bg-gradient-to-br from-purple-100 to-fuchsia-100 text-purple-600 group-hover:from-purple-600 group-hover:to-fuchsia-600 group-hover:text-white transition-colors shrink-0">
+                <BookOpen size={20} />
+              </span>
+              <div className="min-w-0">
+                <p className="text-sm font-bold text-gray-900">My Pages</p>
+                <p className="text-xs text-gray-400 leading-snug">Manage your brands and public pages</p>
+              </div>
+            </button>
 
             {/* Admin */}
             {(user?.role === 'ADMIN' || user?.role === 'MODERATOR') && (

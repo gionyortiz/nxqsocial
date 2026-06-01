@@ -6,6 +6,7 @@ import { usePathname } from 'next/navigation';
 import {
   Home, Compass, Play, PlusSquare, ShieldCheck,
   Settings, LogOut, ShieldAlert, Menu as MenuIcon, Phone, Radio, ChevronsLeftRight, MessageSquare,
+  Bell,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
@@ -22,11 +23,18 @@ import { MenuPanel } from './MenuPanel';
 // calling feature is fully implemented and tested.
 const NAV = [
   { href: '/feed',     icon: Home,        tkey: 'nav.home' },
+  { href: '/messages', icon: MessageSquare, tkey: 'nav.messages' },
+  { href: '/notifications', icon: Bell, tkey: 'nav.notifications' },
   { href: '/search',   icon: Compass,     tkey: 'nav.explore' },
   { href: '/reels',    icon: Play,        tkey: 'nav.reels' },
   { href: '/upload',   icon: PlusSquare,  tkey: 'nav.create' },
   { href: '/verify',   icon: ShieldCheck, tkey: 'nav.verify' },
 ];
+
+const DESKTOP_BADGES: Record<string, number> = {
+  '/messages': 3,
+  '/notifications': 2,
+};
 
 // Items shown on the compact mobile bar (max 5 for thumb reach).
 const MOBILE_NAV = [
@@ -110,6 +118,11 @@ export function Navbar() {
                   <Icon size={20} strokeWidth={active ? 2.6 : 2} />
                 </span>
                 {!compact && label}
+                {!compact && DESKTOP_BADGES[href] ? (
+                  <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+                    {DESKTOP_BADGES[href]}
+                  </span>
+                ) : null}
               </Link>
             );
           })}

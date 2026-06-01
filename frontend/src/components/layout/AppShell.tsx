@@ -1,5 +1,7 @@
 'use client';
 
+import Link from 'next/link';
+import { MessageSquare } from 'lucide-react';
 import { Navbar } from './Navbar';
 
 export function AppShell({
@@ -20,6 +22,17 @@ export function AppShell({
           )}
         </div>
       </main>
+
+      <Link
+        href="/messages"
+        className="hidden md:flex fixed bottom-5 right-5 z-50 items-center gap-2 rounded-full bg-gray-900/90 px-4 py-3 text-white shadow-2xl shadow-purple-900/20 ring-1 ring-white/10 backdrop-blur-md hover:bg-gray-800 transition-colors"
+      >
+        <MessageSquare size={18} />
+        <span className="text-sm font-semibold">Messages</span>
+        <span className="ml-1 min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+          3
+        </span>
+      </Link>
     </div>
   );
 }

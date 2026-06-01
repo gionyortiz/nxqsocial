@@ -23,6 +23,8 @@ const STRINGS: Record<string, Record<LangCode, string>> = {
   'nav.call':    { en: 'Call',    es: 'Llamar',     fr: 'Appel',     pt: 'Chamar',     de: 'Anruf' },
   'nav.create':  { en: 'Create',  es: 'Crear',      fr: 'Créer',     pt: 'Criar',      de: 'Erstellen' },
   'nav.verify':  { en: 'Verify',  es: 'Verificar',  fr: 'Vérifier',  pt: 'Verificar',  de: 'Verifizieren' },
+  'nav.messages':{ en: 'Messages',es: 'Mensajes',   fr: 'Messages',  pt: 'Mensagens',  de: 'Nachrichten' },
+  'nav.notifications':{ en: 'Notifications', es: 'Notificaciones', fr: 'Notifications', pt: 'Notificações', de: 'Benachrichtigungen' },
   'nav.feedback':{ en: 'Feedback',es: 'Comentarios',fr: 'Feedback',  pt: 'Feedback',   de: 'Feedback' },
   'nav.menu':    { en: 'Menu',    es: 'Menú',       fr: 'Menu',      pt: 'Menu',       de: 'Menü' },
   'nav.settings':{ en: 'Settings',es: 'Ajustes',    fr: 'Paramètres',pt: 'Configurações',de: 'Einstellungen' },
