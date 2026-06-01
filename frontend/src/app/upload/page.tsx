@@ -107,15 +107,16 @@ export default function UploadPage() {
       await new Promise((r) => setTimeout(r, 3000));
       try {
         const status = await getMediaStatus(id);
-        setModerationStatus(status.moderationStatus ?? null);
-        setStatusMessage(status.message ?? '');
+        const details = status as any;
+        setModerationStatus(details?.moderationStatus ?? null);
+        setStatusMessage(details?.message ?? '');
         if (status.uploadStatus === 'PUBLISHED') {
           setScanTimedOut(false);
           setPhase('ready');
           return;
         }
         if (status.uploadStatus === 'REJECTED') {
-          setError(status.message ?? 'This video could not be processed. Please upload MP4/H.264.');
+          setError(details?.message ?? 'This video could not be processed. Please upload MP4/H.264.');
           setPhase('rejected');
           return;
         }
@@ -129,15 +130,16 @@ export default function UploadPage() {
     if (!mediaId) return;
     try {
       const status = await getMediaStatus(mediaId);
-      setModerationStatus(status.moderationStatus ?? null);
-      setStatusMessage(status.message ?? '');
+      const details = status as any;
+      setModerationStatus(details?.moderationStatus ?? null);
+      setStatusMessage(details?.message ?? '');
       if (status.uploadStatus === 'PUBLISHED') {
         setScanTimedOut(false);
         setPhase('ready');
         return;
       }
       if (status.uploadStatus === 'REJECTED') {
-        setError(status.message ?? 'This video could not be processed. Please upload MP4/H.264.');
+        setError(details?.message ?? 'This video could not be processed. Please upload MP4/H.264.');
         setPhase('rejected');
         return;
       }
