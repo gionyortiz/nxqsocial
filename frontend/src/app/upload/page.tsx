@@ -172,16 +172,17 @@ export default function UploadPage() {
     setScanTimedOut(false);
     try {
       const result = await runUploadPipeline(file, (pct) => setProgress(pct));
+      const details = result as any;
       setMediaId(result.id);
 
       if (result.uploadStatus === 'REJECTED') {
-        setError(result.message ?? 'This video could not be processed. Please upload MP4/H.264.');
+        setError(details?.message ?? 'This video could not be processed. Please upload MP4/H.264.');
         setPhase('rejected');
         return;
       }
       if (result.uploadStatus === 'SCANNING') {
         setPhase('scanning');
-        setStatusMessage('Processing video…');
+        setStatusMessage(details?.message ?? 'Processing video…');
         await pollUntilReady(result.id);
         return;
       }
