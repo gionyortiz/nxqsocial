@@ -18,6 +18,7 @@ import { TrustBadge } from '@/components/ui/TrustBadge';
 import { formatCount, timeAgo, cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
+import { EngagementListModal } from './EngagementListModal';
 
 interface MediaAsset {
   id: string;
@@ -68,6 +69,7 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
   const [menuOpen, setMenuOpen] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [engagementTab, setEngagementTab] = useState<'likes' | 'comments' | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
   const { user: me } = useAuthStore();
   const isMe = me?.username === post.author.username;
@@ -331,8 +333,12 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
         </div>
 
         <div className="mt-1.5 text-sm text-gray-700 font-medium flex items-center gap-3">
-          <span>{formatCount(likeCount)} likes</span>
-          <span>{formatCount(commentCount)} comments</span>
+          <button type="button" onClick={() => setEngagementTab('likes')} className="hover:text-purple-700 hover:underline">
+            {formatCount(likeCount)} likes
+          </button>
+          <button type="button" onClick={() => setEngagementTab('comments')} className="hover:text-purple-700 hover:underline">
+            {formatCount(commentCount)} comments
+          </button>
           <span>{formatCount(repostCount)} reposts</span>
         </div>
       </div>
@@ -382,6 +388,14 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
             </div>
           </div>
         </div>
+      )}
+
+      {engagementTab && (
+        <EngagementListModal
+          postId={post.id}
+          initialTab={engagementTab}
+          onClose={() => setEngagementTab(null)}
+        />
       )}
     </article>
   );

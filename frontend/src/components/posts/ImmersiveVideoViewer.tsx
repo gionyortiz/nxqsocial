@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Heart, MessageCircle, X, VolumeX, Volume2 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
+import { EngagementListModal } from './EngagementListModal';
 import { api } from '@/lib/api';
 import { cn, formatCount } from '@/lib/utils';
 
@@ -24,8 +25,8 @@ function resolveSrc(url?: string) {
   return url.startsWith('http') ? url : `${mediaBase}${url}`;
 }
 
-function ViewerItem({ post, active, muted, onToggleMute }: {
-  post: VideoPost; active: boolean; muted: boolean; onToggleMute: () => void;
+function ViewerItem({ post, active, muted, onToggleMute, onOpenEngagement }: {
+  post: VideoPost; active: boolean; muted: boolean; onToggleMute: () => void; onOpenEngagement: (tab: 'likes' | 'comments') => void;
 }) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const [liked, setLiked] = useState(post.isLiked);
@@ -108,12 +109,14 @@ function ViewerItem({ post, active, muted, onToggleMute }: {
             className={cn('transition-colors drop-shadow', liked ? 'text-red-500' : 'text-white')}
             fill={liked ? 'currentColor' : 'none'}
           />
-          <span className="text-white text-xs font-medium drop-shadow">{formatCount(likeCount)}</span>
         </button>
-        <div className="flex flex-col items-center gap-1 text-white">
+        <button type="button" onClick={() => onOpenEngagement('likes')} className="flex flex-col items-center gap-1 text-white">
+          <span className="text-xs font-medium drop-shadow">{formatCount(likeCount)}</span>
+        </button>
+        <button type="button" onClick={() => onOpenEngagement('comments')} className="flex flex-col items-center gap-1 text-white">
           <MessageCircle size={28} className="drop-shadow" />
           <span className="text-xs font-medium drop-shadow">{formatCount(post._count.comments)}</span>
-        </div>
+        </button>
       </div>
 
       {/* Author info */}
@@ -143,6 +146,7 @@ export function ImmersiveVideoViewer({ posts, startIndex, onClose }: {
   const containerRef = useRef<HTMLDivElement>(null);
   const [activeIndex, setActiveIndex] = useState(startIndex);
   const [muted, setMuted] = useState(true);
+  const [engagementTab, setEngagementTab] = useState<{ postId: string; tab: 'likes' | 'comments' } | null>(null);
 
   // Jump to the tapped video on open
   useEffect(() => {
@@ -193,10 +197,24 @@ export function ImmersiveVideoViewer({ posts, startIndex, onClose }: {
       >
         {posts.map((post, i) => (
           <div key={post.id} data-viewer-index={i} className="h-[100dvh] w-full">
-            <ViewerItem post={post} active={i === activeIndex} muted={muted} onToggleMute={() => setMuted((m) => !m)} />
+            <ViewerItem
+              post={post}
+              active={i === activeIndex}
+              muted={muted}
+              onToggleMute={() => setMuted((m) => !m)}
+              onOpenEngagement={(tab) => setEngagementTab({ postId: post.id, tab })}
+            />
           </div>
         ))}
       </div>
+
+      {engagementTab && (
+        <EngagementListModal
+          postId={engagementTab.postId}
+          initialTab={engagementTab.tab}
+          onClose={() => setEngagementTab(null)}
+        />
+      )}
     </div>
   );
 }
