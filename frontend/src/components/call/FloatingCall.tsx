@@ -5,7 +5,9 @@ import {
   LiveKitRoom,
   VideoConference,
   RoomAudioRenderer,
+  ParticipantTile,
   formatChatMessageLinks,
+  useTracks,
   useParticipants,
 } from '@livekit/components-react';
 import '@livekit/components-styles';
@@ -24,6 +26,7 @@ import { api } from '@/lib/api';
 import { useCallStore } from '@/store/call';
 import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 import { Avatar } from '@/components/ui/Avatar';
+import { Track } from 'livekit-client';
 
 const RINGBACK_SRC = '/sounds/outgoing-ring.wav';
 
@@ -148,6 +151,65 @@ function VoiceCallPanel({
       </div>
     </div>
   );
+}
+
+function OneToOneVideoStage({
+  peerName,
+}: {
+  peerName: string;
+}) {
+  const cameraTracks = useTracks(
+    [{ source: Track.Source.Camera, withPlaceholder: true }],
+    { onlySubscribed: false },
+  );
+  const remoteTrack = cameraTracks.find((t) => !t.participant.isLocal) ?? null;
+  const localTrack = cameraTracks.find((t) => t.participant.isLocal) ?? null;
+  const [pipCorner, setPipCorner] = useState<'top-right' | 'bottom-right'>('bottom-right');
+
+  return (
+    <div className="relative h-full w-full bg-black overflow-hidden">
+      <div className="absolute inset-0">
+        {remoteTrack ? (
+          <ParticipantTile trackRef={remoteTrack} className="h-full w-full" />
+        ) : (
+          <div className="h-full w-full flex flex-col items-center justify-center text-white bg-gradient-to-br from-slate-900 to-slate-700">
+            <Avatar src={undefined} alt={peerName} size="xl" className="ring-4 ring-white/20" />
+            <p className="mt-3 text-sm font-semibold">Waiting for {peerName}</p>
+          </div>
+        )}
+      </div>
+
+      {localTrack && (
+        <button
+          type="button"
+          onClick={() => setPipCorner((prev) => (prev === 'bottom-right' ? 'top-right' : 'bottom-right'))}
+          className={`absolute z-10 w-24 h-36 md:w-28 md:h-40 rounded-xl overflow-hidden border-2 border-white/70 shadow-2xl bg-black ${
+            pipCorner === 'bottom-right' ? 'bottom-3 right-3' : 'top-3 right-3'
+          }`}
+          title="Move self preview"
+        >
+          <ParticipantTile trackRef={localTrack} className="h-full w-full" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+function VideoCallStage({
+  peerName,
+}: {
+  peerName: string;
+}) {
+  const participants = useParticipants();
+  const remoteCount = participants.filter((p) => !p.isLocal).length;
+  const isOneToOne = remoteCount <= 1;
+
+  if (isOneToOne) {
+    return <OneToOneVideoStage peerName={peerName} />;
+  }
+
+  // Group calls (3+ total participants) keep the standard conference layout.
+  return <VideoConference chatMessageFormatter={formatChatMessageLinks} />;
 }
 
 function CallRoomInner({
@@ -469,7 +531,7 @@ export function FloatingCall() {
                 onEnd={() => endCall('manual_end')}
               />
             ) : (
-              <VideoConference chatMessageFormatter={formatChatMessageLinks} />
+              <VideoCallStage peerName={peer?.displayName ?? peer?.username ?? 'Participant'} />
             )}
             <RoomAudioRenderer />
           </LiveKitRoom>
