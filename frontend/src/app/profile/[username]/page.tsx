@@ -20,7 +20,7 @@ import { fetchUserLive } from '@/lib/live';
 import { callsVisible, startCall } from '@/lib/calls';
 import { formatCount, resolveMediaUrl } from '@/lib/utils';
 
-interface MediaAsset { id: string; url: string; mimeType: string; }
+interface MediaAsset { id: string; url: string; thumbnailUrl?: string; mimeType: string; }
 interface Profile {
   id: string;
   username: string;
@@ -502,11 +502,30 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
               {filteredPosts.map((post) => {
                 const first = post.media?.[0];
                 const src = first ? mediaSrc(first.url) : null;
+                const thumbnail = first?.thumbnailUrl ? mediaSrc(first.thumbnailUrl) : null;
                 const isVideo = first?.mimeType?.startsWith('video/');
                 return (
                   <div key={post.id} className="group relative aspect-square bg-gray-100 overflow-hidden">
                     {src && (isVideo ? (
-                      <video src={src} className="w-full h-full object-cover" muted />
+                      <>
+                        {thumbnail ? (
+                          <Image
+                            src={thumbnail}
+                            alt={post.caption ?? 'Video preview'}
+                            fill
+                            className="object-cover"
+                            sizes="33vw"
+                          />
+                        ) : (
+                          <video
+                            src={src}
+                            className="w-full h-full object-cover"
+                            muted
+                            playsInline
+                            preload="metadata"
+                          />
+                        )}
+                      </>
                     ) : (
                       <Image
                         src={src}

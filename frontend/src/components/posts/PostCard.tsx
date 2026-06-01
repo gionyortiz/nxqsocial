@@ -226,14 +226,24 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
                 className="group w-full h-full relative"
                 aria-label="Play video"
               >
-                <video
-                  src={mediaSrc}
-                  className="w-full h-full object-contain md:object-cover pointer-events-none"
-                  muted
-                  playsInline
-                  preload="metadata"
-                  poster={thumbnailSrc ?? undefined}
-                />
+                {thumbnailSrc ? (
+                  <Image
+                    src={thumbnailSrc}
+                    alt={post.caption ?? 'Video preview'}
+                    fill
+                    className="object-contain md:object-cover"
+                    sizes="(max-width: 640px) 100vw, 800px"
+                  />
+                ) : (
+                  <video
+                    src={mediaSrc}
+                    className="w-full h-full object-contain md:object-cover pointer-events-none"
+                    muted
+                    playsInline
+                    preload="metadata"
+                    poster={thumbnailSrc ?? undefined}
+                  />
+                )}
                 <span className="absolute inset-0 flex items-center justify-center">
                   <span className="w-16 h-16 rounded-full bg-black/50 group-hover:bg-black/60 flex items-center justify-center transition-colors">
                     <Play size={28} className="text-white translate-x-0.5" fill="white" />
