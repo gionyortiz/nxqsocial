@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
   Grid, Film, MapPin, Globe, Calendar, ShieldCheck,
   Trash2, Heart, MessageCircle, Share2, UserPlus, Settings, User,
-  Ban, Phone,
+  Ban, Phone, Video, X,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
@@ -102,6 +102,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [confirmBlock, setConfirmBlock] = useState(false);
   const [blocking, setBlocking] = useState(false);
   const [startingCall, setStartingCall] = useState(false);
+  const [callPickerOpen, setCallPickerOpen] = useState(false);
   const [liveRoom, setLiveRoom] = useState<string | null>(null);
 
   useEffect(() => {
@@ -174,12 +175,22 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     updateUser(updates as any);
   };
 
-  const startProfileCall = async () => {
+  const startProfileCall = async (callType: 'voice' | 'video') => {
     if (startingCall || !profile) return;
     setStartingCall(true);
+    setCallPickerOpen(false);
     try {
-      const room = await startCall({ targets: [profile.username], video: true, group: false });
-      beginCall(room, true);
+      const video = callType === 'video';
+      const room = await startCall({ targets: [profile.username], callType, group: false });
+      beginCall(room, {
+        video,
+        callType,
+        peer: {
+          username: profile.username,
+          displayName: profile.displayName,
+          avatarUrl: profile.avatarUrl,
+        },
+      });
       router.push('/feed');
     } catch {
       // Best effort; if call setup fails we simply reset button state.
@@ -299,7 +310,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 <>
                   {callsVisible(me?.role) && (
                     <button
-                      onClick={startProfileCall}
+                      onClick={() => setCallPickerOpen(true)}
                       disabled={startingCall}
                       className="flex items-center gap-1.5 px-4 py-2 rounded-full border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all disabled:opacity-60"
                       title={`Call ${profile.displayName}`}
@@ -610,6 +621,88 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 {deletingId
                   ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> Deleting…</>
                   : 'Delete post'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Call picker (desktop) ───────────────────────────────────────────── */}
+      {callPickerOpen && callsVisible(me?.role) && !isMe && (
+        <div className="hidden sm:flex fixed inset-0 z-50 items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-bold text-gray-900">Start call with {profile.displayName}</h3>
+              <button
+                type="button"
+                onClick={() => setCallPickerOpen(false)}
+                className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            <div className="space-y-2">
+              <button
+                onClick={() => startProfileCall('voice')}
+                disabled={startingCall}
+                className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border border-gray-200 text-left hover:bg-gray-50 disabled:opacity-60"
+              >
+                <Phone size={17} className="text-emerald-600" />
+                <span>
+                  <span className="block text-sm font-semibold text-gray-900">Voice Call</span>
+                  <span className="block text-xs text-gray-500">Start with microphone only</span>
+                </span>
+              </button>
+              <button
+                onClick={() => startProfileCall('video')}
+                disabled={startingCall}
+                className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border border-gray-200 text-left hover:bg-gray-50 disabled:opacity-60"
+              >
+                <Video size={17} className="text-purple-600" />
+                <span>
+                  <span className="block text-sm font-semibold text-gray-900">Video Call</span>
+                  <span className="block text-xs text-gray-500">Start with camera and microphone</span>
+                </span>
+              </button>
+            </div>
+            <button
+              type="button"
+              onClick={() => setCallPickerOpen(false)}
+              className="mt-3 w-full py-2.5 rounded-xl border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+            >
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* ── Call picker (mobile action sheet) ───────────────────────────────── */}
+      {callPickerOpen && callsVisible(me?.role) && !isMe && (
+        <div className="sm:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
+          <button
+            type="button"
+            onClick={() => setCallPickerOpen(false)}
+            className="absolute inset-0 w-full h-full"
+            aria-label="Close call options"
+          />
+          <div className="absolute bottom-0 left-0 right-0 rounded-t-3xl bg-white p-4 pb-6 shadow-2xl">
+            <h3 className="text-sm font-bold text-gray-900 mb-3">Call {profile.displayName}</h3>
+            <div className="space-y-2">
+              <button
+                onClick={() => startProfileCall('voice')}
+                disabled={startingCall}
+                className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border border-gray-200 text-left hover:bg-gray-50 disabled:opacity-60"
+              >
+                <Phone size={17} className="text-emerald-600" />
+                <span className="text-sm font-semibold text-gray-900">Voice Call</span>
+              </button>
+              <button
+                onClick={() => startProfileCall('video')}
+                disabled={startingCall}
+                className="w-full flex items-center gap-2.5 px-4 py-3 rounded-xl border border-gray-200 text-left hover:bg-gray-50 disabled:opacity-60"
+              >
+                <Video size={17} className="text-purple-600" />
+                <span className="text-sm font-semibold text-gray-900">Video Call</span>
               </button>
             </div>
           </div>

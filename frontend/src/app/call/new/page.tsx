@@ -26,6 +26,13 @@ export default function NewCallPage() {
   const [results, setResults] = useState<UserLite[]>([]);
   const [selected, setSelected] = useState<UserLite[]>([]);
   const [starting, setStarting] = useState(false);
+  const [preferredType, setPreferredType] = useState<'voice' | 'video'>('video');
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const param = new URLSearchParams(window.location.search).get('type');
+    setPreferredType(param === 'voice' ? 'voice' : 'video');
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -54,6 +61,7 @@ export default function NewCallPage() {
     if (selected.length === 0 || starting) return;
     setStarting(true);
     const group = selected.length > 1;
+    const callType = video ? 'video' as const : 'voice' as const;
     void trackEvent('call_started', { video, group, targetCount: selected.length });
     void trackFirstEvent('first_call_started', 'first_call_started', {
       video,
@@ -62,10 +70,18 @@ export default function NewCallPage() {
     });
     const room = await startCall({
       targets: selected.map((s) => s.username),
-      video,
+      callType,
       group,
     });
-    beginCall(room, video);
+    beginCall(room, {
+      video,
+      callType,
+      peer: group ? { username: 'group', displayName: `${selected.length} people` } : {
+        username: selected[0].username,
+        displayName: selected[0].displayName,
+        avatarUrl: selected[0].avatarUrl,
+      },
+    });
     router.push('/feed');
   };
 
@@ -142,14 +158,18 @@ export default function NewCallPage() {
               <button
                 onClick={() => start(false)}
                 disabled={starting}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-green-500 hover:bg-green-600 text-white font-semibold shadow-lg disabled:opacity-60"
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-semibold shadow-lg disabled:opacity-60 ${
+                  preferredType === 'voice' ? 'bg-green-600 hover:bg-green-700' : 'bg-green-500 hover:bg-green-600'
+                }`}
               >
                 <Phone size={18} /> Voice call
               </button>
               <button
                 onClick={() => start(true)}
                 disabled={starting}
-                className="flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-purple-600 hover:bg-purple-700 text-white font-semibold shadow-lg disabled:opacity-60"
+                className={`flex-1 flex items-center justify-center gap-2 py-3.5 rounded-2xl text-white font-semibold shadow-lg disabled:opacity-60 ${
+                  preferredType === 'video' ? 'bg-purple-700 hover:bg-purple-800' : 'bg-purple-600 hover:bg-purple-700'
+                }`}
               >
                 <Video size={18} /> Video call
                 {selected.length > 1 ? ` (${selected.length})` : ''}

@@ -1,4 +1,5 @@
 import { api } from '@/lib/api';
+import type { CallType } from '@/store/call';
 
 /** Build a deterministic-ish unique room id for a call. */
 export function newRoomId(prefix = 'call'): string {
@@ -13,9 +14,10 @@ export function newRoomId(prefix = 'call'): string {
 export async function startCall(opts: {
   targets: string[];
   video?: boolean;
+  callType?: CallType;
   group?: boolean;
 }): Promise<string> {
-  const video = opts.video ?? true;
+  const video = opts.callType ? opts.callType === 'video' : (opts.video ?? true);
   const group = opts.group ?? opts.targets.length > 1;
   const room = newRoomId(group ? 'group' : 'call');
   try {
@@ -32,7 +34,8 @@ export async function startCall(opts: {
 }
 
 export function callHref(room: string, video: boolean): string {
-  return `/call/${encodeURIComponent(room)}${video ? '' : '?video=0'}`;
+  const type: CallType = video ? 'video' : 'voice';
+  return `/call/${encodeURIComponent(room)}?type=${type}`;
 }
 
 /**

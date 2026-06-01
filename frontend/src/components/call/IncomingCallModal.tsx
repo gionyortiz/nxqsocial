@@ -157,12 +157,21 @@ export function IncomingCallModal() {
       .catch(() => setSoundBlocked(true));
   };
 
-  const accept = () => {
+  const accept = (callType: 'voice' | 'video') => {
     if (!invite) return;
     stopRing();
-    const { room, video } = invite;
+    const { room } = invite;
+    const video = callType === 'video';
     setInvite(null);
-    startCall(room, video);
+    startCall(room, {
+      video,
+      callType,
+      peer: {
+        username: invite.caller.username,
+        displayName: invite.caller.displayName,
+        avatarUrl: invite.caller.avatarUrl ?? null,
+      },
+    });
   };
 
   const decline = async () => {
@@ -214,7 +223,7 @@ export function IncomingCallModal() {
           </button>
         )}
 
-        <div className="mt-3 grid grid-cols-2 gap-2">
+        <div className="mt-3 grid grid-cols-3 gap-2">
           <button
             onClick={decline}
             className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-red-500 hover:bg-red-600 text-white text-sm font-semibold"
@@ -222,10 +231,16 @@ export function IncomingCallModal() {
             <PhoneOff size={16} /> Decline
           </button>
           <button
-            onClick={accept}
+            onClick={() => accept('voice')}
+            className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-emerald-500 hover:bg-emerald-600 text-white text-sm font-semibold"
+          >
+            <Phone size={16} /> Voice
+          </button>
+          <button
+            onClick={() => accept('video')}
             className="flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-green-500 hover:bg-green-600 text-white text-sm font-semibold"
           >
-            {invite.video ? <Video size={16} /> : <Phone size={16} />} Accept
+            <Video size={16} /> Video
           </button>
         </div>
       </div>

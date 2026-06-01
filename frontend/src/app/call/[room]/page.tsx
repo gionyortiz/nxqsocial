@@ -15,12 +15,14 @@ export default function CallRoomPage() {
   const beginCall = useCallStore((s) => s.start);
 
   const room = decodeURIComponent(String(params.room ?? ''));
-  const video = search.get('video') !== '0';
+  const typeParam = search.get('type');
+  const callType = typeParam === 'voice' ? 'voice' : 'video';
+  const video = typeParam ? callType === 'video' : search.get('video') !== '0';
 
   useEffect(() => {
-    if (room) beginCall(room, video);
+    if (room) beginCall(room, { video, callType });
     router.replace('/feed');
-  }, [room, video, beginCall, router]);
+  }, [room, video, callType, beginCall, router]);
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
