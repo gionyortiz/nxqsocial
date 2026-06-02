@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
@@ -10,7 +11,24 @@ const CONVERSATIONS = [
   { name: 'NXQ Admin', username: 'nxqadmin', last: 'Your verification is under review', time: '1h', unread: 0 },
 ];
 
+const READ_KEY = 'nxq_msg_read';
+
 export default function MessagesPage() {
+  const [read, setRead] = useState<Record<string, boolean>>({});
+
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem(READ_KEY);
+      if (raw) setRead(JSON.parse(raw));
+    } catch {}
+  }, []);
+
+  const markRead = (username: string) => {
+    const next = { ...read, [username]: true };
+    setRead(next);
+    try { window.localStorage.setItem(READ_KEY, JSON.stringify(next)); } catch {}
+  };
+
   return (
     <AppShell>
       <div className="px-3 sm:px-4 py-4 space-y-4">
@@ -23,24 +41,28 @@ export default function MessagesPage() {
         </div>
 
         <div className="grid gap-3">
-          {CONVERSATIONS.map((thread) => (
-            <Link
-              key={thread.username}
-              href={`/profile/${thread.username}`}
-              className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm hover:border-purple-200 hover:shadow-md transition-all"
-            >
-              <Avatar src={null} alt={thread.username} size="md" />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <p className="font-bold text-gray-900 truncate">{thread.name}</p>
-                  {thread.unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{thread.unread}</span>}
+          {CONVERSATIONS.map((thread) => {
+            const unread = read[thread.username] ? 0 : thread.unread;
+            return (
+              <Link
+                key={thread.username}
+                href={`/profile/${thread.username}`}
+                onClick={() => markRead(thread.username)}
+                className="flex items-center gap-4 rounded-2xl border border-gray-100 bg-white p-4 shadow-sm hover:border-purple-200 hover:shadow-md transition-all"
+              >
+                <Avatar src={null} alt={thread.username} size="md" />
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2">
+                    <p className="font-bold text-gray-900 truncate">{thread.name}</p>
+                    {unread > 0 && <span className="min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">{unread}</span>}
+                  </div>
+                  <p className="text-sm text-gray-500 truncate">@{thread.username}</p>
+                  <p className="text-sm text-gray-700 mt-1">{thread.last}</p>
                 </div>
-                <p className="text-sm text-gray-500 truncate">@{thread.username}</p>
-                <p className="text-sm text-gray-700 mt-1">{thread.last}</p>
-              </div>
-              <span className="text-xs text-gray-400">{thread.time}</span>
-            </Link>
-          ))}
+                <span className="text-xs text-gray-400">{thread.time}</span>
+              </Link>
+            );
+          })}
         </div>
       </div>
     </AppShell>
