@@ -8,8 +8,8 @@ import { resolveMediaUrl } from '@/lib/utils';
 import { trackFirstEvent } from '@/lib/analytics';
 
 const ALLOWED_PROFILE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
-const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
-const MAX_BANNER_SIZE = 8 * 1024 * 1024;
+const MAX_AVATAR_SIZE = 10 * 1024 * 1024;
+const MAX_BANNER_SIZE = 10 * 1024 * 1024;
 
 interface ProfileSnapshot {
   displayName: string;

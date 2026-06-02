@@ -1,6 +1,6 @@
 import {
   Controller, Get, Put, Patch, Post, Delete, Param, Body, Query,
-  UseGuards, UseInterceptors, UploadedFile,
+  UseGuards, UseInterceptors, UploadedFile, BadRequestException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
@@ -22,6 +22,12 @@ class AdminActionDto {
 @Controller('users')
 export class UsersController {
   constructor(private usersService: UsersService) {}
+
+  private validateImageUpload(file: Express.Multer.File | undefined, kind: 'avatar' | 'banner') {
+    if (!file) {
+      throw new BadRequestException(`Select a ${kind === 'avatar' ? 'profile photo' : 'banner image'} before saving`);
+    }
+  }
 
   // ── Admin endpoints ────────────────────────────────────────────────────────
 
@@ -118,10 +124,11 @@ export class UsersController {
         }
         cb(null, true);
       },
-      limits: { fileSize: 5 * 1024 * 1024 },
+      limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
   uploadAvatar(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
+    this.validateImageUpload(file, 'avatar');
     const avatarUrl = `/uploads/avatars/${file.filename}`;
     return this.usersService.updateAvatar(user.id, avatarUrl);
   }
@@ -148,10 +155,11 @@ export class UsersController {
         }
         cb(null, true);
       },
-      limits: { fileSize: 8 * 1024 * 1024 },
+      limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
   uploadBanner(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
+    this.validateImageUpload(file, 'banner');
     const bannerUrl = `/uploads/avatars/${file.filename}`;
     return this.usersService.updateBanner(user.id, bannerUrl);
   }
