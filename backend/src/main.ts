@@ -12,7 +12,9 @@ async function bootstrap() {
   app.getHttpAdapter().getInstance().set('trust proxy', true);
 
   // ── Security headers ──────────────────────────────────────────────────────
-  app.use(helmet());
+  // crossOriginResourcePolicy must allow cross-origin so /uploads/* avatars
+  // and media render on the frontend domain (different origin than the API).
+  app.use(helmet({ crossOriginResourcePolicy: { policy: 'cross-origin' } }));
 
   // ── Upload dirs (local fallback only — S3/R2 preferred in production) ─────
   for (const dir of ['uploads/avatars', 'uploads/images', 'uploads/videos']) {

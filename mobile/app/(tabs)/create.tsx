@@ -10,9 +10,21 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { API_BASE_URL } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
+
+function VideoPreview({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri);
+  return (
+    <VideoView
+      player={player}
+      style={{ width: '100%', height: 260, borderRadius: 12, backgroundColor: '#000' }}
+      contentFit="contain"
+      nativeControls
+    />
+  );
+}
 
 export default function CreateScreen() {
   const { token } = useAuth();
@@ -116,7 +128,7 @@ export default function CreateScreen() {
         ) : null}
 
         {assetUri && assetType === 'video' ? (
-          <Video source={{ uri: assetUri }} style={{ width: '100%', height: 260, borderRadius: 12, backgroundColor: '#000' }} resizeMode={ResizeMode.CONTAIN} useNativeControls shouldPlay={false} />
+          <VideoPreview uri={assetUri} />
         ) : null}
 
         <TextInput

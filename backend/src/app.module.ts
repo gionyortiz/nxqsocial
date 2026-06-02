@@ -40,7 +40,18 @@ import { getClientIpFromRequest } from './common/network/client-ip';
       errorMessage: 'Too many signup attempts. Please wait a few minutes and try again.',
     }),
     StorageModule,
-    ServeStaticModule.forRoot({ rootPath: join(__dirname, '..', 'uploads'), serveRoot: '/uploads' }),
+    ServeStaticModule.forRoot({
+      rootPath: join(__dirname, '..', 'uploads'),
+      serveRoot: '/uploads',
+      serveStaticOptions: {
+        setHeaders: (res) => {
+          // Allow cross-origin <img>/<video> loads from the frontend domain.
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        },
+      },
+    }),
     RedisModule,
     PrismaModule,
     AuthModule,

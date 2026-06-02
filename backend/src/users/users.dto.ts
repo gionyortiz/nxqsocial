@@ -17,7 +17,9 @@ export class UpdateProfileDto {
   location?: string;
 
   @IsOptional()
-  @IsUrl()
+  @IsString()
+  @MaxLength(200)
+  @IsUrl({ require_protocol: false, require_tld: true }, { message: 'Website must be a valid URL' })
   website?: string;
 }
 

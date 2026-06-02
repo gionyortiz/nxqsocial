@@ -47,9 +47,33 @@ export class UsersService {
   }
 
   async updateProfile(userId: string, dto: UpdateProfileDto) {
+    const normalize = (v?: string) => {
+      if (v === undefined) return undefined;
+      const t = v.trim();
+      return t.length === 0 ? null : t;
+    };
+    const data = {
+      displayName: normalize(dto.displayName) ?? undefined,
+      bio: normalize(dto.bio),
+      location: normalize(dto.location),
+      website: normalize(dto.website),
+    };
+    // Use upsert in case profile row is missing for legacy accounts.
     const user = await this.prisma.user.update({
       where: { id: userId },
-      data: { profile: { update: dto } },
+      data: {
+        profile: {
+          upsert: {
+            create: {
+              displayName: data.displayName ?? '',
+              bio: data.bio ?? undefined,
+              location: data.location ?? undefined,
+              website: data.website ?? undefined,
+            },
+            update: data,
+          },
+        },
+      },
       select: USER_PUBLIC_SELECT,
     });
     return flattenUser(user);

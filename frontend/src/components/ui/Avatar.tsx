@@ -1,7 +1,8 @@
 'use client';
 
 import Image from 'next/image';
-import { cn } from '@/lib/utils';
+import { useEffect, useState } from 'react';
+import { cn, resolveMediaUrl } from '@/lib/utils';
 
 interface AvatarProps {
   src?: string | null;
@@ -15,7 +16,14 @@ const ringSize = { xs: 'ring-1', sm: 'ring-1', md: 'ring-2', lg: 'ring-2', xl: '
 
 export function Avatar({ src, alt, size = 'md', className }: AvatarProps) {
   const px = sizes[size];
-  const initials = alt.slice(0, 2).toUpperCase();
+  const initials = (alt || '?').slice(0, 2).toUpperCase();
+  const resolved = src ? resolveMediaUrl(src) : '';
+  const [failed, setFailed] = useState(false);
+
+  // Reset failure state when src changes (e.g. after a fresh upload).
+  useEffect(() => { setFailed(false); }, [resolved]);
+
+  const showImage = !!resolved && !failed;
 
   return (
     <div
@@ -26,14 +34,15 @@ export function Avatar({ src, alt, size = 'md', className }: AvatarProps) {
       )}
       style={{ width: px, height: px }}
     >
-      {src ? (
+      {showImage ? (
         <Image
-          src={src.startsWith('http') ? src : `${process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? 'http://localhost:3000'}${src}`}
+          src={resolved}
           alt={alt}
           width={px}
           height={px}
           className="w-full h-full object-cover"
           unoptimized
+          onError={() => setFailed(true)}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-white font-bold" style={{ fontSize: px * 0.35 }}>

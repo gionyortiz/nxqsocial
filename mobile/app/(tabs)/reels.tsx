@@ -1,10 +1,24 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Dimensions, FlatList, SafeAreaView, Text, View } from 'react-native';
-import { Video, ResizeMode } from 'expo-av';
+import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 const h = Dimensions.get('window').height;
+
+function ReelVideo({ uri }: { uri: string }) {
+  const player = useVideoPlayer(uri, (p) => {
+    p.loop = true;
+  });
+  return (
+    <VideoView
+      player={player}
+      style={{ width: '100%', height: '100%' }}
+      contentFit="cover"
+      nativeControls
+    />
+  );
+}
 
 export default function ReelsScreen() {
   const { token } = useAuth();
@@ -53,14 +67,7 @@ export default function ReelsScreen() {
           const src = resolveMediaUrl(item.media?.[0]?.url);
           return (
             <View style={{ height: h, backgroundColor: '#000' }}>
-              <Video
-                source={{ uri: src }}
-                style={{ width: '100%', height: '100%' }}
-                useNativeControls
-                resizeMode={ResizeMode.COVER}
-                shouldPlay={false}
-                isLooping
-              />
+              <ReelVideo uri={src} />
               <View style={{ position: 'absolute', left: 12, bottom: 50 }}>
                 <Text style={{ color: '#fff', fontWeight: '800' }}>@{item.author.username}</Text>
                 {item.caption ? <Text style={{ color: '#e5e7eb', marginTop: 6 }}>{item.caption}</Text> : null}
