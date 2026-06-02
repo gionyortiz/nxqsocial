@@ -1,6 +1,5 @@
 'use client';
 
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { MessageSquare } from 'lucide-react';
 import { Navbar } from './Navbar';
@@ -12,15 +11,6 @@ export function AppShell({
   children: React.ReactNode;
   aside?: React.ReactNode;
 }) {
-  // Hide the demo "3" badge once the user has opened /messages at least once.
-  const [seenMessages, setSeenMessages] = useState(false);
-  useEffect(() => {
-    try {
-      const raw = window.localStorage.getItem('nxq_nav_seen');
-      if (raw && JSON.parse(raw)?.['/messages']) setSeenMessages(true);
-    } catch {}
-  }, []);
-
   return (
     <div className="min-h-screen bg-gray-50">
       <Navbar />
@@ -39,11 +29,6 @@ export function AppShell({
       >
         <MessageSquare size={18} />
         <span className="text-sm font-semibold">Messages</span>
-        {!seenMessages && (
-          <span className="ml-1 min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
-            3
-          </span>
-        )}
       </Link>
     </div>
   );

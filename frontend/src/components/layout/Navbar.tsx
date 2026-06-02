@@ -31,10 +31,7 @@ const NAV = [
   { href: '/verify',   icon: ShieldCheck, tkey: 'nav.verify' },
 ];
 
-const DEFAULT_BADGES: Record<string, number> = {
-  '/messages': 3,
-  '/notifications': 2,
-};
+const DEFAULT_BADGES: Record<string, number> = {};
 const SEEN_KEY = 'nxq_nav_seen';
 
 // Items shown on the compact mobile bar (max 5 for thumb reach).
