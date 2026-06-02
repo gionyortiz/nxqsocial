@@ -41,7 +41,9 @@ import { getClientIpFromRequest } from './common/network/client-ip';
     }),
     StorageModule,
     ServeStaticModule.forRoot({
-      rootPath: join(__dirname, '..', 'uploads'),
+      // Serve from <cwd>/uploads so this matches where multer disk storage
+      // writes (`./uploads/avatars`) regardless of where compiled JS lives.
+      rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/uploads',
       serveStaticOptions: {
         setHeaders: (res) => {

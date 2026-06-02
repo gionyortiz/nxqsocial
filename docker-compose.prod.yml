@@ -54,6 +54,8 @@ services:
         condition: service_healthy
     ports:
       - "3000:3000"
+    volumes:
+      - backend_uploads:/app/uploads
     healthcheck:
       test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
       interval: 30s
@@ -79,3 +81,4 @@ services:
 volumes:
   pg_data:
   redis_data:
+  backend_uploads:
