@@ -31,10 +31,11 @@ const NAV = [
   { href: '/verify',   icon: ShieldCheck, tkey: 'nav.verify' },
 ];
 
-const DESKTOP_BADGES: Record<string, number> = {
+const DEFAULT_BADGES: Record<string, number> = {
   '/messages': 3,
   '/notifications': 2,
 };
+const SEEN_KEY = 'nxq_nav_seen';
 
 // Items shown on the compact mobile bar (max 5 for thumb reach).
 const MOBILE_NAV = [
@@ -50,11 +51,28 @@ export function Navbar() {
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
   const [compact, setCompact] = useState(false);
+  const [seen, setSeen] = useState<Record<string, boolean>>({});
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? window.localStorage.getItem('nxq_nav_compact') : null;
     if (saved === '1') setCompact(true);
+    try {
+      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(SEEN_KEY) : null;
+      if (raw) setSeen(JSON.parse(raw));
+    } catch {}
   }, []);
+
+  // Mark a badged path as seen the moment the user opens it.
+  useEffect(() => {
+    if (!pathname) return;
+    if (DEFAULT_BADGES[pathname] && !seen[pathname]) {
+      const next = { ...seen, [pathname]: true };
+      setSeen(next);
+      try { window.localStorage.setItem(SEEN_KEY, JSON.stringify(next)); } catch {}
+    }
+  }, [pathname, seen]);
+
+  const badgeFor = (href: string) => (seen[href] ? 0 : (DEFAULT_BADGES[href] ?? 0));
 
   const toggleCompact = () => {
     setCompact((prev) => {
@@ -118,9 +136,9 @@ export function Navbar() {
                   <Icon size={20} strokeWidth={active ? 2.6 : 2} />
                 </span>
                 {!compact && label}
-                {!compact && DESKTOP_BADGES[href] ? (
+                {!compact && badgeFor(href) ? (
                   <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
-                    {DESKTOP_BADGES[href]}
+                    {badgeFor(href)}
                   </span>
                 ) : null}
               </Link>
