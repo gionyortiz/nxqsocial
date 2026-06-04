@@ -1,0 +1,89 @@
+<svg width="1024" height="1024" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#1e1b4b"/>
+      <stop offset="0.5" stop-color="#4c1d95"/>
+      <stop offset="1" stop-color="#0c4a6e"/>
+    </linearGradient>
+    <linearGradient id="steelLight" x1="30" y1="8" x2="90" y2="80" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.4" stop-color="#d7deeb"/>
+      <stop offset="1" stop-color="#9aa7bd"/>
+    </linearGradient>
+    <linearGradient id="steelDark" x1="40" y1="40" x2="100" y2="116" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#7c8aa3"/>
+      <stop offset="0.6" stop-color="#4a566b"/>
+      <stop offset="1" stop-color="#2b3445"/>
+    </linearGradient>
+    <linearGradient id="glow" x1="60" y1="22" x2="60" y2="98" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#a5f3fc"/>
+      <stop offset="0.5" stop-color="#22d3ee"/>
+      <stop offset="1" stop-color="#0ea5e9"/>
+    </linearGradient>
+    <radialGradient id="cavity" cx="50%" cy="50%" r="55%">
+      <stop offset="0" stop-color="#0b3a5c"/>
+      <stop offset="0.7" stop-color="#0a2740"/>
+      <stop offset="1" stop-color="#06121f"/>
+    </radialGradient>
+    <radialGradient id="core" cx="42%" cy="38%" r="62%">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="0.3" stop-color="#cdeeff"/>
+      <stop offset="0.65" stop-color="#38bdf8"/>
+      <stop offset="1" stop-color="#075985"/>
+    </radialGradient>
+    <linearGradient id="purple" x1="20" y1="10" x2="100" y2="110" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#d8b4fe"/>
+      <stop offset="0.5" stop-color="#a855f7"/>
+      <stop offset="1" stop-color="#6d28d9"/>
+    </linearGradient>
+    <filter id="soft" x="-50%" y="-50%" width="200%" height="200%">
+      <feGaussianBlur stdDeviation="2.5"/>
+    </filter>
+  </defs>
+
+  <!-- Full bleed brand background (iOS icons must be opaque, no alpha) -->
+  <rect x="0" y="0" width="120" height="120" fill="url(#bg)"/>
+
+  <!-- Outer hex base -->
+  <polygon points="60,5 109,32.5 109,87.5 60,115 11,87.5 11,32.5" fill="url(#steelDark)" stroke="url(#purple)" stroke-width="3"/>
+  <polygon points="60,5 109,32.5 60,60 11,32.5" fill="url(#steelLight)" opacity="0.95"/>
+  <polygon points="11,32.5 60,60 11,87.5" fill="url(#steelLight)" opacity="0.55"/>
+
+  <!-- Inner bevel -->
+  <polygon points="60,18 98,39 98,81 60,102 22,81 22,39" fill="none" stroke="#e8edf5" stroke-width="1.5" opacity="0.6"/>
+
+  <!-- Circuit traces -->
+  <g stroke="#0ea5e9" stroke-width="1.4" stroke-linecap="round" opacity="0.55">
+    <path d="M60 8 V20"/>
+    <path d="M88 24 L80 38"/>
+    <path d="M104 50 L92 56 M104 50 L99 44"/>
+    <path d="M104 70 L92 64"/>
+    <path d="M88 96 L80 82"/>
+    <path d="M32 96 L40 82"/>
+    <path d="M16 70 L28 64"/>
+    <path d="M16 50 L28 56 M16 50 L21 44"/>
+    <path d="M32 24 L40 38"/>
+  </g>
+  <g fill="#67e8f9">
+    <circle cx="80" cy="38" r="1.9"/><circle cx="92" cy="56" r="1.9"/>
+    <circle cx="92" cy="64" r="1.9"/><circle cx="80" cy="82" r="1.9"/>
+    <circle cx="40" cy="82" r="1.9"/><circle cx="28" cy="64" r="1.9"/>
+    <circle cx="28" cy="56" r="1.9"/><circle cx="40" cy="38" r="1.9"/>
+  </g>
+
+  <!-- Cyan rim hex -->
+  <polygon points="60,22 94,41 94,79 60,98 26,79 26,41" fill="none" stroke="url(#glow)" stroke-width="3.2"/>
+  <polygon points="60,22 94,41 94,79 60,98 26,79 26,41" fill="none" stroke="#a5f3fc" stroke-width="6" opacity="0.35" filter="url(#soft)"/>
+
+  <!-- Recessed cavity -->
+  <polygon points="60,33 85,47.5 85,72.5 60,87 35,72.5 35,47.5" fill="url(#cavity)" stroke="url(#glow)" stroke-width="2"/>
+
+  <!-- Inner stepped hex -->
+  <polygon points="60,41 78,51.5 78,68.5 60,79 42,68.5 42,51.5" fill="none" stroke="#38bdf8" stroke-width="1.6" opacity="0.8"/>
+
+  <!-- Core halo + orb -->
+  <circle cx="60" cy="60" r="20" fill="#22d3ee" opacity="0.35" filter="url(#soft)"/>
+  <circle cx="60" cy="60" r="13.5" fill="url(#core)"/>
+  <circle cx="60" cy="60" r="13.5" fill="none" stroke="#e0f2fe" stroke-width="1.5" opacity="0.8"/>
+  <ellipse cx="55.5" cy="55" rx="4.5" ry="3.2" fill="#ffffff" opacity="0.92"/>
+</svg>
