@@ -45,7 +45,75 @@ const VIDEOS = [
   { url: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/360/Big_Buck_Bunny_360_10s_1MB.mp4', caption: 'On the road again 🚗💨' },
 ];
 
+// Dedicated account for Apple App Review (Guideline 2.1.0 — App Completeness).
+// These credentials are intended to be shared with the reviewer in App Store
+// Connect → App Review Information, so they are deliberately fixed/known.
+const REVIEW_ACCOUNT = {
+  email: 'appreview@nxqsocial.com',
+  username: 'appreview',
+  password: 'NxqAppReview!2026',
+  displayName: 'App Review',
+  bio: 'Apple App Review demo account — full access to NXQ Social.',
+  avatar: 7,
+};
+
+async function seedReviewAccount() {
+  const passwordHash = await bcrypt.hash(REVIEW_ACCOUNT.password, 12);
+  const reviewer = await prisma.user.upsert({
+    where: { email: REVIEW_ACCOUNT.email },
+    // Always reset the password so the reviewer login is guaranteed to work,
+    // even if this seeder has been run before with a different value.
+    update: { passwordHash, emailVerified: true, verificationStatus: 'ID_VERIFIED', trustScore: 95 },
+    create: {
+      email: REVIEW_ACCOUNT.email,
+      username: REVIEW_ACCOUNT.username,
+      passwordHash,
+      role: 'USER',
+      verificationStatus: 'ID_VERIFIED',
+      trustScore: 95,
+      emailVerified: true,
+      profile: { create: { displayName: REVIEW_ACCOUNT.displayName, bio: REVIEW_ACCOUNT.bio, avatarUrl: `https://i.pravatar.cc/200?img=${REVIEW_ACCOUNT.avatar}` } },
+    },
+  });
+
+  // Give the reviewer their own published post + reel so every screen has
+  // content immediately on first login (no empty states during review).
+  const photoCount = await prisma.post.count({ where: { authorId: reviewer.id, type: 'PHOTO' } });
+  if (photoCount < 1) {
+    await prisma.post.create({
+      data: {
+        authorId: reviewer.id,
+        caption: 'Welcome to NXQ Social — verified humans, real moments. ⚡',
+        type: 'PHOTO', visibility: 'PUBLIC', status: 'PUBLISHED', aiLabel: 'NONE',
+        media: { create: {
+          userId: reviewer.id, s3Key: 'demo/appreview-0.jpg', bucket: 'demo',
+          url: 'https://picsum.photos/seed/appreview-0/900/900', mimeType: 'image/jpeg',
+          size: 0, width: 900, height: 900, uploadStatus: 'PUBLISHED', moderationStatus: 'APPROVED', order: 0,
+        } },
+      },
+    });
+  }
+  const videoCount = await prisma.post.count({ where: { authorId: reviewer.id, type: 'SHORT_VIDEO' } });
+  if (videoCount < 1) {
+    await prisma.post.create({
+      data: {
+        authorId: reviewer.id,
+        caption: 'A quick look at the Reels feed 🎥 sound on!',
+        type: 'SHORT_VIDEO', visibility: 'PUBLIC', status: 'PUBLISHED', aiLabel: 'NONE',
+        media: { create: {
+          userId: reviewer.id, s3Key: 'demo/appreview-reel.mp4', bucket: 'demo',
+          url: VIDEOS[0].url, mimeType: 'video/mp4',
+          size: 0, width: 720, height: 1280, durationSec: 15, uploadStatus: 'PUBLISHED', moderationStatus: 'APPROVED', order: 0,
+        } },
+      },
+    });
+  }
+
+  console.log(`App Review account ready: ${REVIEW_ACCOUNT.email} / ${REVIEW_ACCOUNT.password}`);
+}
+
 async function main() {
+  await seedReviewAccount();
   const passwordHash = await bcrypt.hash('DemoPass123!', 12);
   let posts = 0;
 

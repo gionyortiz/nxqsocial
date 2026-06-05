@@ -72,8 +72,8 @@ npm run build:prod:ios
 
 Configured identifiers:
 
-- iOS bundle ID: `com.nxqsocial.app`
-- Android package: `com.nxqsocial.app`
+- iOS bundle ID: `com.gionyortiz.nxqsocial`
+- Android package: `com.gionyortiz.nxqsocial`
 
 ## Notes
 
