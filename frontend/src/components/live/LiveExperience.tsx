@@ -40,13 +40,13 @@ const QUICK_EMOJIS = ['❤️', '😂', '😮', '👏', '🔥', '🎉'];
 /** Gift "stickers" — bigger center-screen bursts. */
 const GIFTS = ['🎁', '🌹', '💎', '👑', '🚀', '🦄'];
 
-/** Royalty-free background music tracks (Bensound CDN — follow Attribution license). */
+/** Royalty-free background music — SoundHelix (free for any use, no CORS issues). */
 const MUSIC_TRACKS = [
-  { id: 'lofi1',   label: 'Lo-Fi Chill',   url: 'https://cdn2.bensound.com/bensound-music/bensound-creativeminds.mp3' },
-  { id: 'hiphop1', label: 'Hip Hop Vibe',  url: 'https://cdn2.bensound.com/bensound-music/bensound-hipjazz.mp3' },
-  { id: 'upbeat1', label: 'Upbeat Pop',    url: 'https://cdn2.bensound.com/bensound-music/bensound-ukulele.mp3' },
-  { id: 'chill1',  label: 'Chill Beats',   url: 'https://cdn2.bensound.com/bensound-music/bensound-sunny.mp3' },
-  { id: 'party1',  label: 'Party Mix',     url: 'https://cdn2.bensound.com/bensound-music/bensound-dance.mp3' },
+  { id: 'lofi1',   label: 'Lo-Fi Chill',   url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-9.mp3' },
+  { id: 'hiphop1', label: 'Hip Hop Vibe',  url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3' },
+  { id: 'upbeat1', label: 'Upbeat Pop',    url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-3.mp3' },
+  { id: 'chill1',  label: 'Chill Beats',   url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-6.mp3' },
+  { id: 'party1',  label: 'Party Mix',     url: 'https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3' },
 ];
 const MAX_CHAT = 60;
 const HEARTBEAT_MS = 15_000;
