@@ -353,10 +353,12 @@ export function LiveExperience({
       to   { opacity: 1; transform: translateY(0); }
     }
     @keyframes nxqGiftPop {
-      0%   { transform: scale(0.3); opacity: 0; }
-      20%  { transform: scale(1.15); opacity: 1; }
-      80%  { transform: scale(1); opacity: 1; }
-      100% { transform: scale(0.9) translateY(-30px); opacity: 0; }
+      0%   { transform: scale(0.2) translateY(60px) rotate(0deg); opacity: 0; }
+      15%  { transform: scale(1.3) translateY(0px) rotate(-5deg); opacity: 1; }
+      30%  { transform: scale(1.1) translateY(-10px) rotate(3deg); opacity: 1; }
+      60%  { transform: scale(1) translateY(-80px) rotate(-2deg); opacity: 1; }
+      85%  { transform: scale(0.8) translateY(-200px) rotate(8deg); opacity: 0.6; }
+      100% { transform: scale(0.3) translateY(-320px) rotate(15deg); opacity: 0; }
     }
   `,
     [],
@@ -459,10 +461,10 @@ export function LiveExperience({
           <div
             key={g.id}
             className="flex flex-col items-center"
-            style={{ animation: 'nxqGiftPop 3.5s ease-out forwards' }}
+            style={{ animation: 'nxqGiftPop 3.5s cubic-bezier(0.22,1,0.36,1) forwards' }}
           >
-            <span className="text-7xl drop-shadow-lg">{g.emoji}</span>
-            <span className="text-xs text-white bg-black/50 rounded-full px-3 py-1 mt-1">
+            <span className="text-8xl drop-shadow-2xl filter">{g.emoji}</span>
+            <span className="text-xs font-bold text-white bg-black/60 rounded-full px-3 py-1 mt-1 shadow-lg">
               {g.name} sent a gift
             </span>
           </div>
