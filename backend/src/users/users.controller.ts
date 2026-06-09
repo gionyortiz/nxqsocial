@@ -77,6 +77,48 @@ export class UsersController {
     return this.usersService.banUser(id, admin.id, dto.reason);
   }
 
+  /** Send a password-reset email on behalf of a user (no admin can see/set passwords). */
+  @Post('admin/:id/send-password-reset')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  sendPasswordReset(@Param('id') id: string, @CurrentUser() admin: any) {
+    return this.usersService.adminSendPasswordReset(id, admin.id);
+  }
+
+  /** Resend email-verification link. */
+  @Post('admin/:id/resend-email-verification')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  resendEmailVerification(@Param('id') id: string, @CurrentUser() admin: any) {
+    return this.usersService.adminResendEmailVerification(id, admin.id);
+  }
+
+  /** Lock account — prevents login without deleting data. */
+  @Post('admin/:id/lock')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  lockAccount(@Param('id') id: string, @CurrentUser() admin: any, @Body() dto: AdminActionDto) {
+    return this.usersService.adminLockAccount(id, admin.id, dto.reason);
+  }
+
+  /** Unlock a previously locked account. */
+  @Post('admin/:id/unlock')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  unlockAccount(@Param('id') id: string, @CurrentUser() admin: any) {
+    return this.usersService.adminUnlockAccount(id, admin.id);
+  }
+
+  /** Invalidate all JWT sessions by rotating the user's jwtVersion. */
+  @Post('admin/:id/force-logout')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  forceLogout(@Param('id') id: string, @CurrentUser() admin: any) {
+    return this.usersService.adminForceLogout(id, admin.id);
+  }
+
+  /** Full account detail for admin support view. */
+  @Get('admin/:id/detail')
+  @UseGuards(JwtAuthGuard, AdminGuard)
+  accountDetail(@Param('id') id: string) {
+    return this.usersService.adminAccountDetail(id);
+  }
+
   // ── Public / self endpoints ────────────────────────────────────────────────
 
   @Get('search')

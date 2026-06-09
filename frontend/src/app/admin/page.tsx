@@ -467,6 +467,7 @@ export default function AdminPage() {
           <TabBtn active={tab === 'audit'} onClick={() => setTab('audit')}>Audit Log</TabBtn>
           <TabBtn active={tab === 'users'} onClick={() => setTab('users')}>User Management</TabBtn>
           <TabBtn active={tab === 'feedback'} onClick={() => setTab('feedback')} badge={feedbackStats?.open ?? 0}>Beta Feedback</TabBtn>
+          <TabBtn active={tab === 'recovery'} onClick={() => setTab('recovery')}>Account Recovery</TabBtn>
         </div>
       </div>
 
@@ -725,6 +726,9 @@ export default function AdminPage() {
         )}
       </div>
 
+      {/* Account Recovery tab rendered outside .p-6 to avoid double padding */}
+      {tab === 'recovery' && <AccountRecoveryTab />}
+
       {historyUserId && <TrustHistoryModal userId={historyUserId} onClose={() => setHistoryUserId(null)} />}
     </div>
   );
@@ -736,5 +740,268 @@ function KpiCard({ label, value }: { label: string; value: number }) {
       <p className="text-[11px] text-gray-400 uppercase tracking-wide">{label}</p>
       <p className="text-lg font-extrabold text-white leading-tight mt-1">{value}</p>
     </div>
+  );
+}
+
+// ── Account Recovery Tab ──────────────────────────────────────────────────────
+
+function AccountRecoveryTab() {
+  const [search, setSearch] = useState('');
+  const [users, setUsers] = useState<AdminUser[]>([]);
+  const [selected, setSelected] = useState<any | null>(null);
+  const [loading, setLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [notice, setNotice] = useState('');
+  const [noticeType, setNoticeType] = useState<'ok' | 'err'>('ok');
+  const [actionReason, setActionReason] = useState('');
+
+  const showNotice = (msg: string, type: 'ok' | 'err' = 'ok') => {
+    setNotice(msg);
+    setNoticeType(type);
+    setTimeout(() => setNotice(''), 4000);
+  };
+
+  const doSearch = async () => {
+    if (!search.trim()) return;
+    setLoading(true);
+    try {
+      const { data } = await api.get('/users/admin/list', { params: { search, take: 10 } });
+      setUsers(data.data ?? []);
+    } catch {
+      showNotice('Search failed', 'err');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadDetail = async (userId: string) => {
+    setDetailLoading(true);
+    try {
+      const { data } = await api.get(`/users/admin/${userId}/detail`);
+      setSelected(data);
+    } catch {
+      showNotice('Could not load user detail', 'err');
+    } finally {
+      setDetailLoading(false);
+    }
+  };
+
+  const action = async (userId: string, endpoint: string, label: string) => {
+    if (!window.confirm(`${label} for this user?`)) return;
+    try {
+      const { data } = await api.post(`/users/admin/${userId}/${endpoint}`, { reason: actionReason || undefined });
+      showNotice(data.message ?? `${label} done.`, 'ok');
+      if (selected?.id === userId) await loadDetail(userId);
+    } catch (e: any) {
+      showNotice(e?.response?.data?.message ?? `${label} failed`, 'err');
+    }
+  };
+
+  return (
+    <div className="p-6 space-y-6">
+      <div>
+        <h2 className="text-lg font-bold text-white mb-1">Account Recovery &amp; Support</h2>
+        <p className="text-sm text-gray-400">Search for a user and take support actions. All actions are logged in the audit trail.</p>
+      </div>
+
+      {notice && (
+        <div className={`rounded-lg px-4 py-2 text-sm font-semibold ${noticeType === 'err' ? 'bg-red-800 text-red-200' : 'bg-green-800 text-green-200'}`}>
+          {notice}
+        </div>
+      )}
+
+      {/* Search */}
+      <div className="flex gap-2">
+        <input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && doSearch()}
+          placeholder="Search by username, email, display name…"
+          className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
+        />
+        <button onClick={doSearch} disabled={loading} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium hover:bg-blue-600 disabled:opacity-50">
+          {loading ? 'Searching…' : 'Search'}
+        </button>
+      </div>
+
+      {/* Results */}
+      {users.length > 0 && !selected && (
+        <div className="space-y-2">
+          {users.map((u) => (
+            <button
+              key={u.id}
+              onClick={() => loadDetail(u.id)}
+              className="w-full text-left rounded-xl border border-gray-700 bg-gray-900 p-3 hover:border-blue-600 transition-colors"
+            >
+              <div className="flex items-center gap-3">
+                <div>
+                  <p className="text-sm font-bold text-blue-400">@{u.username}</p>
+                  <p className="text-xs text-gray-400">{u.email}</p>
+                </div>
+                <div className="ml-auto flex gap-2 items-center">
+                  <span className="text-xs text-gray-500">{u.verificationStatus}</span>
+                  <StatusBadge suspended={u.isSuspended} banned={u.isBanned} />
+                </div>
+              </div>
+            </button>
+          ))}
+        </div>
+      )}
+
+      {/* Detail panel */}
+      {detailLoading && <p className="text-gray-400 text-sm">Loading user details…</p>}
+
+      {selected && !detailLoading && (
+        <div className="space-y-5">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-bold text-white">@{selected.username}</h3>
+            <button onClick={() => setSelected(null)} className="text-xs text-gray-500 hover:text-gray-300">← Back to results</button>
+          </div>
+
+          {/* User info card */}
+          <div className="rounded-xl border border-gray-700 bg-gray-900 p-4 grid grid-cols-2 md:grid-cols-3 gap-3 text-sm">
+            {[
+              { label: 'Email', value: selected.email },
+              { label: 'Phone', value: selected.phone ?? '—' },
+              { label: 'Display Name', value: selected.displayName ?? '—' },
+              { label: 'Role', value: selected.role },
+              { label: 'Trust Score', value: selected.trustScore },
+              { label: 'Verification', value: selected.verificationStatus },
+              { label: 'Email Verified', value: selected.emailVerified ? '✅ Yes' : '❌ No' },
+              { label: 'Phone Verified', value: selected.phoneVerified ? '✅ Yes' : '❌ No' },
+              { label: 'Status', value: selected.isBanned ? 'BANNED' : selected.isSuspended ? 'SUSPENDED' : 'ACTIVE' },
+              { label: 'Joined', value: new Date(selected.createdAt).toLocaleDateString() },
+              { label: 'Posts', value: selected._count?.posts ?? 0 },
+              { label: 'Reports Received', value: selected._count?.reportsReceived ?? 0 },
+            ].map(({ label, value }) => (
+              <div key={label}>
+                <p className="text-[11px] text-gray-500 uppercase tracking-wide">{label}</p>
+                <p className="text-white font-medium mt-0.5">{String(value)}</p>
+              </div>
+            ))}
+          </div>
+
+          {/* Action reason */}
+          <div>
+            <label className="block text-xs text-gray-400 mb-1">Action reason (optional, logged)</label>
+            <input
+              value={actionReason}
+              onChange={(e) => setActionReason(e.target.value)}
+              placeholder="e.g. User requested via support email"
+              className="w-full rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-yellow-500 focus:outline-none"
+            />
+          </div>
+
+          {/* Action buttons */}
+          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+            <ActionButton
+              label="Send Password Reset Email"
+              desc="Sends secure link — admin never sees token"
+              color="blue"
+              onClick={() => action(selected.id, 'send-password-reset', 'Send password reset')}
+            />
+            <ActionButton
+              label="Resend Email Verification"
+              desc="Sends verification reminder to user's inbox"
+              color="indigo"
+              onClick={() => action(selected.id, 'resend-email-verification', 'Resend email verification')}
+            />
+            <ActionButton
+              label="Force Logout"
+              desc="Invalidates all active reset tokens"
+              color="yellow"
+              onClick={() => action(selected.id, 'force-logout', 'Force logout')}
+            />
+            {!selected.isSuspended ? (
+              <ActionButton
+                label="Lock Account"
+                desc="Prevents login without deleting data"
+                color="orange"
+                onClick={() => action(selected.id, 'lock', 'Lock account')}
+              />
+            ) : (
+              <ActionButton
+                label="Unlock Account"
+                desc="Re-enables login for this account"
+                color="green"
+                onClick={() => action(selected.id, 'unlock', 'Unlock account')}
+              />
+            )}
+            {!selected.isSuspended && !selected.isBanned && (
+              <ActionButton
+                label="Suspend"
+                desc="Temporary suspension"
+                color="orange"
+                onClick={() => action(selected.id, 'suspend', 'Suspend user')}
+              />
+            )}
+            {(selected.isSuspended || selected.isBanned) && (
+              <ActionButton
+                label="Restore Account"
+                desc="Remove suspension/ban"
+                color="green"
+                onClick={() => action(selected.id, 'restore', 'Restore account')}
+              />
+            )}
+          </div>
+
+          {/* Password reset history */}
+          {selected.passwordResetHistory?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-bold text-gray-300 mb-2">Password Reset History (last 5)</h4>
+              <div className="space-y-1">
+                {selected.passwordResetHistory.map((r: any, i: number) => (
+                  <div key={i} className="text-xs text-gray-400 flex gap-4">
+                    <span>Requested: {new Date(r.createdAt).toLocaleString()}</span>
+                    <span>Used: {r.usedAt ? new Date(r.usedAt).toLocaleString() : '—'}</span>
+                    <span>Expires: {new Date(r.expiresAt).toLocaleString()}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Audit log */}
+          {selected.auditLog?.length > 0 && (
+            <div>
+              <h4 className="text-sm font-bold text-gray-300 mb-2">Admin Action Log</h4>
+              <div className="space-y-1 max-h-48 overflow-y-auto">
+                {selected.auditLog.map((l: any, i: number) => (
+                  <div key={i} className="text-xs text-gray-400 flex gap-3 py-1 border-b border-gray-800">
+                    <span className="text-gray-500 shrink-0">{new Date(l.createdAt).toLocaleString()}</span>
+                    <span className="text-yellow-400 shrink-0">@{l.admin?.username ?? 'system'}</span>
+                    <span>{l.actionType}</span>
+                    {l.reason && <span className="text-gray-500">— {l.reason}</span>}
+                    {(l.meta as any)?.action && <span className="text-blue-400">({(l.meta as any).action})</span>}
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ActionButton({ label, desc, color, onClick }: {
+  label: string; desc: string; color: string; onClick: () => void;
+}) {
+  const colors: Record<string, string> = {
+    blue: 'border-blue-700 hover:bg-blue-900/40 text-blue-300',
+    indigo: 'border-indigo-700 hover:bg-indigo-900/40 text-indigo-300',
+    yellow: 'border-yellow-700 hover:bg-yellow-900/40 text-yellow-300',
+    orange: 'border-orange-700 hover:bg-orange-900/40 text-orange-300',
+    green: 'border-green-700 hover:bg-green-900/40 text-green-300',
+    red: 'border-red-700 hover:bg-red-900/40 text-red-300',
+  };
+  return (
+    <button
+      onClick={onClick}
+      className={`rounded-xl border bg-gray-900 p-3 text-left transition-colors ${colors[color] ?? colors.blue}`}
+    >
+      <p className="text-sm font-bold">{label}</p>
+      <p className="text-xs text-gray-500 mt-0.5">{desc}</p>
+    </button>
   );
 }

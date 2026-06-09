@@ -49,4 +49,35 @@ export class MailService {
       this.logger.error(`Failed to send reset email to ${to}`, err as any);
     }
   }
+
+  async sendVerificationEmail(to: string, username: string) {
+    const subject = 'Verify your NXQ Social email';
+    const html = `
+      <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">
+        <h2 style="color:#7c3aed;margin:0 0 12px;">Verify your email, @${username}</h2>
+        <p style="color:#374151;font-size:15px;line-height:1.6;">
+          An admin has requested that you verify your email address on NXQ Social.
+          Please log in and go to Settings → Verify to complete the process.
+        </p>
+        <p style="margin:24px 0;">
+          <a href="https://nxqsocial.com/verify" style="background:#7c3aed;color:#fff;text-decoration:none;
+             padding:12px 24px;border-radius:9999px;font-weight:600;display:inline-block;">
+            Go to Verify
+          </a>
+        </p>
+        <p style="color:#9ca3af;font-size:13px;">NXQ Social Trust &amp; Safety Team</p>
+      </div>
+    `;
+
+    if (!this.resend) {
+      this.logger.log(`[DEV] Verification email for ${to}`);
+      return;
+    }
+
+    try {
+      await this.resend.emails.send({ from: this.from, to, subject, html });
+    } catch (err) {
+      this.logger.error(`Failed to send verification email to ${to}`, err as any);
+    }
+  }
 }
