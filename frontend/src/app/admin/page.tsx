@@ -299,7 +299,7 @@ function TrustHistoryModal({ userId, onClose }: { userId: string; onClose: () =>
 
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-type Tab = 'reports' | 'verifications' | 'safety' | 'audit' | 'users' | 'feedback';
+type Tab = 'reports' | 'verifications' | 'safety' | 'audit' | 'users' | 'feedback' | 'recovery';
 
 export default function AdminPage() {
   const user = useAuthStore((s) => s.user);
