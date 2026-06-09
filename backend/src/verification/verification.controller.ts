@@ -9,7 +9,7 @@ import { VerificationService } from './verification.service';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
-import { IsString, IsIn } from 'class-validator';
+import { IsString, IsIn, IsOptional } from 'class-validator';
 
 class RequestVerificationDto {
   @IsString()
@@ -21,6 +21,7 @@ class ReviewVerificationDto {
   @IsString()
   approved!: string;
 
+  @IsOptional()
   @IsString()
   reviewNote?: string;
 }
