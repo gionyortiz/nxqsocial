@@ -40,13 +40,13 @@ const QUICK_EMOJIS = ['❤️', '😂', '😮', '👏', '🔥', '🎉'];
 /** Gift "stickers" — bigger center-screen bursts. */
 const GIFTS = ['🎁', '🌹', '💎', '👑', '🚀', '🦄'];
 
-/** Royalty-free background music tracks (Pixabay / Free Music Archive). */
+/** Royalty-free background music tracks (Bensound CDN — follow Attribution license). */
 const MUSIC_TRACKS = [
-  { id: 'lofi1',   label: 'Lo-Fi Chill',     url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3' },
-  { id: 'hiphop1', label: 'Hip Hop Vibe',     url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0c6ff1bab.mp3' },
-  { id: 'upbeat1', label: 'Upbeat Pop',       url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3' },
-  { id: 'chill1',  label: 'Chill Beats',      url: 'https://cdn.pixabay.com/download/audio/2021/09/09/audio_988b694557.mp3' },
-  { id: 'party1',  label: 'Party Mix',        url: 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3' },
+  { id: 'lofi1',   label: 'Lo-Fi Chill',   url: 'https://cdn2.bensound.com/bensound-music/bensound-creativeminds.mp3' },
+  { id: 'hiphop1', label: 'Hip Hop Vibe',  url: 'https://cdn2.bensound.com/bensound-music/bensound-hipjazz.mp3' },
+  { id: 'upbeat1', label: 'Upbeat Pop',    url: 'https://cdn2.bensound.com/bensound-music/bensound-ukulele.mp3' },
+  { id: 'chill1',  label: 'Chill Beats',   url: 'https://cdn2.bensound.com/bensound-music/bensound-sunny.mp3' },
+  { id: 'party1',  label: 'Party Mix',     url: 'https://cdn2.bensound.com/bensound-music/bensound-dance.mp3' },
 ];
 const MAX_CHAT = 60;
 const HEARTBEAT_MS = 15_000;
