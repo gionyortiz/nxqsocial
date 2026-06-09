@@ -27,6 +27,8 @@ import {
   Flag,
   Hand,
   UserPlus,
+  Music,
+  VolumeX,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
 import { startLiveSession, endLiveSession, liveHeartbeat } from '@/lib/live';
@@ -37,6 +39,15 @@ import { trackEvent } from '@/lib/analytics';
 const QUICK_EMOJIS = ['❤️', '😂', '😮', '👏', '🔥', '🎉'];
 /** Gift "stickers" — bigger center-screen bursts. */
 const GIFTS = ['🎁', '🌹', '💎', '👑', '🚀', '🦄'];
+
+/** Royalty-free background music tracks (Pixabay / Free Music Archive). */
+const MUSIC_TRACKS = [
+  { id: 'lofi1',   label: 'Lo-Fi Chill',     url: 'https://cdn.pixabay.com/download/audio/2022/05/27/audio_1808fbf07a.mp3' },
+  { id: 'hiphop1', label: 'Hip Hop Vibe',     url: 'https://cdn.pixabay.com/download/audio/2022/01/18/audio_d0c6ff1bab.mp3' },
+  { id: 'upbeat1', label: 'Upbeat Pop',       url: 'https://cdn.pixabay.com/download/audio/2022/03/10/audio_c8c8a73467.mp3' },
+  { id: 'chill1',  label: 'Chill Beats',      url: 'https://cdn.pixabay.com/download/audio/2021/09/09/audio_988b694557.mp3' },
+  { id: 'party1',  label: 'Party Mix',        url: 'https://cdn.pixabay.com/download/audio/2022/08/02/audio_884fe92c21.mp3' },
+];
 const MAX_CHAT = 60;
 const HEARTBEAT_MS = 15_000;
 
@@ -120,6 +131,10 @@ export function LiveExperience({
   const [requestedToJoin, setRequestedToJoin] = useState(false);
   const [reporting, setReporting] = useState(false);
   const [reported, setReported] = useState(false);
+  const [showMusic, setShowMusic] = useState(false);
+  const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
+  const [musicVolume, setMusicVolume] = useState(0.4);
+  const musicAudioRef = useRef<HTMLAudioElement | null>(null);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const liveStartedAtRef = useRef<number>(Date.now());
@@ -281,6 +296,55 @@ export function LiveExperience({
     addFloatingReaction(emoji);
     broadcast({ kind: 'reaction', id: randomId(), emoji, ts: Date.now() }, false);
   };
+
+  const playMusic = (trackId: string) => {
+    const track = MUSIC_TRACKS.find(t => t.id === trackId);
+    if (!track) return;
+
+    // Stop current music
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+      musicAudioRef.current = null;
+    }
+
+    if (playingTrackId === trackId) {
+      // Toggle off
+      setPlayingTrackId(null);
+      return;
+    }
+
+    const audio = new Audio(track.url);
+    audio.loop = true;
+    audio.volume = musicVolume;
+    audio.play().catch(() => {});
+    musicAudioRef.current = audio;
+    setPlayingTrackId(trackId);
+  };
+
+  const stopMusic = () => {
+    if (musicAudioRef.current) {
+      musicAudioRef.current.pause();
+      musicAudioRef.current = null;
+    }
+    setPlayingTrackId(null);
+  };
+
+  // Keep volume in sync
+  useEffect(() => {
+    if (musicAudioRef.current) {
+      musicAudioRef.current.volume = musicVolume;
+    }
+  }, [musicVolume]);
+
+  // Stop music when host leaves
+  useEffect(() => {
+    return () => {
+      if (musicAudioRef.current) {
+        musicAudioRef.current.pause();
+        musicAudioRef.current = null;
+      }
+    };
+  }, []);
 
   const sendGift = (emoji: string) => {
     const name = user?.displayName ?? user?.username ?? 'Someone';
@@ -551,6 +615,58 @@ export function LiveExperience({
         </div>
       )}
 
+      {/* Music tray (host only) */}
+      {showMusic && host && (
+        <div className="absolute bottom-20 left-0 right-0 z-30 px-3">
+          <div className="mx-auto max-w-sm bg-black/80 backdrop-blur-xl rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-white text-sm font-bold flex items-center gap-2">
+                <Music size={15} className="text-purple-400" /> Background Music
+              </span>
+              {playingTrackId && (
+                <button onClick={stopMusic} className="flex items-center gap-1 text-xs text-red-400 hover:text-red-300">
+                  <VolumeX size={13} /> Stop
+                </button>
+              )}
+            </div>
+            <div className="grid grid-cols-1 gap-1.5">
+              {MUSIC_TRACKS.map((t) => (
+                <button
+                  key={t.id}
+                  onClick={() => playMusic(t.id)}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-colors text-left ${
+                    playingTrackId === t.id
+                      ? 'bg-purple-600 text-white'
+                      : 'bg-white/10 text-white hover:bg-white/20'
+                  }`}
+                >
+                  <span className="text-base">{playingTrackId === t.id ? '▶️' : '🎵'}</span>
+                  {t.label}
+                  {playingTrackId === t.id && <span className="ml-auto text-xs opacity-70 animate-live-blink">● PLAYING</span>}
+                </button>
+              ))}
+            </div>
+            {/* Volume slider */}
+            <div className="flex items-center gap-2 pt-1">
+              <Music size={13} className="text-gray-400 shrink-0" />
+              <input
+                type="range"
+                min="0"
+                max="1"
+                step="0.05"
+                value={musicVolume}
+                onChange={(e) => setMusicVolume(Number(e.target.value))}
+                className="flex-1 h-1.5 accent-purple-500"
+              />
+              <span className="text-xs text-gray-400 w-8 text-right">{Math.round(musicVolume * 100)}%</span>
+            </div>
+            <p className="text-[11px] text-gray-500 leading-relaxed">
+              Music plays on your device only. Viewers hear it through your microphone. Use headphones to avoid echo.
+            </p>
+          </div>
+        </div>
+      )}
+
       {/* Bottom control bar */}
       <div className="absolute bottom-0 inset-x-0 z-30 bg-gradient-to-t from-black/80 to-transparent">
         <div className="flex items-center gap-2 px-3 pb-3 pt-6">
@@ -599,6 +715,14 @@ export function LiveExperience({
               >
                 <MonitorUp size={18} />
               </TrackToggle>
+              {/* Music button */}
+              <button
+                onClick={() => setShowMusic(s => !s)}
+                title="Background music"
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${playingTrackId ? 'bg-purple-500 hover:bg-purple-600 text-white animate-pulse-glow' : 'bg-white/15 hover:bg-white/25 text-white'}`}
+              >
+                {playingTrackId ? <Music size={18} /> : <Music size={18} />}
+              </button>
             </div>
           )}
 
