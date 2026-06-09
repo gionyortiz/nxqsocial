@@ -1,9 +1,33 @@
 import { router } from 'expo-router';
-import { Pressable, SafeAreaView, Text, View } from 'react-native';
+import { Alert, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
+import { apiRequest } from '@/lib/api';
 
 export default function ProfileScreen() {
-  const { user, logout } = useAuth();
+  const { user, logout, token } = useAuth();
+
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently delete your account and all your data. This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete Forever',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await apiRequest('/users/me', { method: 'DELETE', token: token ?? '' });
+              await logout();
+              router.replace('/login');
+            } catch {
+              Alert.alert('Error', 'Could not delete account. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
@@ -20,7 +44,7 @@ export default function ProfileScreen() {
         </View>
 
         <Pressable onPress={() => router.push('/feedback')} style={{ backgroundColor: '#1f2937', borderRadius: 12, padding: 12 }}>
-          <Text style={{ color: '#fff', fontWeight: '700' }}>Send beta feedback</Text>
+          <Text style={{ color: '#fff', fontWeight: '700' }}>Feedback</Text>
         </Pressable>
 
         <Pressable
@@ -31,6 +55,13 @@ export default function ProfileScreen() {
           style={{ backgroundColor: '#7f1d1d', borderRadius: 12, padding: 12, marginTop: 6 }}
         >
           <Text style={{ color: '#fff', fontWeight: '700' }}>Logout</Text>
+        </Pressable>
+
+        <Pressable
+          onPress={handleDeleteAccount}
+          style={{ backgroundColor: '#1f1010', borderWidth: 1, borderColor: '#7f1d1d', borderRadius: 12, padding: 12, marginTop: 6 }}
+        >
+          <Text style={{ color: '#fca5a5', fontWeight: '700', textAlign: 'center' }}>Delete Account</Text>
         </Pressable>
       </View>
     </SafeAreaView>

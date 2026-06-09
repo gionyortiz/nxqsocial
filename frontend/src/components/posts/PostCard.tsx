@@ -15,6 +15,8 @@ import {
   Sparkles,
   Bot,
   HelpCircle,
+  Flag,
+  CheckCircle2,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
@@ -82,6 +84,10 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
   const [engagementTab, setEngagementTab] = useState<'likes' | 'comments' | null>(null);
   const [heartAnim, setHeartAnim] = useState(false);
   const [floatHeart, setFloatHeart] = useState(false);
+  const [reportOpen, setReportOpen] = useState(false);
+  const [reportReason, setReportReason] = useState('SPAM');
+  const [reporting, setReporting] = useState(false);
+  const [reportDone, setReportDone] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const doubleTapRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { user: me } = useAuthStore();
@@ -106,6 +112,19 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
     } finally {
       setDeleting(false);
       setConfirmDelete(false);
+    }
+  };
+
+  const handleReport = async () => {
+    setReporting(true);
+    try {
+      await api.post('/reports', { reason: reportReason, reportedPostId: post.id });
+      setReportDone(true);
+      setTimeout(() => { setReportOpen(false); setReportDone(false); }, 1800);
+    } catch {
+      setReportOpen(false);
+    } finally {
+      setReporting(false);
     }
   };
 
@@ -264,6 +283,15 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
               </div>
             )}
           </div>
+        )}
+        {!isMe && (
+          <button
+            onClick={() => setReportOpen(true)}
+            className="p-2 rounded-full text-gray-300 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+            title="Report post"
+          >
+            <Flag size={17} />
+          </button>
         )}
       </div>
 
@@ -493,6 +521,66 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
                 {deleting ? 'Deleting…' : 'Delete'}
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Report modal ─────────────────────────────────────────── */}
+      {reportOpen && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60 backdrop-blur-sm p-4">
+          <div className="bg-white dark:bg-[#1f2937] rounded-3xl shadow-2xl w-full max-w-sm p-6 animate-slide-up">
+            {reportDone ? (
+              <div className="flex flex-col items-center py-4 gap-3">
+                <CheckCircle2 size={40} className="text-green-500" />
+                <p className="font-bold text-gray-900 dark:text-gray-100">Report submitted</p>
+                <p className="text-sm text-gray-500 text-center">Our moderation team will review this post.</p>
+              </div>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-2xl bg-orange-100 dark:bg-orange-900/30 flex items-center justify-center">
+                    <Flag size={18} className="text-orange-500" />
+                  </div>
+                  <div>
+                    <h3 className="font-bold text-gray-900 dark:text-gray-100">Report post</h3>
+                    <p className="text-xs text-gray-500">Why are you reporting this?</p>
+                  </div>
+                </div>
+                <div className="flex flex-col gap-1.5 mb-5">
+                  {[
+                    { value: 'SPAM', label: 'Spam or misleading' },
+                    { value: 'HARASSMENT', label: 'Harassment or bullying' },
+                    { value: 'HATE_SPEECH', label: 'Hate speech' },
+                    { value: 'VIOLENCE', label: 'Violence or dangerous content' },
+                    { value: 'NUDITY', label: 'Nudity or sexual content' },
+                    { value: 'MISINFORMATION', label: 'False information' },
+                    { value: 'OTHER', label: 'Other' },
+                  ].map((r) => (
+                    <button
+                      key={r.value}
+                      onClick={() => setReportReason(r.value)}
+                      className={cn(
+                        'flex items-center gap-3 px-3 py-2.5 rounded-2xl text-sm font-semibold transition-all text-left',
+                        reportReason === r.value
+                          ? 'bg-orange-50 dark:bg-orange-900/30 text-orange-700 dark:text-orange-300 ring-1 ring-orange-200'
+                          : 'text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5',
+                      )}
+                    >
+                      <span className={cn('w-4 h-4 rounded-full border-2 flex-shrink-0', reportReason === r.value ? 'border-orange-500 bg-orange-500' : 'border-gray-300')} />
+                      {r.label}
+                    </button>
+                  ))}
+                </div>
+                <div className="flex gap-3">
+                  <button onClick={() => setReportOpen(false)} className="flex-1 py-3 rounded-2xl border border-[var(--border)] text-sm font-semibold text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors">
+                    Cancel
+                  </button>
+                  <button onClick={handleReport} disabled={reporting} className="flex-1 py-3 rounded-2xl bg-orange-500 hover:bg-orange-600 text-white text-sm font-semibold disabled:opacity-60 transition-colors">
+                    {reporting ? 'Submitting…' : 'Submit report'}
+                  </button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}

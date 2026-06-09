@@ -24,6 +24,7 @@ const schema = z.object({
     .regex(/[0-9]/, 'Add a number')
     .regex(/[^A-Za-z0-9]/, 'Add a special character'),
   inviteCode: z.string().optional(),
+  agreeToTerms: z.boolean().refine((v) => v === true, { message: 'You must agree to the Terms of Service and Community Guidelines to continue.' }),
 });
 type FormData = z.infer<typeof schema>;
 
@@ -93,6 +94,26 @@ export default function RegisterPage() {
 
             {IS_BETA && (
               <Input label="Invite Code" placeholder="Enter your invite code" error={errors.inviteCode?.message} {...register('inviteCode')} />
+            )}
+
+            {/* EULA — required by Apple Guideline 1.2 */}
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+              <input
+                type="checkbox"
+                id="agreeToTerms"
+                className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 flex-shrink-0"
+                {...register('agreeToTerms')}
+              />
+              <label htmlFor="agreeToTerms" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
+                I agree to the{' '}
+                <a href="/terms" target="_blank" className="text-purple-600 font-semibold hover:underline">Terms of Service</a>
+                {' '}and{' '}
+                <a href="/community-guidelines" target="_blank" className="text-purple-600 font-semibold hover:underline">Community Guidelines</a>.
+                {' '}I understand that objectionable content and abusive behavior are not tolerated and may result in account removal.
+              </label>
+            </div>
+            {errors.agreeToTerms && (
+              <p className="text-xs text-red-500 -mt-1">{errors.agreeToTerms.message}</p>
             )}
 
             {serverError && (
