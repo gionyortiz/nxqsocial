@@ -5,8 +5,9 @@ import { PrismaService } from '../prisma/prisma.service';
  * A live session is considered "stale" (host's tab closed without a clean end)
  * if it hasn't sent a heartbeat in this many milliseconds. Stale LIVE sessions
  * are filtered out of the active list and lazily marked ENDED.
+ * Set to 30s — heartbeat fires every 15s so this gives 2 missed beats.
  */
-const STALE_MS = 45_000;
+const STALE_MS = 30_000;
 
 @Injectable()
 export class LiveService {

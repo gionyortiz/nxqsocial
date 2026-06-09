@@ -239,9 +239,29 @@ export function LiveExperience({
     };
     beat();
     const id = setInterval(beat, HEARTBEAT_MS);
+
+    // Safety net: if the tab is closed without clicking End, send a beacon
+    // to mark the session ended. navigator.sendBeacon works during unload.
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(/\/+$/, '');
+    const endUrl = `${apiBase}/live/${encodeURIComponent(room)}/end`;
+    const handleUnload = () => {
+      try {
+        const token = typeof window !== 'undefined'
+          ? (JSON.parse(localStorage.getItem('auth-storage') ?? '{}')?.state?.token ?? '')
+          : '';
+        navigator.sendBeacon(endUrl + `?_beacon=1&token=${token}`);
+      } catch {
+        // best-effort
+      }
+    };
+    window.addEventListener('beforeunload', handleUnload);
+    window.addEventListener('pagehide', handleUnload);
+
     return () => {
       stopped = true;
       clearInterval(id);
+      window.removeEventListener('beforeunload', handleUnload);
+      window.removeEventListener('pagehide', handleUnload);
       void endLiveSession(room);
       const durationSec = Math.max(0, Math.round((Date.now() - liveStartedAtRef.current) / 1000));
       const payload = {
