@@ -13,6 +13,7 @@ export interface CompleteUploadResponse {
   id: string;
   uploadStatus: UploadStatus;
   url: string | null;
+  message?: string;
 }
 
 export interface MediaStatusResponse {
@@ -21,6 +22,8 @@ export interface MediaStatusResponse {
   url: string | null;
   mimeType: string;
   size: number;
+  moderationStatus?: string;
+  message?: string;
 }
 
 /** Request a presigned S3 PUT URL for direct-client upload. */
@@ -78,6 +81,10 @@ export async function completeUpload(mediaId: string): Promise<CompleteUploadRes
 export async function getMediaStatus(mediaId: string): Promise<MediaStatusResponse> {
   const { data } = await api.get<MediaStatusResponse>(`/media/${mediaId}/status`);
   return data;
+}
+
+export async function removeMedia(mediaId: string): Promise<void> {
+  await api.delete(`/media/${mediaId}`);
 }
 
 /**

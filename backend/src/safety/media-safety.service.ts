@@ -15,6 +15,20 @@ export interface MediaScanResult {
   provider: 'rekognition' | 'none';
 }
 
+export interface VideoScanStartResult {
+  status: 'STARTED' | 'BYPASSED' | 'FAILED';
+  jobId: string | null;
+  failureReason?: string;
+  userMessage?: string;
+}
+
+export interface VideoScanPollResult {
+  status: 'IN_PROGRESS' | 'SUCCEEDED' | 'FAILED';
+  result?: MediaScanResult;
+  failureReason?: string;
+  userMessage?: string;
+}
+
 /**
  * Thresholds — labels above BLOCK_THRESHOLD trigger UNDER_REVIEW.
  * Labels above HARD_BLOCK_THRESHOLD trigger immediate rejection.
@@ -129,7 +143,9 @@ export class MediaSafetyService {
    * The video must already be in the S3 bucket (bucketName / objectKey).
    */
   async startVideoScan(bucketName: string, objectKey: string): Promise<string | null> {
-    if (!this.enabled || !this.client) return null;
+    if (!this.enabled || !this.client) {
+      return null;
+    }
 
     try {
       const response = await this.client.send(
@@ -142,7 +158,25 @@ export class MediaSafetyService {
       return response.JobId ?? null;
     } catch (err: any) {
       this.logger.error(`Rekognition video scan start failed: ${err?.message}`);
-      return null;
+      throw err;
+    }
+  }
+
+  async startVideoScanJob(bucketName: string, objectKey: string): Promise<VideoScanStartResult> {
+    if (!this.enabled || !this.client) {
+      return { status: 'BYPASSED', jobId: null };
+    }
+
+    try {
+      const jobId = await this.startVideoScan(bucketName, objectKey);
+      return { status: jobId ? 'STARTED' : 'FAILED', jobId };
+    } catch (err: any) {
+      return {
+        status: 'FAILED',
+        jobId: null,
+        failureReason: err?.message ?? 'Video moderation job failed to start',
+        userMessage: this.toUserFacingVideoError(err?.message),
+      };
     }
   }
 
@@ -168,6 +202,44 @@ export class MediaSafetyService {
     } catch (err: any) {
       this.logger.error(`Rekognition video poll failed: ${err?.message}`);
       return null;
+    }
+  }
+
+  async pollVideoScan(jobId: string): Promise<VideoScanPollResult> {
+    if (!this.enabled || !this.client) {
+      return { status: 'FAILED', failureReason: 'Scanner unavailable', userMessage: 'Video safety review is unavailable right now.' };
+    }
+
+    try {
+      const response = await this.client.send(new GetContentModerationCommand({ JobId: jobId }));
+
+      if (response.JobStatus === 'IN_PROGRESS') {
+        return { status: 'IN_PROGRESS' };
+      }
+
+      if (response.JobStatus !== 'SUCCEEDED') {
+        return {
+          status: 'FAILED',
+          failureReason: response.StatusMessage ?? response.JobStatus ?? 'Video moderation failed',
+          userMessage: this.toUserFacingVideoError(response.StatusMessage ?? response.JobStatus),
+        };
+      }
+
+      const allLabels: ModerationLabel[] = (response.ModerationLabels ?? [])
+        .map((d) => d.ModerationLabel!)
+        .filter(Boolean);
+
+      return {
+        status: 'SUCCEEDED',
+        result: this.processLabels(allLabels, 'rekognition'),
+      };
+    } catch (err: any) {
+      this.logger.error(`Rekognition video poll failed: ${err?.message}`);
+      return {
+        status: 'FAILED',
+        failureReason: err?.message ?? 'Video moderation polling failed',
+        userMessage: this.toUserFacingVideoError(err?.message),
+      };
     }
   }
 
@@ -212,5 +284,13 @@ export class MediaSafetyService {
       maxConfidence,
       provider,
     };
+  }
+
+  private toUserFacingVideoError(message?: string): string {
+    const text = (message ?? '').toLowerCase();
+    if (text.includes('codec') || text.includes('h.264') || text.includes('h264') || text.includes('hevc') || text.includes('format') || text.includes('quicktime')) {
+      return 'This video format could not be processed. Please upload MP4/H.264.';
+    }
+    return 'Video processing failed. Please try again with a smaller MP4 video.';
   }
 }

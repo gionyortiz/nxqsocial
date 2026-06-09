@@ -17,6 +17,7 @@ import {
 } from './media.dto';
 
 const PRESIGN_TTL_SECONDS = 600; // 10 minutes
+const VIDEO_SCAN_TIMEOUT_MS = 5 * 60 * 1000;
 
 function extFromMime(mime: string): string {
   const map: Record<string, string> = {
@@ -33,6 +34,22 @@ function extFromMime(mime: string): string {
 
 function isVideo(mime: string): boolean {
   return mime.startsWith('video/');
+}
+
+function videoStartFailureData(reason?: string, userMessage?: string) {
+  return {
+    status: 'FAILED_TO_START',
+    failureReason: reason ?? null,
+    userMessage: userMessage ?? 'Video processing failed. Please try again.',
+  };
+}
+
+function videoTimeoutData() {
+  return {
+    status: 'PROCESSING_TIMEOUT',
+    reviewReason: 'Video processing failed or timed out',
+    userMessage: 'Video uploaded. Safety review is still processing. You can leave this page and check again later.',
+  };
 }
 
 @Injectable()
@@ -96,7 +113,7 @@ export class MediaService {
   async completeUpload(
     userId: string,
     mediaId: string,
-  ): Promise<{ id: string; uploadStatus: string; url: string | null }> {
+  ): Promise<{ id: string; uploadStatus: string; url: string | null; message?: string }> {
     const asset = await this.prisma.mediaAsset.findUnique({ where: { id: mediaId } });
     if (!asset) throw new NotFoundException('MediaAsset not found');
     if (asset.userId !== userId) throw new ForbiddenException('Not your upload');
@@ -114,16 +131,38 @@ export class MediaService {
 
     if (isVideo(asset.mimeType)) {
       // Async video scan via Rekognition StartContentModeration
-      const jobId = await this.safety.startVideoScan(asset.bucket, asset.s3Key);
+      const scanStart = await this.safety.startVideoScanJob(asset.bucket, asset.s3Key);
       const updated = await this.prisma.mediaAsset.update({
         where: { id: mediaId },
         data: {
           url: publicUrl,
-          uploadStatus: jobId ? 'SCANNING' : 'PUBLISHED', // fallback: no scanner → publish directly
-          safetyJobId: jobId ?? undefined,
+          uploadStatus:
+            scanStart.status === 'STARTED'
+              ? 'SCANNING'
+              : scanStart.status === 'BYPASSED'
+                ? 'PUBLISHED'
+                : 'REJECTED',
+          moderationStatus:
+            scanStart.status === 'FAILED'
+              ? 'FLAGGED'
+              : scanStart.status === 'BYPASSED'
+                ? 'APPROVED'
+                : 'PENDING',
+          safetyJobId: scanStart.jobId ?? undefined,
+          safetyResult:
+            scanStart.status === 'STARTED'
+              ? ({ status: 'SCANNING', scanStartedAt: new Date().toISOString() } as any)
+              : scanStart.status === 'FAILED'
+                ? (videoStartFailureData(scanStart.failureReason, scanStart.userMessage) as any)
+                : ({ status: 'BYPASSED' } as any),
         },
       });
-      return { id: updated.id, uploadStatus: updated.uploadStatus, url: updated.url };
+      return {
+        id: updated.id,
+        uploadStatus: updated.uploadStatus,
+        url: updated.url,
+        ...(scanStart.status === 'FAILED' ? { message: scanStart.userMessage } : {}),
+      };
     }
 
     // Sync image scan — download from S3 to scan
@@ -154,10 +193,14 @@ export class MediaService {
   async getStatus(
     userId: string,
     mediaId: string,
-  ): Promise<{ id: string; uploadStatus: string; url: string | null; mimeType: string; size: number }> {
-    const asset = await this.prisma.mediaAsset.findUnique({ where: { id: mediaId } });
+  ): Promise<{ id: string; uploadStatus: string; url: string | null; mimeType: string; size: number; moderationStatus?: string; message?: string }> {
+    let asset: any = await this.prisma.mediaAsset.findUnique({ where: { id: mediaId } });
     if (!asset) throw new NotFoundException('MediaAsset not found');
     if (asset.userId !== userId) throw new ForbiddenException('Not your upload');
+
+    if (asset.uploadStatus === 'SCANNING' && asset.safetyJobId) {
+      asset = await this.refreshVideoScanStatus(asset);
+    }
 
     return {
       id: asset.id,
@@ -165,6 +208,84 @@ export class MediaService {
       url: asset.url,
       mimeType: asset.mimeType,
       size: asset.size,
+      moderationStatus: asset.moderationStatus,
+      message: (asset.safetyResult as any)?.userMessage,
     };
+  }
+
+  async removeUpload(userId: string, mediaId: string) {
+    const asset = await this.prisma.mediaAsset.findUnique({ where: { id: mediaId } });
+    if (!asset) throw new NotFoundException('MediaAsset not found');
+    if (asset.userId !== userId) throw new ForbiddenException('Not your upload');
+    if (asset.postId) throw new BadRequestException('Media asset is already attached to a post');
+
+    await this.prisma.mediaAsset.delete({ where: { id: mediaId } });
+
+    if (this.storage.isEnabled && asset.s3Key) {
+      this.storage.delete(asset.s3Key).catch(() => {});
+    }
+
+    return { success: true, id: mediaId };
+  }
+
+  private async refreshVideoScanStatus(asset: any) {
+    const poll = await this.safety.pollVideoScan(asset.safetyJobId!);
+
+    if (poll.status === 'IN_PROGRESS') {
+      const startedAt = new Date((asset.safetyResult as any)?.scanStartedAt ?? asset.updatedAt ?? asset.createdAt).getTime();
+      if (Date.now() - startedAt <= VIDEO_SCAN_TIMEOUT_MS) {
+        return asset;
+      }
+
+      return this.prisma.mediaAsset.update({
+        where: { id: asset.id },
+        data: {
+          uploadStatus: 'PUBLISHED',
+          moderationStatus: 'FLAGGED',
+          safetyResult: {
+            ...((asset.safetyResult as object) ?? {}),
+            ...videoTimeoutData(),
+            timedOutAt: new Date().toISOString(),
+          } as any,
+        },
+      });
+    }
+
+    if (poll.status === 'FAILED') {
+      return this.prisma.mediaAsset.update({
+        where: { id: asset.id },
+        data: {
+          uploadStatus: 'REJECTED',
+          moderationStatus: 'FLAGGED',
+          safetyResult: {
+            ...((asset.safetyResult as object) ?? {}),
+            status: 'FAILED',
+            failureReason: poll.failureReason ?? null,
+            userMessage: poll.userMessage,
+            failedAt: new Date().toISOString(),
+          } as any,
+        },
+      });
+    }
+
+    const scanResult = poll.result!;
+    const mediaStatus = this.safety.statusFromScan(scanResult);
+    return this.prisma.mediaAsset.update({
+      where: { id: asset.id },
+      data: {
+        uploadStatus: mediaStatus === 'REJECTED' ? 'REJECTED' : 'PUBLISHED',
+        moderationStatus:
+          mediaStatus === 'PUBLISHED'
+            ? 'APPROVED'
+            : mediaStatus === 'REJECTED'
+              ? 'REJECTED'
+              : 'FLAGGED',
+        safetyResult: {
+          ...(scanResult as any),
+          status: 'SUCCEEDED',
+          reviewedAt: new Date().toISOString(),
+        } as any,
+      },
+    });
   }
 }

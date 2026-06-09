@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Get,
+  Delete,
   Param,
   Body,
   UseGuards,
@@ -35,5 +36,10 @@ export class MediaController {
   @Get(':id/status')
   getStatus(@Req() req: any, @Param('id') id: string) {
     return this.media.getStatus(req.user.id, id);
+  }
+
+  @Delete(':id')
+  removeUpload(@Req() req: any, @Param('id') id: string) {
+    return this.media.removeUpload(req.user.id, id);
   }
 }

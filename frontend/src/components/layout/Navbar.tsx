@@ -85,30 +85,31 @@ export function Navbar() {
   return (
     <>
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
-      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-white border-r border-gray-100 px-2.5 py-6 gap-1 z-40">
+      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-white/80 dark:bg-[#111827]/80 backdrop-blur-xl border-r border-white/60 dark:border-white/[0.06] px-3 py-6 gap-1 z-40 shadow-[var(--shadow-sm)]">
 
         {/* Logo */}
-        <div className="mb-6 px-2.5 flex items-center justify-between">
-          <Link href="/feed" className="flex items-center gap-2 min-w-0">
-            <Logo size={34} />
+        <div className="mb-5 px-2.5 flex items-center justify-between">
+          <Link href="/feed" className="flex items-center gap-2.5 min-w-0">
+            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-500 flex items-center justify-center shadow-[var(--shadow-brand)] flex-shrink-0">
+              <Logo size={22} className="text-white" />
+            </div>
             {!compact && (
-              <span className="text-xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent tracking-tight truncate">
+              <span className="text-[22px] font-black gradient-text tracking-tight truncate">
                 NXQ Social
               </span>
             )}
           </Link>
           <button
             onClick={toggleCompact}
-            className="hidden xl:flex items-center justify-center w-8 h-8 rounded-lg text-gray-500 hover:text-purple-700 hover:bg-purple-50 transition-colors"
+            className="hidden xl:flex items-center justify-center w-8 h-8 rounded-xl text-gray-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
             title={compact ? 'Expand sidebar' : 'Compact sidebar'}
-            aria-label={compact ? 'Expand sidebar' : 'Compact sidebar'}
           >
-            <ChevronsLeftRight size={16} />
+            <ChevronsLeftRight size={15} />
           </button>
         </div>
 
         {/* Primary nav */}
-        <div className="flex flex-col gap-1">
+        <div className="flex flex-col gap-0.5">
           {NAV.map(({ href, icon: Icon, tkey }) => {
             const active = isActive(href);
             const label = t(tkey);
@@ -117,24 +118,22 @@ export function Navbar() {
                 key={href}
                 href={href}
                 className={cn(
-                  'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
+                  'group flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[15px] font-semibold transition-all duration-150',
                   active
-                    ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200 ring-1 ring-purple-300/60'
-                    : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
+                    ? 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white shadow-[var(--shadow-brand)]'
+                    : 'text-gray-600 dark:text-gray-400 hover:bg-purple-50 dark:hover:bg-white/[0.05] hover:text-purple-700 dark:hover:text-purple-300',
                 )}
                 title={compact ? label : undefined}
               >
-                <span
-                  className={cn(
-                    'flex items-center justify-center w-9 h-9 rounded-xl transition-colors',
-                    active ? 'bg-white/20' : 'bg-gray-50 group-hover:bg-white',
-                  )}
-                >
-                  <Icon size={20} strokeWidth={active ? 2.6 : 2} />
+                <span className={cn(
+                  'flex items-center justify-center w-9 h-9 rounded-xl transition-all flex-shrink-0',
+                  active ? 'bg-white/20' : 'bg-gray-100/80 dark:bg-white/[0.06] group-hover:bg-white/80 dark:group-hover:bg-white/10',
+                )}>
+                  <Icon size={19} strokeWidth={active ? 2.5 : 2} />
                 </span>
-                {!compact && label}
+                {!compact && <span className="flex-1 truncate">{label}</span>}
                 {!compact && badgeFor(href) ? (
-                  <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center">
+                  <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-bounce-in">
                     {badgeFor(href)}
                   </span>
                 ) : null}
@@ -142,53 +141,43 @@ export function Navbar() {
             );
           })}
 
-          {/* Call — Beta feature, gated by flag/role */}
+          {/* Call — Beta feature */}
           {callsVisible(user?.role) && (
             <Link
               href="/call/new"
               className={cn(
-                'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
+                'group flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[15px] font-semibold transition-all duration-150',
                 isActive('/call')
-                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200 ring-1 ring-purple-300/60'
-                  : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
+                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white shadow-[var(--shadow-brand)]'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-purple-50 dark:hover:bg-white/[0.05] hover:text-purple-700',
               )}
               title={compact ? 'Call' : undefined}
             >
-              <span
-                className={cn(
-                  'flex items-center justify-center w-9 h-9 rounded-xl transition-colors',
-                  isActive('/call') ? 'bg-white/20' : 'bg-gray-50 group-hover:bg-white',
-                )}
-              >
-                <Phone size={20} strokeWidth={isActive('/call') ? 2.6 : 2} />
+              <span className={cn('flex items-center justify-center w-9 h-9 rounded-xl transition-all flex-shrink-0', isActive('/call') ? 'bg-white/20' : 'bg-gray-100/80 dark:bg-white/[0.06] group-hover:bg-white/80')}>
+                <Phone size={19} strokeWidth={isActive('/call') ? 2.5 : 2} />
               </span>
               {!compact && <span className="flex-1">Call</span>}
-              {!compact && <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>}
+              {!compact && <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px] font-bold uppercase tracking-wide">Beta</span>}
             </Link>
           )}
 
-          {/* Live — Beta feature, gated by flag/role */}
+          {/* Live — Beta feature */}
           {liveVisible(user?.role) && (
             <Link
               href="/live/new"
               className={cn(
-                'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
+                'group flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[15px] font-semibold transition-all duration-150',
                 isActive('/live')
-                  ? 'bg-gradient-to-r from-rose-600 to-red-600 text-white shadow-md shadow-rose-200 ring-1 ring-rose-300/60'
-                  : 'text-gray-600 hover:bg-rose-50 hover:text-rose-700',
+                  ? 'bg-gradient-to-r from-rose-600 to-orange-500 text-white shadow-lg shadow-rose-200'
+                  : 'text-gray-600 dark:text-gray-400 hover:bg-rose-50 dark:hover:bg-white/[0.05] hover:text-rose-600',
               )}
               title={compact ? 'Live' : undefined}
             >
-              <span
-                className={cn(
-                  'flex items-center justify-center w-9 h-9 rounded-xl transition-colors',
-                  isActive('/live') ? 'bg-white/20' : 'bg-gray-50 group-hover:bg-white',
-                )}
-              >
-                <Radio size={20} strokeWidth={isActive('/live') ? 2.6 : 2} />
+              <span className={cn('flex items-center justify-center w-9 h-9 rounded-xl transition-all flex-shrink-0', isActive('/live') ? 'bg-white/20' : 'bg-gray-100/80 dark:bg-white/[0.06] group-hover:bg-white/80')}>
+                <Radio size={19} strokeWidth={isActive('/live') ? 2.5 : 2} />
               </span>
               {!compact && <span className="flex-1">Live</span>}
-              {!compact && <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>}
+              {!compact && <span className="px-2 py-0.5 rounded-full bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 text-[10px] font-bold uppercase tracking-wide flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-live-blink inline-block" />LIVE</span>}
             </Link>
           )}
 
@@ -304,7 +293,8 @@ export function Navbar() {
       </nav>
 
       {/* ── Mobile bottom bar ────────────────────────────────────────────── */}
-      <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-md border-t border-gray-100 z-40 flex items-stretch pb-[env(safe-area-inset-bottom)]">
+      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-40 pb-[env(safe-area-inset-bottom)]">
+        <div className="bg-white/85 dark:bg-[#111827]/90 backdrop-blur-2xl rounded-[28px] shadow-[var(--shadow-float)] border border-white/70 dark:border-white/10 flex items-stretch px-1 py-1">
         {MOBILE_NAV.map(({ href, icon: Icon, tkey }) => {
           const active = isActive(href);
           const label = t(tkey);
@@ -313,14 +303,17 @@ export function Navbar() {
               key={href}
               href={href}
               className={cn(
-                'flex-1 flex flex-col items-center py-2 gap-0.5 text-[11px] font-semibold transition-colors',
-                active ? 'text-purple-600' : 'text-gray-400 hover:text-gray-600',
+                'flex-1 flex flex-col items-center py-2 gap-0.5 text-[10px] font-bold transition-all rounded-[22px]',
+                active ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500',
               )}
             >
-              <div className={cn('p-1.5 rounded-xl transition-colors', active ? 'bg-purple-100' : '')}>
-                <Icon size={22} strokeWidth={active ? 2.6 : 2} />
+              <div className={cn(
+                'p-2 rounded-2xl transition-all',
+                active ? 'bg-gradient-to-br from-purple-600 to-fuchsia-500 text-white shadow-[var(--shadow-brand)]' : '',
+              )}>
+                <Icon size={21} strokeWidth={active ? 2.5 : 2} className={active ? 'text-white' : ''} />
               </div>
-              {label}
+              <span className={active ? 'gradient-text' : ''}>{label}</span>
             </Link>
           );
         })}
@@ -330,16 +323,11 @@ export function Navbar() {
           <Link
             href={`/profile/${user.username}`}
             className={cn(
-              'flex-1 flex flex-col items-center py-2 gap-0.5 text-[11px] font-semibold transition-colors',
-              pathname.startsWith('/profile') ? 'text-purple-600' : 'text-gray-400',
+              'flex-1 flex flex-col items-center py-2 gap-0.5 text-[10px] font-bold transition-all rounded-[22px]',
+              pathname.startsWith('/profile') ? 'text-purple-600 dark:text-purple-400' : 'text-gray-400 dark:text-gray-500',
             )}
           >
-            <div
-              className={cn(
-                'p-0.5 rounded-full transition-all',
-                pathname.startsWith('/profile') ? 'ring-2 ring-purple-500' : 'ring-2 ring-transparent',
-              )}
-            >
+            <div className={cn('p-0.5 rounded-full', pathname.startsWith('/profile') ? 'ring-verified' : 'ring-2 ring-transparent')}>
               <Avatar src={user.avatarUrl} alt={user.username} size="xs" />
             </div>
             {t('nav.profile')}
@@ -349,13 +337,14 @@ export function Navbar() {
         {/* Menu tab */}
         <button
           onClick={() => setMenuOpen(true)}
-          className="flex-1 flex flex-col items-center py-2 gap-0.5 text-[11px] font-semibold text-gray-400 hover:text-gray-600 transition-colors"
+          className="flex-1 flex flex-col items-center py-2 gap-0.5 text-[10px] font-bold text-gray-400 dark:text-gray-500 hover:text-gray-600 transition-colors rounded-[22px]"
         >
-          <div className="p-1.5 rounded-xl">
-            <MenuIcon size={22} strokeWidth={2} />
+          <div className="p-2 rounded-2xl">
+            <MenuIcon size={21} strokeWidth={2} />
           </div>
           {t('nav.menu')}
         </button>
+        </div>
       </nav>
 
       {/* ── Full menu panel ──────────────────────────────────────────────── */}
