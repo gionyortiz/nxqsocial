@@ -422,9 +422,18 @@ export default function AdminPage() {
   return (
     <div className="min-h-screen bg-gray-950 text-white">
       {/* Header */}
-      <div className="border-b border-gray-800 bg-gray-900 px-6 py-4">
-        <h1 className="text-xl font-bold">Moderation Dashboard</h1>
-        <p className="text-sm text-gray-400">NXQ Social Admin &middot; {new Date().toLocaleDateString()}</p>
+      <div className="border-b border-gray-800 bg-gray-900 px-6 py-4 flex items-center gap-4">
+        <button
+          onClick={() => router.push('/feed')}
+          className="flex items-center gap-2 text-sm text-gray-400 hover:text-white transition-colors px-3 py-1.5 rounded-lg hover:bg-gray-800"
+        >
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Back to Feed
+        </button>
+        <div>
+          <h1 className="text-xl font-bold">Moderation Dashboard</h1>
+          <p className="text-sm text-gray-400">NXQ Social Admin &middot; {new Date().toLocaleDateString()}</p>
+        </div>
       </div>
 
       {notice && (
