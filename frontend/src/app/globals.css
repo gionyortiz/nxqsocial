@@ -18,13 +18,13 @@ html {
 ::-webkit-scrollbar-thumb:hover { background: rgba(124,58,237,0.5); }
 
 :root {
-  /* Core */
-  --background: #f0f2f8;
-  --foreground: #0f172a;
-  --surface: #ffffff;
-  --surface-2: #f8f9fc;
-  --surface-muted: #f1f5f9;
-  --border: #e8eaf0;
+  /* Core — always dark */
+  --background: #08090f;
+  --foreground: #f1f5f9;
+  --surface: #111827;
+  --surface-2: #1a2234;
+  --surface-muted: #1f2937;
+  --border: rgba(255,255,255,0.07);
 
   /* Brand */
   --brand-purple: #7c3aed;
@@ -40,32 +40,18 @@ html {
   --gradient-live:     linear-gradient(135deg, #ef4444 0%, #f97316 100%);
 
   /* Shadows */
-  --shadow-sm:    0 1px 4px rgba(15,23,42,0.06);
-  --shadow-card:  0 2px 20px rgba(15,23,42,0.08);
-  --shadow-brand: 0 8px 32px rgba(124,58,237,0.18);
-  --shadow-float: 0 20px 60px rgba(15,23,42,0.15);
+  --shadow-sm:    0 1px 4px rgba(0,0,0,0.35);
+  --shadow-card:  0 2px 20px rgba(0,0,0,0.4);
+  --shadow-brand: 0 8px 32px rgba(124,58,237,0.28);
+  --shadow-float: 0 20px 60px rgba(0,0,0,0.5);
 
   /* Glass */
-  --glass-bg:     rgba(255,255,255,0.75);
-  --glass-border: rgba(255,255,255,0.6);
+  --glass-bg:     rgba(17,24,39,0.75);
+  --glass-border: rgba(255,255,255,0.08);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #08090f;
-    --foreground: #f1f5f9;
-    --surface: #111827;
-    --surface-2: #1a2234;
-    --surface-muted: #1f2937;
-    --border: rgba(255,255,255,0.07);
-    --shadow-card:  0 2px 20px rgba(0,0,0,0.35);
-    --shadow-brand: 0 8px 32px rgba(124,58,237,0.28);
-    --shadow-float: 0 20px 60px rgba(0,0,0,0.5);
-    --glass-bg:     rgba(17,24,39,0.75);
-    --glass-border: rgba(255,255,255,0.08);
-  }
-  ::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.35); }
-}
+/* Keep scrollbar dark always */
+::-webkit-scrollbar-thumb { background: rgba(124,58,237,0.35); }
 
 @theme inline {
   --color-background: var(--background);
@@ -78,8 +64,8 @@ body {
   background-color: var(--background);
   color: var(--foreground);
   background-image:
-    radial-gradient(ellipse at 10% 10%, rgba(124,58,237,0.05) 0, transparent 55%),
-    radial-gradient(ellipse at 90% 90%, rgba(236,72,153,0.04) 0, transparent 55%);
+    radial-gradient(ellipse at 10% 10%, rgba(124,58,237,0.08) 0, transparent 55%),
+    radial-gradient(ellipse at 90% 90%, rgba(236,72,153,0.06) 0, transparent 55%);
   min-height: 100vh;
 }
 
@@ -183,16 +169,10 @@ body {
 
 /* ── Skeleton ──────────────────────────────────────────────── */
 .skeleton {
-  background: linear-gradient(90deg, #e2e8f0 25%, #f8fafc 50%, #e2e8f0 75%);
+  background: linear-gradient(90deg, #1f2937 25%, #2d3748 50%, #1f2937 75%);
   background-size: 600px 100%;
   animation: shimmer 1.5s infinite;
   border-radius: 8px;
-}
-@media (prefers-color-scheme: dark) {
-  .skeleton {
-    background: linear-gradient(90deg, #1f2937 25%, #2d3748 50%, #1f2937 75%);
-    background-size: 600px 100%;
-  }
 }
 
 /* ── Card hover lift ───────────────────────────────────────── */

@@ -14,8 +14,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} h-full antialiased`}>
-      <body className="min-h-full font-[var(--font-geist)] bg-gray-50 text-gray-900">
+    <html lang="en" className={`${geist.variable} h-full antialiased dark`}>
+      <body className="min-h-full font-[var(--font-geist)]" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
         <I18nProvider>
           {children}
           <IncomingCallModal />
