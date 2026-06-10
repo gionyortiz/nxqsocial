@@ -865,20 +865,18 @@ export function LiveExperience({
         </div>
       )}
 
-      {/* Bottom control bar */}
-      <div className="absolute bottom-0 inset-x-0 z-30 bg-gradient-to-t from-black/80 to-transparent">
-        <div className="flex items-center gap-2 px-3 pb-3 pt-6">
-          {/* Chat input (everyone) */}
+      {/* Bottom control bar — mobile-first, always visible */}
+      <div className="absolute bottom-0 inset-x-0 z-30 bg-gradient-to-t from-black/90 to-transparent">
+        {/* Chat row */}
+        <div className="flex items-center gap-2 px-3 pt-4 pb-2">
           <div className="flex-1 flex items-center gap-1.5 bg-white/15 backdrop-blur rounded-full pl-3 pr-1.5 py-1">
             <input
               value={draft}
               onChange={(e) => setDraft(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') sendChat();
-              }}
+              onKeyDown={(e) => { if (e.key === 'Enter') sendChat(); }}
               maxLength={300}
               placeholder="Add a comment…"
-              className="flex-1 bg-transparent text-sm text-white placeholder:text-white/50 outline-none"
+              className="flex-1 bg-transparent text-sm text-white placeholder:text-white/50 outline-none min-w-0"
             />
             <button
               onClick={sendChat}
@@ -888,103 +886,77 @@ export function LiveExperience({
               <Send size={15} />
             </button>
           </div>
+        </div>
 
-          {/* Host media controls */}
-          {host && (
-            <div className="flex items-center gap-1.5">
-              <TrackToggle
-                source={Track.Source.Microphone}
-                showIcon={false}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white"
-              >
-                <Mic size={18} />
+        {/* Action buttons row */}
+        <div className="flex items-center justify-center gap-3 px-3 pb-4">
+          {host ? (
+            /* Host controls */
+            <>
+              <TrackToggle source={Track.Source.Microphone} showIcon={false}
+                className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
+                <Mic size={20} />
               </TrackToggle>
-              <TrackToggle
-                source={Track.Source.Camera}
-                showIcon={false}
-                className="flex items-center justify-center w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white"
-              >
-                <Video size={18} />
+              <TrackToggle source={Track.Source.Camera} showIcon={false}
+                className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
+                <Video size={20} />
               </TrackToggle>
-              <TrackToggle
-                source={Track.Source.ScreenShare}
-                showIcon={false}
-                className="hidden sm:flex items-center justify-center w-10 h-10 rounded-full bg-white/15 hover:bg-white/25 text-white"
-              >
-                <MonitorUp size={18} />
+              <TrackToggle source={Track.Source.ScreenShare} showIcon={false}
+                className="hidden sm:flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
+                <MonitorUp size={20} />
               </TrackToggle>
-              {/* Music button */}
-              <button
-                onClick={() => setShowMusic(s => !s)}
-                title="Background music"
-                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${playingTrackId ? 'bg-purple-500 hover:bg-purple-600 text-white animate-pulse-glow' : 'bg-white/15 hover:bg-white/25 text-white'}`}
-              >
-                {playingTrackId ? <Music size={18} /> : <Music size={18} />}
+              <button onClick={() => setShowMusic(s => !s)}
+                className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-colors ${playingTrackId ? 'bg-purple-500 text-white' : 'bg-white/15 text-white'}`}>
+                <Music size={20} />
               </button>
-              {/* Invite viewer to join live */}
-              <button
-                onClick={() => setShowInvitePanel(s => !s)}
-                title="Invite a viewer to go live with you"
-                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${showInvitePanel ? 'bg-green-500 text-white' : 'bg-white/15 hover:bg-white/25 text-white'}`}
-              >
-                <UserPlus size={18} />
+              <button onClick={() => setShowInvitePanel(s => !s)}
+                className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-colors ${showInvitePanel ? 'bg-green-500 text-white' : 'bg-white/15 text-white'}`}>
+                <UserPlus size={20} />
               </button>
-              {/* Battle button — only when guest is present */}
               {cameraTracks.length >= 2 && (
-                <button
-                  onClick={() => battleActive ? endBattle() : startBattle(60)}
-                  title={battleActive ? 'End battle' : 'Start 60s battle'}
-                  className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm transition-colors ${
-                    battleActive
-                      ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
-                      : 'bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90'
-                  }`}
-                >
+                <button onClick={() => battleActive ? endBattle() : startBattle(60)}
+                  className={`flex items-center justify-center w-12 h-12 rounded-2xl text-lg transition-colors ${battleActive ? 'bg-red-500 animate-pulse text-white' : 'bg-gradient-to-br from-rose-500 to-orange-500 text-white'}`}>
                   ⚔️
                 </button>
               )}
-            </div>
+            </>
+          ) : (
+            /* Viewer controls — ✋ is the hero button */
+            <>
+              {/* Request to join — BIG prominent button */}
+              <button
+                onClick={requestToJoin}
+                disabled={requestedToJoin}
+                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all ${
+                  requestedToJoin
+                    ? 'bg-white/10 text-gray-400 cursor-default'
+                    : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:opacity-90 active:scale-95'
+                }`}
+              >
+                <Hand size={18} />
+                {requestedToJoin ? 'Request sent ✓' : 'Join Live'}
+              </button>
+            </>
           )}
 
-          {/* Viewer: ask to join the live */}
-          {!host && (
-            <button
-              onClick={requestToJoin}
-              disabled={requestedToJoin}
-              title="Ask to join the live"
-              className="flex items-center justify-center w-11 h-11 rounded-full bg-white/15 hover:bg-white/25 disabled:opacity-60 text-white shrink-0"
-            >
-              <Hand size={19} />
-            </button>
-          )}
-
-          {/* Gift button (everyone) */}
-          <button
-            onClick={() => setShowGifts((s) => !s)}
-            title="Send a gift"
-            className="flex items-center justify-center w-11 h-11 rounded-full bg-amber-400 hover:bg-amber-500 active:scale-90 transition text-black shrink-0 shadow-lg"
-          >
+          {/* Gift button — everyone */}
+          <button onClick={() => setShowGifts(s => !s)}
+            className="flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-90 transition text-black shrink-0 shadow-lg">
             <Gift size={20} />
           </button>
 
-          {/* Heart / reaction button (everyone) */}
-          <button
-            onClick={() => sendReaction('❤️')}
-            className="flex items-center justify-center w-11 h-11 rounded-full bg-rose-500 hover:bg-rose-600 active:scale-90 transition text-white shrink-0 shadow-lg"
-            aria-label="Send a heart"
-          >
+          {/* Heart — everyone */}
+          <button onClick={() => sendReaction('❤️')}
+            className="flex items-center justify-center w-12 h-12 rounded-2xl bg-rose-500 hover:bg-rose-600 active:scale-90 transition text-white shrink-0 shadow-lg">
             <Heart size={20} fill="currentColor" />
           </button>
         </div>
 
         {/* Quick emoji row */}
-        <div className="flex items-center justify-center gap-1.5 pb-3">
+        <div className="flex items-center justify-center gap-2 pb-3">
           {QUICK_EMOJIS.map((e) => (
-            <button
-              key={e}
-              onClick={() => sendReaction(e)}
-              className="w-9 h-9 rounded-full bg-white/10 hover:bg-white/20 active:scale-90 transition text-lg"
-            >
+            <button key={e} onClick={() => sendReaction(e)}
+              className="text-2xl active:scale-90 transition-transform hover:scale-110">
               {e}
             </button>
           ))}
