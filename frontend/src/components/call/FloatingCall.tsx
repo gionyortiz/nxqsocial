@@ -523,9 +523,9 @@ export function FloatingCall() {
       ? {}
       : pos
         ? { left: pos.x, top: pos.y, right: 'auto', bottom: 'auto' }
-        : { right: 16, bottom: 16 };
+        : { right: 16, bottom: 88 };  // 88px = above the floating mobile pill nav
 
-  const zClass = !isVoiceMode && mode === 'full' ? 'z-[200]' : 'z-[140]';
+  const zClass = !isVoiceMode && mode === 'full' ? 'z-[200]' : 'z-[9999]';
   const callLabel = isVoiceMode ? 'Voice call' : 'Video call';
 
   return (
@@ -556,7 +556,7 @@ export function FloatingCall() {
             !isVoiceMode && mode === 'full' ? '' : 'cursor-move'
           }`}
         >
-          {(isVoiceMode || mode !== 'full') && <GripHorizontal size={15} className="text-gray-500 shrink-0" />}
+          {(isVoiceMode || mode !== 'full') && <GripHorizontal size={18} className="text-gray-400 shrink-0" />}
           <span className="text-xs font-semibold flex-1 truncate">{callLabel}</span>
           <button
             onClick={() => setMode('compact')}
