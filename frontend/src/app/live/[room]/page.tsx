@@ -16,15 +16,14 @@ export default function LiveRoomPage() {
 
   const room = decodeURIComponent(String(params.room ?? ''));
   const host = search.get('host') === '1';
-  // A guest co-host publishes media but does NOT own the live session
-  // (so they get a "Leave" button instead of "End", and never create/own the
-  // server-side live record).
   const guest = search.get('guest') === '1';
   const isOwner = host && !guest;
 
   const [token, setToken] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Guest pre-join: ask for camera/mic permissions before connecting
+  const [guestReady, setGuestReady] = useState(!guest);
 
   useEffect(() => {
     if (!room) return;
@@ -81,6 +80,36 @@ export default function LiveRoomPage() {
       <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
         <div className="w-8 h-8 border-2 border-rose-400 border-t-transparent rounded-full animate-spin mb-4" />
         <p className="text-gray-400 text-sm">{host ? 'Starting your broadcast…' : 'Joining live stream…'}</p>
+      </div>
+    );
+  }
+
+  // Guest pre-join screen: request permissions before entering
+  if (guest && !guestReady) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white px-6 text-center">
+        <Radio size={40} className="text-green-400 mb-4" />
+        <h1 className="text-xl font-bold mb-2">You&apos;re invited to go live!</h1>
+        <p className="text-gray-400 text-sm mb-8 max-w-sm">
+          You&apos;ll be joining the live stream with your camera and microphone. Make sure you&apos;re ready before joining.
+        </p>
+        <button
+          onClick={async () => {
+            try {
+              // Request permissions proactively so the browser doesn't block them
+              await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+            } catch {
+              // User may deny — they can still join with just mic
+            }
+            setGuestReady(true);
+          }}
+          className="px-8 py-3 rounded-2xl bg-gradient-to-r from-green-500 to-emerald-500 text-white font-bold text-lg shadow-lg hover:opacity-90 transition mb-3"
+        >
+          🎥 Join Live Now
+        </button>
+        <button onClick={leave} className="text-sm text-gray-500 hover:text-gray-300 transition">
+          Cancel
+        </button>
       </div>
     );
   }
