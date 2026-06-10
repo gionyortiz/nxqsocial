@@ -5,7 +5,7 @@ import Image from 'next/image';
 import {
   Grid, Film, MapPin, Globe, Calendar, ShieldCheck,
   Trash2, Heart, MessageCircle, Share2, UserPlus, Settings, User,
-  Ban, Phone, Video, X,
+  Ban, Phone, Video, X, ShieldAlert,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
@@ -210,6 +210,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   };
 
   const isMe = me?.username === username;
+  const isAdmin = me?.role === 'ADMIN' || me?.role === 'MODERATOR';
   const filteredPosts = posts.filter((p) =>
     tab === 'reels'
       ? (p.type === 'VIDEO' || p.type === 'SHORT_VIDEO')
@@ -351,6 +352,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                   >
                     <Share2 size={14} />
                   </button>
+                  {/* Admin view button — only visible to admins */}
+                  {isAdmin && !isMe && (
+                    <button
+                      onClick={() => router.push(`/admin?user=${profile.username}`)}
+                      className="p-2 rounded-full border-2 border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 transition-all"
+                      title="Admin: view user details"
+                    >
+                      <ShieldAlert size={15} />
+                    </button>
+                  )}
                 </>
               )}
             </div>

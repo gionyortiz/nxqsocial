@@ -309,6 +309,15 @@ export default function AdminPage() {
   const [notice, setNotice] = useState('');
   const [noticeType, setNoticeType] = useState<'success' | 'error'>('success');
 
+  // Auto-open Account Recovery tab if ?user= param is present
+  const [initialRecoveryUser, setInitialRecoveryUser] = useState<string | null>(null);
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams(window.location.search);
+    const u = params.get('user');
+    if (u) { setTab('recovery'); setInitialRecoveryUser(u); }
+  }, []);
+
   const [reports, setReports] = useState<Report[]>([]);
   const [verifications, setVerifications] = useState<Verification[]>([]);
   const [safetyFlags, setSafetyFlags] = useState<SafetyFlag[]>([]);
@@ -727,7 +736,7 @@ export default function AdminPage() {
       </div>
 
       {/* Account Recovery tab rendered outside .p-6 to avoid double padding */}
-      {tab === 'recovery' && <AccountRecoveryTab />}
+      {tab === 'recovery' && <AccountRecoveryTab initialUser={initialRecoveryUser} />}
 
       {historyUserId && <TrustHistoryModal userId={historyUserId} onClose={() => setHistoryUserId(null)} />}
     </div>
@@ -745,8 +754,8 @@ function KpiCard({ label, value }: { label: string; value: number }) {
 
 // ── Account Recovery Tab ──────────────────────────────────────────────────────
 
-function AccountRecoveryTab() {
-  const [search, setSearch] = useState('');
+function AccountRecoveryTab({ initialUser }: { initialUser?: string | null }) {
+  const [search, setSearch] = useState(initialUser ?? '');
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [selected, setSelected] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
@@ -755,18 +764,28 @@ function AccountRecoveryTab() {
   const [noticeType, setNoticeType] = useState<'ok' | 'err'>('ok');
   const [actionReason, setActionReason] = useState('');
 
+  // Auto-search when opened with a pre-filled username
+  useEffect(() => {
+    if (initialUser) doSearch(initialUser);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialUser]);
+
   const showNotice = (msg: string, type: 'ok' | 'err' = 'ok') => {
     setNotice(msg);
     setNoticeType(type);
     setTimeout(() => setNotice(''), 4000);
   };
 
-  const doSearch = async () => {
-    if (!search.trim()) return;
+  const doSearch = async (q?: string) => {
+    const term = q ?? search;
+    if (!term.trim()) return;
     setLoading(true);
     try {
-      const { data } = await api.get('/users/admin/list', { params: { search, take: 10 } });
-      setUsers(data.data ?? []);
+      const { data } = await api.get('/users/admin/list', { params: { search: term, take: 10 } });
+      const list = data.data ?? [];
+      setUsers(list);
+      // If exactly one result, auto-load detail
+      if (list.length === 1) loadDetail(list[0].id);
     } catch {
       showNotice('Search failed', 'err');
     } finally {
