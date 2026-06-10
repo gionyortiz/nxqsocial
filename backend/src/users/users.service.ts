@@ -425,12 +425,28 @@ export class UsersService {
       select: { actionType: true, reason: true, meta: true, createdAt: true, admin: { select: { username: true } } },
     });
 
+    // Derive the signup source from the recorded signup_completed analytics event.
+    const signupEvent = await this.prisma.analyticsEvent.findFirst({
+      where: { userId: targetId, name: 'signup_completed' },
+      orderBy: { createdAt: 'desc' },
+      select: { properties: true },
+    });
+    const rawSource = (signupEvent?.properties as any)?.source as string | undefined;
+    // Honest derivation from existing data — no OAuth/device fields are stored yet.
+    const registrationMethod = user.phone ? 'Phone' : 'Email';
+    const signupSource =
+      rawSource === 'invite_code' ? 'Invited (invite code)'
+      : rawSource === 'open_registration' ? 'Open registration'
+      : 'Unknown';
+
     const { profile, passwordResets, ...base } = user;
     return {
       ...base,
       displayName: profile?.displayName,
       avatarUrl: profile?.avatarUrl,
       bio: profile?.bio,
+      registrationMethod,
+      signupSource,
       passwordResetHistory: passwordResets,
       auditLog: auditLogs,
     };

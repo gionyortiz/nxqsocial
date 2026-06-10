@@ -882,6 +882,8 @@ function AccountRecoveryTab({ initialUser }: { initialUser?: string | null }) {
             {[
               { label: 'Email', value: selected.email },
               { label: 'Phone', value: selected.phone ?? '—' },
+              { label: 'Registration Method', value: selected.registrationMethod ?? '—' },
+              { label: 'Signup Source', value: selected.signupSource ?? '—' },
               { label: 'Display Name', value: selected.displayName ?? '—' },
               { label: 'Role', value: selected.role },
               { label: 'Trust Score', value: selected.trustScore },
