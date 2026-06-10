@@ -1,7 +1,11 @@
 import { Link, router } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
+
+const TERMS_URL = 'https://nxqsocial.com/terms';
+const GUIDELINES_URL = 'https://nxqsocial.com/community-guidelines';
+const PRIVACY_URL = 'https://nxqsocial.com/privacy';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
@@ -49,6 +53,30 @@ export default function RegisterScreen() {
         <TextInput placeholder="Password" placeholderTextColor="#8790ab" secureTextEntry value={password} onChangeText={setPassword} style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }} />
         <TextInput placeholder="Invite code (if required)" placeholderTextColor="#8790ab" autoCapitalize="characters" value={inviteCode} onChangeText={setInviteCode} style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }} />
 
+        {/* Read-before-signup links — Apple Guideline 2.1(a): must be accessible BEFORE account creation */}
+        <View style={{ backgroundColor: '#10182b', borderRadius: 12, padding: 14, gap: 8 }}>
+          <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>
+            Please review before creating your account:
+          </Text>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
+            <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
+              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>
+                Terms of Service
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => Linking.openURL(GUIDELINES_URL)}>
+              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>
+                Community Guidelines
+              </Text>
+            </Pressable>
+            <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
+              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>
+                Privacy Policy
+              </Text>
+            </Pressable>
+          </View>
+        </View>
+
         {/* EULA — required by Apple Guideline 1.2 */}
         <Pressable
           onPress={() => setAgreedToTerms((v) => !v)}
@@ -64,9 +92,19 @@ export default function RegisterScreen() {
           </View>
           <Text style={{ color: '#93a1bd', fontSize: 13, flex: 1, lineHeight: 20 }}>
             I agree to the{' '}
-            <Text style={{ color: '#a78bfa', fontWeight: '700' }}>Terms of Service</Text>
+            <Text
+              style={{ color: '#a78bfa', fontWeight: '700', textDecorationLine: 'underline' }}
+              onPress={() => Linking.openURL(TERMS_URL)}
+            >
+              Terms of Service
+            </Text>
             {' '}and{' '}
-            <Text style={{ color: '#a78bfa', fontWeight: '700' }}>Community Guidelines</Text>
+            <Text
+              style={{ color: '#a78bfa', fontWeight: '700', textDecorationLine: 'underline' }}
+              onPress={() => Linking.openURL(GUIDELINES_URL)}
+            >
+              Community Guidelines
+            </Text>
             {'. '}I understand that objectionable content and abusive behavior are not tolerated and may result in account removal.
           </Text>
         </Pressable>
