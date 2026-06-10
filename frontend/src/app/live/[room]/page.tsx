@@ -2,12 +2,33 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useSearchParams, useRouter } from 'next/navigation';
-import { LiveKitRoom } from '@livekit/components-react';
+import { LiveKitRoom, useLocalParticipant } from '@livekit/components-react';
 import '@livekit/components-styles';
 import { Radio } from 'lucide-react';
 import { api } from '@/lib/api';
 import { LiveExperience } from '@/components/live/LiveExperience';
 import { trackEvent, trackFirstEvent } from '@/lib/analytics';
+
+/** Auto-enables camera + mic for guests once they're connected to the room. */
+function GuestAutoPublish() {
+  const { localParticipant } = useLocalParticipant();
+
+  useEffect(() => {
+    if (!localParticipant) return;
+    // Small delay to let the room fully connect before publishing
+    const t = setTimeout(async () => {
+      try {
+        await localParticipant.setCameraEnabled(true);
+        await localParticipant.setMicrophoneEnabled(true);
+      } catch {
+        // If auto fails, the user can still toggle manually
+      }
+    }, 800);
+    return () => clearTimeout(t);
+  }, [localParticipant]);
+
+  return null;
+}
 
 export default function LiveRoomPage() {
   const params = useParams();
@@ -96,10 +117,12 @@ export default function LiveRoomPage() {
         <button
           onClick={async () => {
             try {
-              // Request permissions proactively so the browser doesn't block them
-              await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+              // Request and immediately release — just to warm up browser permission
+              const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true });
+              // Stop all tracks so LiveKit can claim the devices cleanly
+              stream.getTracks().forEach(t => t.stop());
             } catch {
-              // User may deny — they can still join with just mic
+              // Permission denied or not available — still let them try to join
             }
             setGuestReady(true);
           }}
@@ -125,6 +148,8 @@ export default function LiveRoomPage() {
         onDisconnected={leave}
         style={{ height: '100%' }}
       >
+        {/* Auto-publish camera+mic for guests after connection */}
+        {guest && <GuestAutoPublish />}
         <LiveExperience host={host} isOwner={isOwner} room={room} onLeave={leave} />
       </LiveKitRoom>
     </div>
