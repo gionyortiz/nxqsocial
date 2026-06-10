@@ -612,6 +612,14 @@ export function LiveExperience({
       85%  { transform: scale(0.8) translateY(-200px) rotate(8deg); opacity: 0.6; }
       100% { transform: scale(0.3) translateY(-320px) rotate(15deg); opacity: 0; }
     }
+    /* Make live video fill the frame instead of letterboxing (TikTok/IG style) */
+    .lk-participant-tile, .lk-participant-media-video {
+      width: 100% !important;
+      height: 100% !important;
+    }
+    .lk-participant-media-video {
+      object-fit: cover !important;
+    }
   `,
     [],
   );
@@ -629,52 +637,76 @@ export function LiveExperience({
               <ParticipantTile />
             </GridLayout>
           ) : (
-            // 2+ participants (host + guests) — split screen side by side
-            <div className="flex h-full w-full">
-              {cameraTracks.slice(0, 2).map((track, i) => (
-                <div key={track.participant?.identity ?? i} className="flex-1 relative overflow-hidden border-r border-white/10 last:border-r-0">
-                  <GridLayout tracks={[track]} style={{ height: '100%', width: '100%' }}>
+            <>
+              {/* MOBILE co-host (non-battle): main video full-screen + floating PiP */}
+              {!battleActive && (
+                <div className="md:hidden relative h-full w-full">
+                  {/* Main video fills the screen */}
+                  <GridLayout tracks={[cameraTracks[0]]} style={{ height: '100%', width: '100%' }}>
                     <ParticipantTile />
                   </GridLayout>
-                  {/* Name tag */}
-                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-semibold">
-                    {i === 0 ? (host ? 'You' : 'Host') : 'Guest'}
+                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-semibold z-10">
+                    {host ? 'You' : 'Host'}
                   </div>
-                  {/* Battle score */}
-                  {battleActive && (
-                    <div className="absolute top-2 left-1/2 -translate-x-1/2 text-2xl font-black text-white drop-shadow-lg">
-                      {battleScores[i]}
+                  {/* Floating picture-in-picture for the second participant */}
+                  <div className="absolute top-16 right-3 w-24 h-36 rounded-2xl overflow-hidden border-2 border-white/25 shadow-2xl z-20 bg-black">
+                    <GridLayout tracks={[cameraTracks[1]]} style={{ height: '100%', width: '100%' }}>
+                      <ParticipantTile />
+                    </GridLayout>
+                    <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-semibold">
+                      Guest
                     </div>
-                  )}
-                  {/* Viewer vote buttons during battle */}
-                  {battleActive && !host && (
-                    <button
-                      onClick={() => sendBattleVote(i as 0 | 1, i === 0 ? '🔥' : '⚡')}
-                      className="absolute bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white text-sm font-bold shadow-lg hover:opacity-90 transition"
-                    >
-                      Vote {i === 0 ? '🔥' : '⚡'}
-                    </button>
-                  )}
-                </div>
-              ))}
-
-              {/* Battle scorebar center divider */}
-              {battleActive && (
-                <div className="absolute inset-x-0 top-0 z-10 flex flex-col items-center pointer-events-none">
-                  <div className="flex items-center gap-0 w-full h-2">
-                    <div
-                      className="h-full bg-gradient-to-r from-rose-500 to-orange-500 transition-all duration-300"
-                      style={{ width: `${battleScores[0] + battleScores[1] === 0 ? 50 : Math.round(battleScores[0] / (battleScores[0] + battleScores[1]) * 100)}%` }}
-                    />
-                    <div className="flex-1 h-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
-                  </div>
-                  <div className="mt-1 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-bold flex items-center gap-2">
-                    ⚔️ BATTLE
-                    <span className="text-amber-400">{Math.floor(battleTimeLeft / 60)}:{String(battleTimeLeft % 60).padStart(2, '0')}</span>
                   </div>
                 </div>
               )}
-            </div>
+
+              {/* DESKTOP split (and MOBILE battle VS): side-by-side columns */}
+              <div className={`${battleActive ? 'flex' : 'hidden md:flex'} h-full w-full`}>
+                {cameraTracks.slice(0, 2).map((track, i) => (
+                  <div key={track.participant?.identity ?? i} className="flex-1 relative overflow-hidden border-r border-white/10 last:border-r-0">
+                    <GridLayout tracks={[track]} style={{ height: '100%', width: '100%' }}>
+                      <ParticipantTile />
+                    </GridLayout>
+                    {/* Name tag */}
+                    <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-semibold">
+                      {i === 0 ? (host ? 'You' : 'Host') : 'Guest'}
+                    </div>
+                    {/* Battle score */}
+                    {battleActive && (
+                      <div className="absolute top-2 left-1/2 -translate-x-1/2 text-2xl font-black text-white drop-shadow-lg">
+                        {battleScores[i]}
+                      </div>
+                    )}
+                    {/* Viewer vote buttons during battle */}
+                    {battleActive && !host && (
+                      <button
+                        onClick={() => sendBattleVote(i as 0 | 1, i === 0 ? '🔥' : '⚡')}
+                        className="absolute bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white text-sm font-bold shadow-lg hover:opacity-90 transition"
+                      >
+                        Vote {i === 0 ? '🔥' : '⚡'}
+                      </button>
+                    )}
+                  </div>
+                ))}
+
+                {/* Battle scorebar center divider */}
+                {battleActive && (
+                  <div className="absolute inset-x-0 top-0 z-10 flex flex-col items-center pointer-events-none">
+                    <div className="flex items-center gap-0 w-full h-2">
+                      <div
+                        className="h-full bg-gradient-to-r from-rose-500 to-orange-500 transition-all duration-300"
+                        style={{ width: `${battleScores[0] + battleScores[1] === 0 ? 50 : Math.round(battleScores[0] / (battleScores[0] + battleScores[1]) * 100)}%` }}
+                      />
+                      <div className="flex-1 h-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
+                    </div>
+                    <div className="mt-1 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-bold flex items-center gap-2">
+                      ⚔️ BATTLE
+                      <span className="text-amber-400">{Math.floor(battleTimeLeft / 60)}:{String(battleTimeLeft % 60).padStart(2, '0')}</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+            </>
           )
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
@@ -982,33 +1014,33 @@ export function LiveExperience({
         </div>
 
         {/* Action buttons row */}
-        <div className="flex items-center justify-center gap-3 px-3 pb-4">
+        <div className="flex items-center justify-start sm:justify-center gap-2.5 px-3 pb-4 overflow-x-auto no-scrollbar">
           {host ? (
             /* Host controls */
             <>
               <TrackToggle source={Track.Source.Microphone} showIcon={false}
-                className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
+                className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
                 <Mic size={20} />
               </TrackToggle>
               <TrackToggle source={Track.Source.Camera} showIcon={false}
-                className="flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
+                className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
                 <Video size={20} />
               </TrackToggle>
               <TrackToggle source={Track.Source.ScreenShare} showIcon={false}
-                className="hidden sm:flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
+                className="shrink-0 hidden sm:flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
                 <MonitorUp size={20} />
               </TrackToggle>
               <button onClick={() => setShowMusic(s => !s)}
-                className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-colors ${playingTrackId ? 'bg-purple-500 text-white' : 'bg-white/15 text-white'}`}>
+                className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl transition-colors ${playingTrackId ? 'bg-purple-500 text-white' : 'bg-white/15 text-white'}`}>
                 <Music size={20} />
               </button>
               <button onClick={() => setShowInvitePanel(s => !s)}
-                className={`flex items-center justify-center w-12 h-12 rounded-2xl transition-colors ${showInvitePanel ? 'bg-green-500 text-white' : 'bg-white/15 text-white'}`}>
+                className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl transition-colors ${showInvitePanel ? 'bg-green-500 text-white' : 'bg-white/15 text-white'}`}>
                 <UserPlus size={20} />
               </button>
               {cameraTracks.length >= 2 && (
                 <button onClick={() => battleActive ? endBattle() : startBattle(60)}
-                  className={`flex items-center justify-center w-12 h-12 rounded-2xl text-lg transition-colors ${battleActive ? 'bg-red-500 animate-pulse text-white' : 'bg-gradient-to-br from-rose-500 to-orange-500 text-white'}`}>
+                  className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-lg transition-colors ${battleActive ? 'bg-red-500 animate-pulse text-white' : 'bg-gradient-to-br from-rose-500 to-orange-500 text-white'}`}>
                   ⚔️
                 </button>
               )}
@@ -1020,7 +1052,7 @@ export function LiveExperience({
               <button
                 onClick={requestToJoin}
                 disabled={requestedToJoin}
-                className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all ${
+                className={`shrink-0 flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all ${
                   requestedToJoin
                     ? 'bg-amber-500/20 text-amber-300 cursor-default border border-amber-500/40'
                     : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:opacity-90 active:scale-95'
@@ -1043,13 +1075,13 @@ export function LiveExperience({
 
           {/* Gift button — everyone */}
           <button onClick={() => setShowGifts(s => !s)}
-            className="flex items-center justify-center w-12 h-12 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-90 transition text-black shrink-0 shadow-lg">
+            className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-90 transition text-black shadow-lg">
             <Gift size={20} />
           </button>
 
           {/* Heart — everyone */}
           <button onClick={() => sendReaction('❤️')}
-            className="flex items-center justify-center w-12 h-12 rounded-2xl bg-rose-500 hover:bg-rose-600 active:scale-90 transition text-white shrink-0 shadow-lg">
+            className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-rose-500 hover:bg-rose-600 active:scale-90 transition text-white shadow-lg">
             <Heart size={20} fill="currentColor" />
           </button>
         </div>
