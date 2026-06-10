@@ -119,7 +119,7 @@ export default function ExplorePage() {
             value={query}
             onChange={(e) => onSearch(e.target.value)}
             placeholder="Search people…"
-            className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
+            className="w-full pl-10 pr-4 py-3 rounded-2xl border border-[var(--border)] bg-[var(--surface)] text-gray-100 placeholder-gray-500 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
           />
         </div>
 
@@ -132,20 +132,34 @@ export default function ExplorePage() {
               </div>
             )}
             {results.map((u) => (
-              <Link
+              <div
                 key={u.id}
-                href={`/profile/${u.username}`}
-                className="flex items-center gap-3 p-3 rounded-2xl bg-white ring-1 ring-gray-100 hover:ring-purple-200 transition-all"
+                className="flex items-center gap-3 p-3 rounded-2xl bg-white dark:bg-[#111827] ring-1 ring-gray-100 dark:ring-white/10 hover:ring-purple-200 dark:hover:ring-purple-700 transition-all"
               >
-                <Avatar src={u.avatarUrl} alt={u.username} size="md" />
-                <div className="min-w-0 flex-1">
+                <Link href={`/profile/${u.username}`} className="shrink-0">
+                  <Avatar src={u.avatarUrl} alt={u.username} size="md" />
+                </Link>
+                <Link href={`/profile/${u.username}`} className="min-w-0 flex-1">
                   <div className="flex items-center gap-1">
-                    <p className="font-semibold text-sm text-gray-900 truncate">{u.displayName}</p>
+                    <p className="font-semibold text-sm text-gray-900 dark:text-gray-100 truncate">{u.displayName}</p>
                     <TrustBadge status={u.verificationStatus} />
                   </div>
                   <p className="text-xs text-gray-400 truncate">@{u.username}</p>
-                </div>
-              </Link>
+                </Link>
+                {u.username !== me?.username && (
+                  <button
+                    onClick={(e) => { e.preventDefault(); follow(u.username); }}
+                    disabled={followed[u.username]}
+                    className={`shrink-0 px-4 py-1.5 rounded-full text-xs font-bold transition-all ${
+                      followed[u.username]
+                        ? 'bg-gray-100 dark:bg-white/10 text-gray-500'
+                        : 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white shadow-md hover:opacity-90'
+                    }`}
+                  >
+                    {followed[u.username] ? 'Following' : '+ Follow'}
+                  </button>
+                )}
+              </div>
             ))}
             {!searching && results.length === 0 && (
               <p className="text-center text-gray-400 py-10">No people found for &ldquo;{query}&rdquo;</p>
@@ -172,7 +186,7 @@ export default function ExplorePage() {
 
             {/* Suggested creators */}
             <section>
-              <h2 className="text-sm font-bold text-gray-900 mb-3 flex items-center gap-1.5">
+              <h2 className="text-sm font-bold text-gray-100 mb-3 flex items-center gap-1.5">
                 <Users size={15} className="text-purple-500" /> Suggested creators
               </h2>
               {loading ? (
@@ -182,11 +196,11 @@ export default function ExplorePage() {
               ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
                   {creators.map((c) => (
-                    <div key={c.id} className="rounded-2xl bg-white ring-1 ring-gray-100 p-4 text-center">
+                    <div key={c.id} className="rounded-2xl bg-[var(--surface)] ring-1 ring-[var(--border)] p-4 text-center">
                       <Link href={`/profile/${c.username}`} className="flex flex-col items-center">
                         <Avatar src={c.avatarUrl} alt={c.username} size="lg" />
                         <div className="flex items-center gap-1 mt-2">
-                          <p className="font-semibold text-sm text-gray-900 truncate max-w-[7rem]">{c.displayName}</p>
+                          <p className="font-semibold text-sm text-gray-100 truncate max-w-[7rem]">{c.displayName}</p>
                           <TrustBadge status={c.verificationStatus} />
                         </div>
                         <p className="text-xs text-gray-400 truncate max-w-[8rem]">@{c.username}</p>
@@ -194,9 +208,13 @@ export default function ExplorePage() {
                       <button
                         onClick={() => follow(c.username)}
                         disabled={followed[c.username]}
-                        className="mt-3 w-full py-1.5 rounded-full bg-purple-600 hover:bg-purple-700 disabled:bg-gray-100 disabled:text-gray-400 text-white text-xs font-semibold transition-colors"
+                        className={`mt-3 w-full py-1.5 rounded-full text-xs font-bold transition-all ${
+                          followed[c.username]
+                            ? 'bg-white/10 text-gray-400'
+                            : 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white shadow hover:opacity-90'
+                        }`}
                       >
-                        {followed[c.username] ? 'Following' : 'Follow'}
+                        {followed[c.username] ? 'Following ✓' : '+ Follow'}
                       </button>
                     </div>
                   ))}
