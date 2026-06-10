@@ -509,18 +509,22 @@ export function LiveExperience({
 
   // Guest: poll backend every 2s to check if host approved them
   useEffect(() => {
-    if (!requestedToJoin || host) return;
+    if (!requestedToJoin || host || !user?.id) return;
+    let redirected = false;
     const poll = async () => {
+      if (redirected) return;
       try {
         const { data } = await api.get(`/live/${encodeURIComponent(room)}/guest-check`);
-        if (data?.approved) {
+        if (data?.approved && !redirected) {
+          redirected = true;
           router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
         }
       } catch { /* ignore */ }
     };
+    poll(); // poll immediately
     const id = setInterval(poll, 2000);
     return () => clearInterval(id);
-  }, [requestedToJoin, host, room, router]);
+  }, [requestedToJoin, host, room, router, user?.id]);
 
   const reportLive = async () => {
     if (!hostIdentity || hostIdentity === user?.id) return;
@@ -987,12 +991,21 @@ export function LiveExperience({
                 disabled={requestedToJoin}
                 className={`flex items-center gap-2 px-5 py-3 rounded-2xl font-bold text-sm transition-all ${
                   requestedToJoin
-                    ? 'bg-white/10 text-gray-400 cursor-default'
+                    ? 'bg-amber-500/20 text-amber-300 cursor-default border border-amber-500/40'
                     : 'bg-gradient-to-r from-green-500 to-emerald-500 text-white shadow-lg hover:opacity-90 active:scale-95'
                 }`}
               >
-                <Hand size={18} />
-                {requestedToJoin ? 'Request sent ✓' : 'Join Live'}
+                {requestedToJoin ? (
+                  <>
+                    <span className="w-3 h-3 rounded-full bg-amber-400 animate-pulse" />
+                    Waiting for host…
+                  </>
+                ) : (
+                  <>
+                    <Hand size={18} />
+                    Join Live
+                  </>
+                )}
               </button>
             </>
           )}
