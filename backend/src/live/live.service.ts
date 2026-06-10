@@ -1,5 +1,7 @@
-import { Injectable, BadRequestException, ForbiddenException } from '@nestjs/common';
+import { Injectable, BadRequestException, ForbiddenException, Inject } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { REDIS_CLIENT } from '../redis/redis.module';
+import type Redis from 'ioredis';
 
 /**
  * A live session is considered "stale" (host's tab closed without a clean end)
@@ -11,7 +13,10 @@ const STALE_MS = 30_000;
 
 @Injectable()
 export class LiveService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {}
 
   /** Host begins (or resumes) broadcasting in a room. */
   async start(hostId: string, room: string, title?: string) {
@@ -99,6 +104,52 @@ export class LiveService {
       orderBy: { startedAt: 'desc' },
     });
     return session ? this.shape(session) : null;
+  }
+
+  /** Viewer requests to join live as guest. Host polls to see requests. */
+  async requestGuestJoin(room: string, userId: string, displayName: string) {
+    const key = `live:guestreq:${room}`;
+    const req = JSON.stringify({ userId, displayName, ts: Date.now() });
+    // Store in a Redis list, TTL 5 min
+    await this.redis.lpush(key, req);
+    await this.redis.expire(key, 300);
+    return { ok: true };
+  }
+
+  /** Host polls for pending guest requests. */
+  async getGuestRequests(room: string) {
+    const key = `live:guestreq:${room}`;
+    const items = await this.redis.lrange(key, 0, 19);
+    return items.map(i => JSON.parse(i));
+  }
+
+  /** Host approves a guest - writes approval to Redis so guest can poll. */
+  async approveGuest(room: string, userId: string) {
+    // Remove from requests list
+    const reqKey = `live:guestreq:${room}`;
+    const items = await this.redis.lrange(reqKey, 0, 99);
+    for (const item of items) {
+      const parsed = JSON.parse(item);
+      if (parsed.userId === userId) {
+        await this.redis.lrem(reqKey, 1, item);
+        break;
+      }
+    }
+    // Write approval flag - guest polls this key
+    const approvalKey = `live:approved:${room}:${userId}`;
+    await this.redis.set(approvalKey, '1', 'EX', 300);
+    return { ok: true };
+  }
+
+  /** Guest polls this to know if they've been approved. */
+  async checkApproval(room: string, userId: string) {
+    const key = `live:approved:${room}:${userId}`;
+    const val = await this.redis.get(key);
+    if (val) {
+      await this.redis.del(key); // consume once
+      return { approved: true };
+    }
+    return { approved: false };
   }
 
   private shape(s: {

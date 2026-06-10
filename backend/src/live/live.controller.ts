@@ -3,6 +3,17 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { LiveService } from './live.service';
 import { StartLiveDto, HeartbeatDto } from './live.dto';
+import { IsString } from 'class-validator';
+
+class GuestRequestDto {
+  @IsString()
+  displayName!: string;
+}
+
+class ApproveGuestDto {
+  @IsString()
+  userId!: string;
+}
 
 @Controller('live')
 @UseGuards(JwtAuthGuard)
@@ -41,5 +52,36 @@ export class LiveController {
   @Post(':room/end')
   end(@CurrentUser() user: any, @Param('room') room: string) {
     return this.live.end(user.id, room);
+  }
+
+  /** Viewer requests to join as guest. */
+  @Post(':room/guest-request')
+  guestRequest(
+    @CurrentUser() user: any,
+    @Param('room') room: string,
+    @Body() dto: GuestRequestDto,
+  ) {
+    return this.live.requestGuestJoin(room, user.id, dto.displayName);
+  }
+
+  /** Host fetches pending guest requests. */
+  @Get(':room/guest-requests')
+  getGuestRequests(@Param('room') room: string) {
+    return this.live.getGuestRequests(room);
+  }
+
+  /** Host approves a guest. */
+  @Post(':room/guest-approve')
+  approveGuest(
+    @Param('room') room: string,
+    @Body() dto: ApproveGuestDto,
+  ) {
+    return this.live.approveGuest(room, dto.userId);
+  }
+
+  /** Guest polls to check if they've been approved. */
+  @Get(':room/guest-check')
+  checkApproval(@CurrentUser() user: any, @Param('room') room: string) {
+    return this.live.checkApproval(room, user.id);
   }
 }

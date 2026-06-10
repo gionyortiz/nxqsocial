@@ -412,9 +412,28 @@ export function LiveExperience({
     setDraft('');
   };
 
-  const requestToJoin = () => {
+  const requestToJoin = async () => {
     if (!user) return;
     setRequestedToJoin(true);
+    try {
+      // POST to backend — reliable cross-device
+      await api.post(`/live/${encodeURIComponent(room)}/guest-request`, {
+        displayName: user.displayName ?? user.username,
+      });
+    } catch {
+      // Fallback: data channel
+      broadcast(
+        {
+          kind: 'guest-request',
+          id: randomId(),
+          userId: user.id,
+          name: user.displayName ?? user.username,
+          ts: Date.now(),
+        },
+        true,
+      );
+    }
+    // Also send via data channel as a backup
     broadcast(
       {
         kind: 'guest-request',
@@ -427,7 +446,12 @@ export function LiveExperience({
     );
   };
 
-  const approveGuest = (g: GuestRequest) => {
+  const approveGuest = async (g: GuestRequest) => {
+    try {
+      // Write to backend — guest is polling this
+      await api.post(`/live/${encodeURIComponent(room)}/guest-approve`, { userId: g.userId });
+    } catch { /* ignore */ }
+    // Also send via data channel as backup
     broadcast({ kind: 'guest-approve', id: randomId(), userId: g.userId, ts: Date.now() }, true);
     setGuestRequests((prev) => prev.filter((r) => r.userId !== g.userId));
   };
@@ -463,6 +487,40 @@ export function LiveExperience({
 
   // Cleanup battle timer on unmount
   useEffect(() => () => { if (battleTimerRef.current) clearInterval(battleTimerRef.current); }, []);
+
+  // Host: poll backend for guest requests every 3s (more reliable than data channel)
+  useEffect(() => {
+    if (!isOwner) return;
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/live/${encodeURIComponent(room)}/guest-requests`);
+        if (Array.isArray(data) && data.length > 0) {
+          setGuestRequests(prev => {
+            const newReqs = data.filter((d: any) => !prev.some(p => p.userId === d.userId));
+            return newReqs.length > 0 ? [...prev, ...newReqs.map((d: any) => ({ userId: d.userId, name: d.displayName }))] : prev;
+          });
+        }
+      } catch { /* ignore */ }
+    };
+    poll();
+    const id = setInterval(poll, 3000);
+    return () => clearInterval(id);
+  }, [isOwner, room]);
+
+  // Guest: poll backend every 2s to check if host approved them
+  useEffect(() => {
+    if (!requestedToJoin || host) return;
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/live/${encodeURIComponent(room)}/guest-check`);
+        if (data?.approved) {
+          router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
+        }
+      } catch { /* ignore */ }
+    };
+    const id = setInterval(poll, 2000);
+    return () => clearInterval(id);
+  }, [requestedToJoin, host, room, router]);
 
   const reportLive = async () => {
     if (!hostIdentity || hostIdentity === user?.id) return;
