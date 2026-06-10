@@ -135,6 +135,7 @@ export function LiveExperience({
   const [playingTrackId, setPlayingTrackId] = useState<string | null>(null);
   const [musicVolume, setMusicVolume] = useState(0.4);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [showInvitePanel, setShowInvitePanel] = useState(false);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const liveStartedAtRef = useRef<number>(Date.now());
@@ -615,6 +616,67 @@ export function LiveExperience({
         </div>
       )}
 
+      {/* Invite panel (host only) */}
+      {showInvitePanel && host && (
+        <div className="absolute bottom-20 left-0 right-0 z-30 px-3">
+          <div className="mx-auto max-w-sm bg-black/85 backdrop-blur-xl rounded-2xl p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-white text-sm font-bold flex items-center gap-2">
+                <UserPlus size={15} className="text-green-400" /> Invite to go live
+              </span>
+              <span className="text-xs text-gray-400">{viewers} viewer{viewers !== 1 ? 's' : ''}</span>
+            </div>
+
+            {/* Pending requests */}
+            {guestRequests.length > 0 && (
+              <div className="space-y-2">
+                <p className="text-[11px] text-amber-400 font-bold uppercase tracking-wide">Wants to join</p>
+                {guestRequests.map((g) => (
+                  <div key={g.userId} className="flex items-center gap-3 bg-amber-500/10 rounded-xl px-3 py-2">
+                    <Hand size={14} className="text-amber-400 shrink-0" />
+                    <span className="text-sm text-white flex-1 font-semibold truncate">{g.name}</span>
+                    <button
+                      onClick={() => { approveGuest(g); setShowInvitePanel(false); }}
+                      className="px-3 py-1.5 rounded-full bg-green-500 hover:bg-green-600 text-white text-xs font-bold"
+                    >
+                      ✓ Add
+                    </button>
+                    <button
+                      onClick={() => setGuestRequests(prev => prev.filter(r => r.userId !== g.userId))}
+                      className="px-2 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {guestRequests.length === 0 && viewers === 0 && (
+              <p className="text-center text-gray-500 text-sm py-4">No viewers yet. Share your live link to get people watching!</p>
+            )}
+
+            {guestRequests.length === 0 && viewers > 0 && (
+              <p className="text-center text-gray-400 text-sm py-3">
+                Viewers can tap the <Hand size={13} className="inline text-amber-300" /> button to request to join.<br />
+                Their request will appear here.
+              </p>
+            )}
+
+            {/* Share link */}
+            <button
+              onClick={() => {
+                const url = typeof window !== 'undefined' ? window.location.href.replace('?host=1', '') : '';
+                navigator.clipboard?.writeText(url).catch(() => {});
+              }}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold transition-colors"
+            >
+              <Link2 size={14} /> Copy live link to share
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Music tray (host only) */}
       {showMusic && host && (
         <div className="absolute bottom-20 left-0 right-0 z-30 px-3">
@@ -722,6 +784,14 @@ export function LiveExperience({
                 className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${playingTrackId ? 'bg-purple-500 hover:bg-purple-600 text-white animate-pulse-glow' : 'bg-white/15 hover:bg-white/25 text-white'}`}
               >
                 {playingTrackId ? <Music size={18} /> : <Music size={18} />}
+              </button>
+              {/* Invite viewer to join live */}
+              <button
+                onClick={() => setShowInvitePanel(s => !s)}
+                title="Invite a viewer to go live with you"
+                className={`flex items-center justify-center w-10 h-10 rounded-full transition-colors ${showInvitePanel ? 'bg-green-500 text-white' : 'bg-white/15 hover:bg-white/25 text-white'}`}
+              >
+                <UserPlus size={18} />
               </button>
             </div>
           )}
