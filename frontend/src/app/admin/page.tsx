@@ -838,7 +838,7 @@ function AccountRecoveryTab({ initialUser }: { initialUser?: string | null }) {
           placeholder="Search by username, email, display name…"
           className="flex-1 rounded-lg border border-gray-700 bg-gray-800 px-3 py-2 text-sm text-white placeholder-gray-500 focus:border-blue-500 focus:outline-none"
         />
-        <button onClick={doSearch} disabled={loading} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium hover:bg-blue-600 disabled:opacity-50">
+        <button onClick={() => doSearch()} disabled={loading} className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-medium hover:bg-blue-600 disabled:opacity-50">
           {loading ? 'Searching…' : 'Search'}
         </button>
       </div>
