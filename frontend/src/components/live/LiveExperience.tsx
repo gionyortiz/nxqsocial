@@ -63,7 +63,10 @@ type LiveEvent =
   | { kind: 'reaction'; id: string; emoji: string; ts: number }
   | { kind: 'gift'; id: string; emoji: string; name: string; ts: number }
   | { kind: 'guest-request'; id: string; userId: string; name: string; ts: number }
-  | { kind: 'guest-approve'; id: string; userId: string; ts: number };
+  | { kind: 'guest-approve'; id: string; userId: string; ts: number }
+  | { kind: 'battle-start'; id: string; durationSec: number; ts: number }
+  | { kind: 'battle-vote'; id: string; side: 0 | 1; name: string; emoji: string; ts: number }
+  | { kind: 'battle-end'; id: string; ts: number };
 
 interface ChatMessage {
   id: string;
@@ -136,6 +139,12 @@ export function LiveExperience({
   const [musicVolume, setMusicVolume] = useState(0.4);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const [showInvitePanel, setShowInvitePanel] = useState(false);
+
+  // ---- Battle state -------------------------------------------------------
+  const [battleActive, setBattleActive] = useState(false);
+  const [battleTimeLeft, setBattleTimeLeft] = useState(0);
+  const [battleScores, setBattleScores] = useState<[number, number]>([0, 0]);
+  const battleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const liveStartedAtRef = useRef<number>(Date.now());
@@ -216,6 +225,35 @@ export function LiveExperience({
           if (!host && evt.userId === user?.id) {
             router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
           }
+          break;
+        case 'battle-start':
+          setBattleActive(true);
+          setBattleScores([0, 0]);
+          setBattleTimeLeft(evt.durationSec);
+          if (battleTimerRef.current) clearInterval(battleTimerRef.current);
+          battleTimerRef.current = setInterval(() => {
+            setBattleTimeLeft(t => {
+              if (t <= 1) {
+                clearInterval(battleTimerRef.current!);
+                setBattleActive(false);
+                return 0;
+              }
+              return t - 1;
+            });
+          }, 1000);
+          break;
+        case 'battle-vote':
+          setBattleScores(prev => {
+            const next: [number, number] = [...prev] as [number, number];
+            next[evt.side] += 1;
+            return next;
+          });
+          addGiftBurst(evt.emoji, evt.name);
+          break;
+        case 'battle-end':
+          setBattleActive(false);
+          setBattleTimeLeft(0);
+          if (battleTimerRef.current) clearInterval(battleTimerRef.current);
           break;
       }
     },
@@ -390,6 +428,38 @@ export function LiveExperience({
     setGuestRequests((prev) => prev.filter((r) => r.userId !== g.userId));
   };
 
+  const startBattle = (durationSec = 60) => {
+    const evt = { kind: 'battle-start' as const, id: randomId(), durationSec, ts: Date.now() };
+    setBattleActive(true);
+    setBattleScores([0, 0]);
+    setBattleTimeLeft(durationSec);
+    broadcast(evt, true);
+    if (battleTimerRef.current) clearInterval(battleTimerRef.current);
+    battleTimerRef.current = setInterval(() => {
+      setBattleTimeLeft(t => {
+        if (t <= 1) { clearInterval(battleTimerRef.current!); setBattleActive(false); return 0; }
+        return t - 1;
+      });
+    }, 1000);
+  };
+
+  const endBattle = () => {
+    setBattleActive(false);
+    setBattleTimeLeft(0);
+    if (battleTimerRef.current) clearInterval(battleTimerRef.current);
+    broadcast({ kind: 'battle-end', id: randomId(), ts: Date.now() }, true);
+  };
+
+  const sendBattleVote = (side: 0 | 1, emoji: string) => {
+    const name = user?.displayName ?? user?.username ?? 'Someone';
+    broadcast({ kind: 'battle-vote', id: randomId(), side, name, emoji, ts: Date.now() }, true);
+    setBattleScores(prev => { const n: [number, number] = [...prev] as [number, number]; n[side] += 1; return n; });
+    addGiftBurst(emoji, name);
+  };
+
+  // Cleanup battle timer on unmount
+  useEffect(() => () => { if (battleTimerRef.current) clearInterval(battleTimerRef.current); }, []);
+
   const reportLive = async () => {
     if (!hostIdentity || hostIdentity === user?.id) return;
     setReporting(true);
@@ -473,8 +543,40 @@ export function LiveExperience({
                   <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-semibold">
                     {i === 0 ? (host ? 'You' : 'Host') : 'Guest'}
                   </div>
+                  {/* Battle score */}
+                  {battleActive && (
+                    <div className="absolute top-2 left-1/2 -translate-x-1/2 text-2xl font-black text-white drop-shadow-lg">
+                      {battleScores[i]}
+                    </div>
+                  )}
+                  {/* Viewer vote buttons during battle */}
+                  {battleActive && !host && (
+                    <button
+                      onClick={() => sendBattleVote(i as 0 | 1, i === 0 ? '🔥' : '⚡')}
+                      className="absolute bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white text-sm font-bold shadow-lg hover:opacity-90 transition"
+                    >
+                      Vote {i === 0 ? '🔥' : '⚡'}
+                    </button>
+                  )}
                 </div>
               ))}
+
+              {/* Battle scorebar center divider */}
+              {battleActive && (
+                <div className="absolute inset-x-0 top-0 z-10 flex flex-col items-center pointer-events-none">
+                  <div className="flex items-center gap-0 w-full h-2">
+                    <div
+                      className="h-full bg-gradient-to-r from-rose-500 to-orange-500 transition-all duration-300"
+                      style={{ width: `${battleScores[0] + battleScores[1] === 0 ? 50 : Math.round(battleScores[0] / (battleScores[0] + battleScores[1]) * 100)}%` }}
+                    />
+                    <div className="flex-1 h-full bg-gradient-to-r from-purple-500 to-fuchsia-500" />
+                  </div>
+                  <div className="mt-1 px-3 py-1 rounded-full bg-black/70 text-white text-xs font-bold flex items-center gap-2">
+                    ⚔️ BATTLE
+                    <span className="text-amber-400">{Math.floor(battleTimeLeft / 60)}:{String(battleTimeLeft % 60).padStart(2, '0')}</span>
+                  </div>
+                </div>
+              )}
             </div>
           )
         ) : (
@@ -811,6 +913,20 @@ export function LiveExperience({
               >
                 <UserPlus size={18} />
               </button>
+              {/* Battle button — only when guest is present */}
+              {cameraTracks.length >= 2 && (
+                <button
+                  onClick={() => battleActive ? endBattle() : startBattle(60)}
+                  title={battleActive ? 'End battle' : 'Start 60s battle'}
+                  className={`flex items-center justify-center w-10 h-10 rounded-full font-bold text-sm transition-colors ${
+                    battleActive
+                      ? 'bg-red-500 hover:bg-red-600 text-white animate-pulse'
+                      : 'bg-gradient-to-r from-rose-500 to-orange-500 text-white hover:opacity-90'
+                  }`}
+                >
+                  ⚔️
+                </button>
+              )}
             </div>
           )}
 
