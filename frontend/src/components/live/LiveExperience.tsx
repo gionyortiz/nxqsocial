@@ -412,8 +412,13 @@ export function LiveExperience({
     setDraft('');
   };
 
+  // sessionStorage key so polling survives page refreshes within the same tab
+  const ssRequestKey = `nxq_live_req:${room}`;
+
   const requestToJoin = async () => {
     if (!user) return;
+    // Persist across possible page refresh
+    sessionStorage.setItem(ssRequestKey, '1');
     setRequestedToJoin(true);
     try {
       // POST to backend — reliable cross-device
@@ -507,9 +512,31 @@ export function LiveExperience({
     return () => clearInterval(id);
   }, [isOwner, room]);
 
+  // On mount: restore pending-request flag from sessionStorage (survives page refresh)
+  // and do a one-time immediate check in case we were approved while the page was reloading
+  useEffect(() => {
+    if (host || isOwner || !user?.id) return;
+    const ssKey = `nxq_live_req:${room}`;
+    const hadPendingRequest = !!sessionStorage.getItem(ssKey);
+    if (hadPendingRequest) {
+      setRequestedToJoin(true);
+    }
+    // One-shot check regardless of pending flag — catches stale approvals
+    api.get(`/live/${encodeURIComponent(room)}/guest-check`)
+      .then(({ data }) => {
+        if (data?.approved) {
+          sessionStorage.removeItem(ssKey);
+          router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
+        }
+      })
+      .catch(() => {});
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [host, isOwner, room, user?.id]); // intentionally omit router to avoid re-running on nav
+
   // Guest: poll backend every 2s to check if host approved them
   useEffect(() => {
     if (!requestedToJoin || host || !user?.id) return;
+    const ssKey = `nxq_live_req:${room}`;
     let redirected = false;
     const poll = async () => {
       if (redirected) return;
@@ -517,9 +544,13 @@ export function LiveExperience({
         const { data } = await api.get(`/live/${encodeURIComponent(room)}/guest-check`);
         if (data?.approved && !redirected) {
           redirected = true;
+          sessionStorage.removeItem(ssKey);
           router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
         }
-      } catch { /* ignore */ }
+      } catch (err) {
+        // Log in dev so we can see auth/network errors
+        if (process.env.NODE_ENV !== 'production') console.error('[guest-check poll]', err);
+      }
     };
     poll(); // poll immediately
     const id = setInterval(poll, 2000);
