@@ -150,6 +150,9 @@ export function LiveExperience({
   const liveStartedAtRef = useRef<number>(Date.now());
   const peakViewersRef = useRef<number>(0);
   const chatCountRef = useRef<number>(0);
+  // Keep a ref to user.id so handleData always has the latest value (avoids stale closure)
+  const userIdRef = useRef<string | undefined>(user?.id);
+  useEffect(() => { userIdRef.current = user?.id; }, [user?.id]);
 
   // Viewers = everyone except the broadcaster(s) (camera publishers).
   const publishers = new Set(cameraTracks.map((t) => t.participant?.identity));
@@ -222,7 +225,8 @@ export function LiveExperience({
           }
           break;
         case 'guest-approve':
-          if (!host && evt.userId === user?.id) {
+          // Use ref to avoid stale closure on user?.id
+          if (!host && (evt.userId === userIdRef.current || evt.userId === user?.id)) {
             router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
           }
           break;
@@ -257,7 +261,7 @@ export function LiveExperience({
           break;
       }
     },
-    [addFloatingReaction, addGiftBurst, isOwner, host, user?.id, room, router],
+    [addFloatingReaction, addGiftBurst, isOwner, host, room, router],
   );
 
   const { send } = useDataChannel(handleData);
@@ -783,16 +787,28 @@ export function LiveExperience({
               </p>
             )}
 
-            {/* Share link */}
-            <button
-              onClick={() => {
-                const url = typeof window !== 'undefined' ? window.location.href.replace('?host=1', '') : '';
-                navigator.clipboard?.writeText(url).catch(() => {});
-              }}
-              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-white/10 hover:bg-white/15 text-white text-sm font-semibold transition-colors"
-            >
-              <Link2 size={14} /> Copy live link to share
-            </button>
+            {/* Share link — direct guest join URL as backup */}
+            <div className="space-y-1.5">
+              <button
+                onClick={() => {
+                  const base = typeof window !== 'undefined' ? window.location.origin : '';
+                  const guestUrl = `${base}/live/${encodeURIComponent(room)}?host=1&guest=1`;
+                  navigator.clipboard?.writeText(guestUrl).catch(() => {});
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-green-600/30 hover:bg-green-600/50 text-green-300 text-sm font-semibold transition-colors border border-green-600/40"
+              >
+                <Link2 size={14} /> Copy guest join link (send to them)
+              </button>
+              <button
+                onClick={() => {
+                  const url = typeof window !== 'undefined' ? window.location.href.replace('?host=1', '') : '';
+                  navigator.clipboard?.writeText(url).catch(() => {});
+                }}
+                className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-white/10 hover:bg-white/15 text-gray-300 text-xs font-medium transition-colors"
+              >
+                <Link2 size={13} /> Copy viewer link
+              </button>
+            </div>
           </div>
         </div>
       )}
