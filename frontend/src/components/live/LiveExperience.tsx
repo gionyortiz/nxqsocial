@@ -456,9 +456,27 @@ export function LiveExperience({
       {/* Video stage (full bleed) */}
       <div className="absolute inset-0">
         {hasVideo ? (
-          <GridLayout tracks={cameraTracks} style={{ height: '100%' }}>
-            <ParticipantTile />
-          </GridLayout>
+          cameraTracks.length === 1 ? (
+            // Single host — full screen
+            <GridLayout tracks={cameraTracks} style={{ height: '100%' }}>
+              <ParticipantTile />
+            </GridLayout>
+          ) : (
+            // 2+ participants (host + guests) — split screen side by side
+            <div className="flex h-full w-full">
+              {cameraTracks.slice(0, 2).map((track, i) => (
+                <div key={track.participant?.identity ?? i} className="flex-1 relative overflow-hidden border-r border-white/10 last:border-r-0">
+                  <GridLayout tracks={[track]} style={{ height: '100%', width: '100%' }}>
+                    <ParticipantTile />
+                  </GridLayout>
+                  {/* Name tag */}
+                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-semibold">
+                    {i === 0 ? (host ? 'You' : 'Host') : 'Guest'}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
             <Radio size={40} className="text-rose-500 mb-3 animate-pulse" />
