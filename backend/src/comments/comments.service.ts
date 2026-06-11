@@ -1,6 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { SafetyService } from '../safety/safety.service';
+import { NotificationFeedService } from '../notification-feed/notification-feed.service';
 import { CreateCommentDto } from './comments.dto';
 
 @Injectable()
@@ -8,6 +9,7 @@ export class CommentsService {
   constructor(
     private prisma: PrismaService,
     private safety: SafetyService,
+    private notifications: NotificationFeedService,
   ) {}
 
   async create(userId: string, postId: string, dto: CreateCommentDto) {
@@ -34,6 +36,15 @@ export class CommentsService {
     if (!scan.safe) {
       this.safety.scanAndPersist('comment', comment.id, dto.content).catch(() => {});
     }
+
+    // Notify the post author of the new comment.
+    void this.notifications.create({
+      recipientId: post.authorId,
+      actorId: userId,
+      type: 'COMMENT',
+      postId,
+      commentId: comment.id,
+    });
 
     return comment;
   }

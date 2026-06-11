@@ -26,6 +26,7 @@ import { LiveModule } from './live/live.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { FeedModule } from './feed/feed.module';
+import { NotificationFeedModule } from './notification-feed/notification-feed.module';
 import { getClientIpFromRequest } from './common/network/client-ip';
 
 @Module({
@@ -76,6 +77,7 @@ import { getClientIpFromRequest } from './common/network/client-ip';
     AnalyticsModule,
     FeedbackModule,
     FeedModule,
+    NotificationFeedModule,
   ],
 })
 export class AppModule {}

@@ -49,6 +49,8 @@ model User {
   liveSessions    LiveSession[]  @relation("liveHost")
   analyticsEvents AnalyticsEvent[]
   betaFeedbacks   BetaFeedback[]
+  notifications      Notification[] @relation("notificationRecipient")
+  notificationsActed Notification[] @relation("notificationActor")
 }
 
 model Block {
@@ -465,4 +467,32 @@ enum BetaFeedbackStatus {
   RESOLVED
   WONT_FIX
 }
+
+// ─────────────────────────────────────────
+// In-app notifications
+// ─────────────────────────────────────────
+model Notification {
+  id          String           @id @default(cuid())
+  recipientId String
+  actorId     String?
+  type        NotificationType
+  postId      String?
+  commentId   String?
+  read        Boolean          @default(false)
+  createdAt   DateTime         @default(now())
+
+  recipient User  @relation("notificationRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+  actor     User? @relation("notificationActor", fields: [actorId], references: [id], onDelete: Cascade)
+
+  @@index([recipientId, read, createdAt])
+  @@index([recipientId, createdAt])
+}
+
+enum NotificationType {
+  FOLLOW
+  LIKE
+  COMMENT
+  MENTION
+}
+
 

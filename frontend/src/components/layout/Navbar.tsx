@@ -13,6 +13,7 @@ import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import Logo from '@/components/Logo';
 import { cn } from '@/lib/utils';
+import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
 import { callsVisible } from '@/lib/calls';
 import { liveVisible } from '@/lib/live';
@@ -49,6 +50,7 @@ export function Navbar() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [compact, setCompact] = useState(false);
   const [seen, setSeen] = useState<Record<string, boolean>>({});
+  const [unreadNotifs, setUnreadNotifs] = useState(0);
 
   useEffect(() => {
     const saved = typeof window !== 'undefined' ? window.localStorage.getItem('nxq_nav_compact') : null;
@@ -69,7 +71,32 @@ export function Navbar() {
     }
   }, [pathname, seen]);
 
-  const badgeFor = (href: string) => (seen[href] ? 0 : (DEFAULT_BADGES[href] ?? 0));
+  const badgeFor = (href: string) => {
+    if (href === '/notifications') return unreadNotifs;
+    return seen[href] ? 0 : (DEFAULT_BADGES[href] ?? 0);
+  };
+
+  // Poll the real unread notification count while signed in.
+  useEffect(() => {
+    if (!user) return;
+    let active = true;
+    const fetchUnread = async () => {
+      try {
+        const { data } = await api.get('/notifications/unread-count');
+        if (active) setUnreadNotifs(data?.count ?? 0);
+      } catch {
+        /* ignore */
+      }
+    };
+    fetchUnread();
+    const id = setInterval(fetchUnread, 30000);
+    return () => { active = false; clearInterval(id); };
+  }, [user]);
+
+  // Clear the badge as soon as the user opens the notifications page.
+  useEffect(() => {
+    if (pathname === '/notifications') setUnreadNotifs(0);
+  }, [pathname]);
 
   const toggleCompact = () => {
     setCompact((prev) => {
@@ -134,7 +161,7 @@ export function Navbar() {
                 {!compact && <span className="flex-1 truncate">{label}</span>}
                 {!compact && badgeFor(href) ? (
                   <span className="ml-auto min-w-5 h-5 px-1.5 rounded-full bg-rose-500 text-white text-[10px] font-bold flex items-center justify-center animate-bounce-in">
-                    {badgeFor(href)}
+                    {badgeFor(href) > 9 ? '9+' : badgeFor(href)}
                   </span>
                 ) : null}
               </Link>

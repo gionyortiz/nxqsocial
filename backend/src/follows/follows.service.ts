@@ -1,9 +1,13 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationFeedService } from '../notification-feed/notification-feed.service';
 
 @Injectable()
 export class FollowsService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationFeedService,
+  ) {}
 
   private findUserByUsername(username: string) {
     return this.prisma.user.findFirst({
@@ -26,6 +30,11 @@ export class FollowsService {
     }
 
     await this.prisma.follow.create({ data: { followerId, followingId: target.id } });
+    void this.notifications.create({
+      recipientId: target.id,
+      actorId: followerId,
+      type: 'FOLLOW',
+    });
     return { following: true };
   }
 

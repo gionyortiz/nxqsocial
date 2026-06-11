@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationFeedService } from '../notification-feed/notification-feed.service';
 
 const PERSON_SELECT = {
   id: true,
@@ -10,7 +11,10 @@ const PERSON_SELECT = {
 
 @Injectable()
 export class LikesService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private notifications: NotificationFeedService,
+  ) {}
 
   async findByPost(postId: string) {
     return this.prisma.like.findMany({
@@ -38,6 +42,18 @@ export class LikesService {
 
     await this.prisma.like.create({ data: { userId, postId } });
     const count = await this.prisma.like.count({ where: { postId } });
+    const post = await this.prisma.post.findUnique({
+      where: { id: postId },
+      select: { authorId: true },
+    });
+    if (post) {
+      void this.notifications.create({
+        recipientId: post.authorId,
+        actorId: userId,
+        type: 'LIKE',
+        postId,
+      });
+    }
     return { liked: true, count };
   }
 }
