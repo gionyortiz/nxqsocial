@@ -34,7 +34,7 @@ export default function FeedbackScreen() {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
       <View style={{ padding: 16, gap: 12 }}>
-        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>Beta Feedback</Text>
+        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>Feedback</Text>
 
         <View style={{ flexDirection: 'row', gap: 8 }}>
           {['BUG', 'SUGGESTION', 'CALL_PROBLEM'].map((v) => (

@@ -21,16 +21,6 @@ export default function MoreScreen() {
           subtitle="Report bugs and suggest product improvements."
           onPress={() => router.push('/feedback')}
         />
-        <MenuButton
-          title="Calls"
-          subtitle="LiveKit mobile call integration entry point."
-          onPress={() => router.push('/calls')}
-        />
-        <MenuButton
-          title="Push Notifications"
-          subtitle="Structure placeholder for Expo/FCM/APNs setup."
-          onPress={() => router.push('/push')}
-        />
       </View>
     </SafeAreaView>
   );

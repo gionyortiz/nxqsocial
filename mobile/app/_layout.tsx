@@ -54,8 +54,6 @@ function RootLayoutNav() {
           <Stack.Screen name="register" options={{ headerShown: false }} />
           <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
           <Stack.Screen name="feedback" options={{ title: 'Feedback' }} />
-          <Stack.Screen name="calls" options={{ title: 'Calls' }} />
-          <Stack.Screen name="push" options={{ title: 'Push Notifications' }} />
         </Stack>
       </ThemeProvider>
     </AuthProvider>
