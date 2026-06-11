@@ -61,14 +61,16 @@ export default function NotificationsPage() {
   const router = useRouter();
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(false);
   const [marking, setMarking] = useState(false);
 
   const load = useCallback(async () => {
+    setError(false);
     try {
       const { data } = await api.get('/notifications');
       setItems(data.data ?? []);
     } catch {
-      // ignore — show empty state
+      setError(true);
     } finally {
       setLoading(false);
     }
@@ -124,6 +126,18 @@ export default function NotificationsPage() {
         {loading ? (
           <div className="flex justify-center py-16">
             <Loader2 size={24} className="animate-spin text-purple-500" />
+          </div>
+        ) : error ? (
+          <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-10 text-center">
+            <Bell size={36} className="mx-auto text-gray-300 mb-3" />
+            <p className="font-semibold text-gray-900">Couldn&apos;t load notifications</p>
+            <p className="mt-1 text-sm text-gray-500">Please check your connection and try again.</p>
+            <button
+              onClick={() => { setLoading(true); load(); }}
+              className="mt-4 px-4 py-2 rounded-xl bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700"
+            >
+              Retry
+            </button>
           </div>
         ) : items.length === 0 ? (
           <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-10 text-center">

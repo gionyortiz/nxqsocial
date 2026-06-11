@@ -14,9 +14,13 @@ export class NotificationFeedService {
   constructor(private prisma: PrismaService) {}
 
   /**
-   * Create an in-app notification. Silently no-ops when the actor is the
-   * recipient (you never notify yourself) or on any write error, so callers
-   * can fire-and-forget without affecting the primary action.
+   * Create an in-app notification. Silently no-ops when:
+   *  - the actor is the recipient (you never notify yourself),
+   *  - either party has blocked the other,
+   *  - an identical actor/type/target notification was created very recently
+   *    (anti-spam dedupe),
+   * and on any write error, so callers can fire-and-forget without affecting
+   * the primary action.
    */
   async create(params: {
     recipientId: string;
@@ -28,6 +32,34 @@ export class NotificationFeedService {
     const { recipientId, actorId, type, postId, commentId } = params;
     if (actorId && actorId === recipientId) return;
     try {
+      if (actorId) {
+        // Respect blocks in either direction.
+        const block = await this.prisma.block.findFirst({
+          where: {
+            OR: [
+              { blockerId: recipientId, blockedId: actorId },
+              { blockerId: actorId, blockedId: recipientId },
+            ],
+          },
+          select: { id: true },
+        });
+        if (block) return;
+
+        // Anti-spam: skip if the same actor produced the same notification
+        // for the same target within the last 60 seconds.
+        const recent = await this.prisma.notification.findFirst({
+          where: {
+            recipientId,
+            actorId,
+            type,
+            postId: postId ?? null,
+            createdAt: { gte: new Date(Date.now() - 60_000) },
+          },
+          select: { id: true },
+        });
+        if (recent) return;
+      }
+
       await this.prisma.notification.create({
         data: { recipientId, actorId, type, postId, commentId },
       });
