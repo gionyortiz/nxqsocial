@@ -36,26 +36,62 @@ interface ApiOptions {
   headers?: Record<string, string>;
 }
 
+const NATIVE_NETWORK_RETRY_ATTEMPTS = 3;
+const NATIVE_NETWORK_RETRY_DELAY_MS = 500;
+
+function sleep(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function isTransientNativeNetworkError(error: unknown): boolean {
+  if (!(error instanceof Error)) return false;
+  const message = error.message.toLowerCase();
+  return (
+    message.includes('network request failed')
+    || message.includes('could not connect to the server')
+    || message.includes('fetch failed')
+    || message.includes('load failed')
+  );
+}
+
 export async function apiRequest<T>(
   path: string,
   { method = 'GET', token, body, headers = {} }: ApiOptions = {},
 ): Promise<T> {
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
-      method,
-      headers: {
-        'Content-Type': 'application/json',
-        ...(token ? { Authorization: `Bearer ${token}` } : {}),
-        ...headers,
-      },
-      body: body ? JSON.stringify(body) : undefined,
-    });
-  } catch (error) {
-    if (Platform.OS === 'web') {
-      throw new Error('Network/CORS error from Expo web. For full auth testing use Expo Go on iOS/Android, or allow http://localhost:8081 in backend CORS.');
+  let res: Response | null = null;
+  let lastError: unknown = null;
+
+  for (let attempt = 1; attempt <= NATIVE_NETWORK_RETRY_ATTEMPTS; attempt += 1) {
+    try {
+      res = await fetch(`${API_BASE_URL}${path}`, {
+        method,
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          ...headers,
+        },
+        body: body ? JSON.stringify(body) : undefined,
+      });
+      break;
+    } catch (error) {
+      lastError = error;
+      if (Platform.OS === 'web') {
+        throw new Error('Network/CORS error from Expo web. For full auth testing use Expo Go on iOS/Android, or allow http://localhost:8081 in backend CORS.');
+      }
+
+      const shouldRetry = isTransientNativeNetworkError(error) && attempt < NATIVE_NETWORK_RETRY_ATTEMPTS;
+      if (!shouldRetry) {
+        throw new Error('Could not connect to the server. Check your connection and try again.');
+      }
+
+      await sleep(NATIVE_NETWORK_RETRY_DELAY_MS * attempt);
     }
-    throw error;
+  }
+
+  if (!res) {
+    throw (lastError instanceof Error
+      ? lastError
+      : new Error('Could not connect to the server. Check your connection and try again.'));
   }
 
   if (!res.ok) {

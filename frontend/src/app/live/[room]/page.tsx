@@ -10,22 +10,23 @@ import { LiveExperience } from '@/components/live/LiveExperience';
 import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 /** Auto-enables camera + mic for guests once they're connected to the room. */
-function GuestAutoPublish() {
+function GuestAutoPublish({ enabled }: { enabled: boolean }) {
   const { localParticipant } = useLocalParticipant();
 
   useEffect(() => {
-    if (!localParticipant) return;
-    // Small delay to let the room fully connect before publishing
-    const t = setTimeout(async () => {
+    if (!enabled || !localParticipant) return;
+
+    const run = async () => {
       try {
         await localParticipant.setCameraEnabled(true);
         await localParticipant.setMicrophoneEnabled(true);
-      } catch {
-        // If auto fails, the user can still toggle manually
+      } catch (err) {
+        console.error('Guest auto publish failed', err);
       }
-    }, 800);
-    return () => clearTimeout(t);
-  }, [localParticipant]);
+    };
+
+    run();
+  }, [enabled, localParticipant]);
 
   return null;
 }
@@ -39,6 +40,7 @@ export default function LiveRoomPage() {
   const host = search.get('host') === '1';
   const guest = search.get('guest') === '1';
   const isOwner = host && !guest;
+  const publishOnJoin = host || guest;
 
   const [token, setToken] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
@@ -143,13 +145,13 @@ export default function LiveRoomPage() {
         token={token}
         serverUrl={serverUrl}
         connect
-        video={host}
-        audio={host}
+        video={publishOnJoin}
+        audio={publishOnJoin}
         onDisconnected={leave}
         style={{ height: '100%' }}
       >
         {/* Auto-publish camera+mic for guests after connection */}
-        {guest && <GuestAutoPublish />}
+        {guest && <GuestAutoPublish enabled />}
         <LiveExperience host={host} isOwner={isOwner} room={room} onLeave={leave} />
       </LiveKitRoom>
     </div>

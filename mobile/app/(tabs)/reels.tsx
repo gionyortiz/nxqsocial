@@ -1,5 +1,6 @@
-import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Dimensions, FlatList, SafeAreaView, Text, View } from 'react-native';
+import { useCallback, useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, FlatList, RefreshControl, SafeAreaView, Text, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -24,22 +25,32 @@ export default function ReelsScreen() {
   const { token } = useAuth();
   const [items, setItems] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
+  const load = async () => {
+    if (!token) return;
+    setError(null);
+    try {
+      const data = await apiRequest<{ data: PostItem[] }>('/posts/reels', { token });
+      setItems(data.data || []);
+    } catch (e: any) {
+      setError(e?.message ?? 'Could not load reels right now. Pull to refresh.');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
   useEffect(() => {
-    const load = async () => {
-      if (!token) return;
-      try {
-        const data = await apiRequest<{ data: PostItem[] }>('/posts/reels', { token });
-        setItems(data.data || []);
-      } catch (e: any) {
-        setError(e?.message ?? 'Failed to load reels');
-      } finally {
-        setLoading(false);
-      }
-    };
     load();
   }, [token]);
+
+  useFocusEffect(
+    useCallback(() => {
+      load();
+    }, [token]),
+  );
 
   if (loading) {
     return (
@@ -52,7 +63,7 @@ export default function ReelsScreen() {
   if (!items.length) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <Text style={{ color: '#fff' }}>{error || 'No reels yet.'}</Text>
+        <Text style={{ color: '#fff', textAlign: 'center' }}>{error || 'No reels yet.'}</Text>
       </SafeAreaView>
     );
   }
@@ -63,6 +74,7 @@ export default function ReelsScreen() {
         data={items}
         pagingEnabled
         keyExtractor={(item) => item.id}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
         renderItem={({ item }) => {
           const src = resolveMediaUrl(item.media?.[0]?.url);
           return (
