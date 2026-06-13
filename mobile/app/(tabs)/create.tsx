@@ -81,51 +81,26 @@ export default function CreateScreen() {
     try {
       const filename = assetType === 'video' ? 'mobile-upload.mp4' : 'mobile-upload.jpg';
       const mime = assetType === 'video' ? 'video/mp4' : 'image/jpeg';
-      let status = 0;
-      let responseBody = '';
+      const form = new FormData();
+      form.append('caption', caption);
+      form.append('type', assetType === 'video' ? 'VIDEO' : 'PHOTO');
+      form.append('visibility', 'PUBLIC');
+      form.append('media', {
+        uri: assetUri,
+        name: filename,
+        type: mime,
+      } as any);
 
-      // Lazy import avoids module-load crashes at app startup on some iOS builds.
-      try {
-        const FileSystem = await import('expo-file-system/legacy');
-        const upload = await FileSystem.uploadAsync(`${API_BASE_URL}/posts`, assetUri, {
-          httpMethod: 'POST',
-          uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-          fieldName: 'media',
-          mimeType: mime,
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-          parameters: {
-            caption,
-            type: assetType === 'video' ? 'VIDEO' : 'PHOTO',
-            visibility: 'PUBLIC',
-          },
-        });
-        status = upload.status;
-        responseBody = upload.body || '';
-      } catch {
-        const form = new FormData();
-        form.append('caption', caption);
-        form.append('type', assetType === 'video' ? 'VIDEO' : 'PHOTO');
-        form.append('visibility', 'PUBLIC');
-        form.append('media', {
-          uri: assetUri,
-          name: filename,
-          type: mime,
-        } as any);
-
-        const res = await fetch(`${API_BASE_URL}/posts`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-          body: form,
-        });
-        status = res.status;
-        responseBody = await res.text();
-      }
+      const res = await fetch(`${API_BASE_URL}/posts`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        body: form,
+      });
+      const status = res.status;
+      const responseBody = await res.text();
 
       if (status < 200 || status >= 300) {
         const err = (() => {
