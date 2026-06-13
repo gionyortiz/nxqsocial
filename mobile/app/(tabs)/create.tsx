@@ -4,10 +4,15 @@ import {
   ActivityIndicator,
   Alert,
   Image,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   Pressable,
   SafeAreaView,
+  ScrollView,
   Text,
   TextInput,
+  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -71,6 +76,7 @@ export default function CreateScreen() {
 
   const submit = async () => {
     if (!token || !assetUri || !assetType) return;
+    Keyboard.dismiss();
     setPosting(true);
     try {
       const form = new FormData();
@@ -80,15 +86,24 @@ export default function CreateScreen() {
 
       const filename = assetType === 'video' ? 'mobile-upload.mp4' : 'mobile-upload.jpg';
       const mime = assetType === 'video' ? 'video/mp4' : 'image/jpeg';
-      form.append('media', {
-        uri: assetUri,
-        name: filename,
-        type: mime,
-      } as any);
+      // RN fetch in some iOS runtimes rejects object-style FormData parts.
+      // Build a Blob part instead for stable multipart uploads.
+      let mediaBlob: Blob;
+      try {
+        const localFile = await fetch(assetUri);
+        mediaBlob = await localFile.blob();
+      } catch {
+        throw new Error('Could not read selected media file. Please pick the media again and retry.');
+      }
+      form.append('media', mediaBlob, filename);
 
       const res = await fetch(`${API_BASE_URL}/posts`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+          ...(mime ? { 'X-Upload-Mime': mime } : {}),
+        },
         body: form,
       });
 
@@ -102,7 +117,12 @@ export default function CreateScreen() {
       setCaption('');
       Alert.alert('Posted', 'Your content is now live on NXQ Social.');
     } catch (e: any) {
-      Alert.alert('Upload failed', e?.message || 'Could not publish post.');
+      const rawMessage = String(e?.message || 'Could not publish post.');
+      const lowered = rawMessage.toLowerCase();
+      const userMessage = lowered.includes('unsupported formdatapart')
+        ? 'Upload failed on this build due to an iOS multipart compatibility issue. Please update to the next test build.'
+        : rawMessage;
+      Alert.alert('Upload failed', userMessage);
     } finally {
       setPosting(false);
     }
@@ -110,44 +130,55 @@ export default function CreateScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
-      <View style={{ flex: 1, padding: 14, gap: 12 }}>
-        <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>Create Post</Text>
-        <Text style={{ color: '#93a1bd' }}>Use camera or library for photo/video uploads.</Text>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 14 : 0}
+      >
+        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+          <ScrollView
+            contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 28 }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900' }}>Create Post</Text>
+            <Text style={{ color: '#93a1bd' }}>Use camera or library for photo/video uploads.</Text>
 
-        <View style={{ flexDirection: 'row', gap: 10 }}>
-          <Pressable onPress={captureMedia} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 12, padding: 14 }}>
-            <Text style={{ color: '#c7d2fe', fontWeight: '700', textAlign: 'center' }}>Open camera</Text>
-          </Pressable>
-          <Pressable onPress={pickMedia} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 12, padding: 14 }}>
-            <Text style={{ color: '#c7d2fe', fontWeight: '700', textAlign: 'center' }}>{assetUri ? 'Change media' : 'Pick from library'}</Text>
-          </Pressable>
-        </View>
+            <View style={{ flexDirection: 'row', gap: 10 }}>
+              <Pressable onPress={captureMedia} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 12, padding: 14 }}>
+                <Text style={{ color: '#c7d2fe', fontWeight: '700', textAlign: 'center' }}>Open camera</Text>
+              </Pressable>
+              <Pressable onPress={pickMedia} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 12, padding: 14 }}>
+                <Text style={{ color: '#c7d2fe', fontWeight: '700', textAlign: 'center' }}>{assetUri ? 'Change media' : 'Pick from library'}</Text>
+              </Pressable>
+            </View>
 
-        {assetUri && assetType === 'image' ? (
-          <Image source={{ uri: assetUri }} style={{ width: '100%', height: 260, borderRadius: 12 }} resizeMode="cover" />
-        ) : null}
+            {assetUri && assetType === 'image' ? (
+              <Image source={{ uri: assetUri }} style={{ width: '100%', height: 260, borderRadius: 12 }} resizeMode="cover" />
+            ) : null}
 
-        {assetUri && assetType === 'video' ? (
-          <VideoPreview uri={assetUri} />
-        ) : null}
+            {assetUri && assetType === 'video' ? (
+              <VideoPreview uri={assetUri} />
+            ) : null}
 
-        <TextInput
-          value={caption}
-          onChangeText={setCaption}
-          placeholder="Write a caption"
-          placeholderTextColor="#8790ab"
-          multiline
-          style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 12, minHeight: 90, textAlignVertical: 'top' }}
-        />
+            <TextInput
+              value={caption}
+              onChangeText={setCaption}
+              placeholder="Write a caption"
+              placeholderTextColor="#8790ab"
+              multiline
+              style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 12, minHeight: 90, textAlignVertical: 'top' }}
+            />
 
-        <Pressable
-          onPress={submit}
-          disabled={!assetUri || posting}
-          style={{ backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: !assetUri || posting ? 0.6 : 1 }}
-        >
-          {posting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800' }}>Publish</Text>}
-        </Pressable>
-      </View>
+            <Pressable
+              onPress={submit}
+              disabled={!assetUri || posting}
+              style={{ backgroundColor: '#4f46e5', borderRadius: 12, paddingVertical: 14, alignItems: 'center', opacity: !assetUri || posting ? 0.6 : 1 }}
+            >
+              {posting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800' }}>Publish</Text>}
+            </Pressable>
+          </ScrollView>
+        </TouchableWithoutFeedback>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 }
