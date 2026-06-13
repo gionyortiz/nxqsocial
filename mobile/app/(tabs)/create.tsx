@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import * as FileSystem from 'expo-file-system/legacy';
 import { useState } from 'react';
 import {
   ActivityIndicator,
@@ -81,47 +82,31 @@ export default function CreateScreen() {
     try {
       const filename = assetType === 'video' ? 'mobile-upload.mp4' : 'mobile-upload.jpg';
       const mime = assetType === 'video' ? 'video/mp4' : 'image/jpeg';
-      const createBaseForm = () => {
-        const form = new FormData();
-        form.append('caption', caption);
-        form.append('type', assetType === 'video' ? 'VIDEO' : 'PHOTO');
-        form.append('visibility', 'PUBLIC');
-        return form;
-      };
+      const upload = await FileSystem.uploadAsync(`${API_BASE_URL}/posts`, assetUri, {
+        httpMethod: 'POST',
+        uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+        fieldName: 'media',
+        mimeType: mime,
+        headers: {
+          Authorization: `Bearer ${token}`,
+          Accept: 'application/json',
+        },
+        parameters: {
+          caption,
+          type: assetType === 'video' ? 'VIDEO' : 'PHOTO',
+          visibility: 'PUBLIC',
+        },
+      });
 
-      const postForm = async (form: FormData) => {
-        return fetch(`${API_BASE_URL}/posts`, {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${token}`,
-            Accept: 'application/json',
-          },
-          body: form,
-        });
-      };
-
-      // Strategy A: Blob part (works best on most runtimes).
-      // Strategy B: URI file object fallback for iOS asset URI edge-cases.
-      let res: Response;
-      try {
-        const localFile = await fetch(assetUri);
-        const mediaBlob = await localFile.blob();
-        const blobForm = createBaseForm();
-        blobForm.append('media', mediaBlob, filename);
-        res = await postForm(blobForm);
-      } catch {
-        const uriForm = createBaseForm();
-        uriForm.append('media', {
-          uri: assetUri,
-          name: filename,
-          type: mime,
-        } as any);
-        res = await postForm(uriForm);
-      }
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => ({}));
-        throw new Error(err?.message || 'Failed to create post');
+      if (upload.status < 200 || upload.status >= 300) {
+        const err = (() => {
+          try {
+            return JSON.parse(upload.body || '{}');
+          } catch {
+            return {} as any;
+          }
+        })();
+        throw new Error(err?.message || `Failed to create post (${upload.status})`);
       }
 
       setAssetUri(null);
@@ -132,7 +117,7 @@ export default function CreateScreen() {
       const rawMessage = String(e?.message || 'Could not publish post.');
       const lowered = rawMessage.toLowerCase();
       const userMessage = lowered.includes('unsupported formdatapart')
-        ? 'Upload failed due to iOS multipart compatibility. Please tap Change media and try once more.'
+        ? 'Upload failed due to iOS multipart compatibility. Please try again in the latest build.'
         : rawMessage;
       Alert.alert('Upload failed', userMessage);
     } finally {
