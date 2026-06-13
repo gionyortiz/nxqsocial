@@ -79,33 +79,45 @@ export default function CreateScreen() {
     Keyboard.dismiss();
     setPosting(true);
     try {
-      const form = new FormData();
-      form.append('caption', caption);
-      form.append('type', assetType === 'video' ? 'VIDEO' : 'PHOTO');
-      form.append('visibility', 'PUBLIC');
-
       const filename = assetType === 'video' ? 'mobile-upload.mp4' : 'mobile-upload.jpg';
       const mime = assetType === 'video' ? 'video/mp4' : 'image/jpeg';
-      // RN fetch in some iOS runtimes rejects object-style FormData parts.
-      // Build a Blob part instead for stable multipart uploads.
-      let mediaBlob: Blob;
+      const createBaseForm = () => {
+        const form = new FormData();
+        form.append('caption', caption);
+        form.append('type', assetType === 'video' ? 'VIDEO' : 'PHOTO');
+        form.append('visibility', 'PUBLIC');
+        return form;
+      };
+
+      const postForm = async (form: FormData) => {
+        return fetch(`${API_BASE_URL}/posts`, {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+          },
+          body: form,
+        });
+      };
+
+      // Strategy A: Blob part (works best on most runtimes).
+      // Strategy B: URI file object fallback for iOS asset URI edge-cases.
+      let res: Response;
       try {
         const localFile = await fetch(assetUri);
-        mediaBlob = await localFile.blob();
+        const mediaBlob = await localFile.blob();
+        const blobForm = createBaseForm();
+        blobForm.append('media', mediaBlob, filename);
+        res = await postForm(blobForm);
       } catch {
-        throw new Error('Could not read selected media file. Please pick the media again and retry.');
+        const uriForm = createBaseForm();
+        uriForm.append('media', {
+          uri: assetUri,
+          name: filename,
+          type: mime,
+        } as any);
+        res = await postForm(uriForm);
       }
-      form.append('media', mediaBlob, filename);
-
-      const res = await fetch(`${API_BASE_URL}/posts`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          ...(mime ? { 'X-Upload-Mime': mime } : {}),
-        },
-        body: form,
-      });
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}));
@@ -120,7 +132,7 @@ export default function CreateScreen() {
       const rawMessage = String(e?.message || 'Could not publish post.');
       const lowered = rawMessage.toLowerCase();
       const userMessage = lowered.includes('unsupported formdatapart')
-        ? 'Upload failed on this build due to an iOS multipart compatibility issue. Please update to the next test build.'
+        ? 'Upload failed due to iOS multipart compatibility. Please tap Change media and try once more.'
         : rawMessage;
       Alert.alert('Upload failed', userMessage);
     } finally {
