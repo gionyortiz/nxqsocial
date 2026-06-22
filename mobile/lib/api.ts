@@ -38,9 +38,25 @@ interface ApiOptions {
 
 const NATIVE_NETWORK_RETRY_ATTEMPTS = 3;
 const NATIVE_NETWORK_RETRY_DELAY_MS = 500;
+const REQUEST_TIMEOUT_MS = 12000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function classifyNetworkError(error: unknown): string {
+  if (!(error instanceof Error)) return `Could not connect to ${API_BASE_URL}`;
+  const m = error.message.toLowerCase();
+  if (m.includes('timed out') || m.includes('timeout') || error.name === 'AbortError') {
+    return `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s — server may be slow or unreachable (${API_BASE_URL})`;
+  }
+  if (m.includes('hostname') || m.includes('host could not be found') || m.includes('dns') || m.includes('nodename nor servname')) {
+    return `DNS error — cannot resolve ${API_BASE_URL}. Check your network or disable Private Relay/VPN.`;
+  }
+  if (m.includes('network request failed') || m.includes('fetch failed') || m.includes('load failed') || m.includes('network connection was lost')) {
+    return `Network error — cannot reach ${API_BASE_URL}. Check Wi-Fi/cellular and disable iCloud Private Relay.`;
+  }
+  return `Could not connect to ${API_BASE_URL}: ${error.message}`;
 }
 
 function isTransientNativeNetworkError(error: unknown): boolean {
@@ -51,6 +67,7 @@ function isTransientNativeNetworkError(error: unknown): boolean {
     || message.includes('could not connect to the server')
     || message.includes('fetch failed')
     || message.includes('load failed')
+    || message.includes('network connection was lost')
   );
 }
 
@@ -62,6 +79,8 @@ export async function apiRequest<T>(
   let lastError: unknown = null;
 
   for (let attempt = 1; attempt <= NATIVE_NETWORK_RETRY_ATTEMPTS; attempt += 1) {
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
       res = await fetch(`${API_BASE_URL}${path}`, {
         method,
@@ -71,17 +90,17 @@ export async function apiRequest<T>(
           ...headers,
         },
         body: body ? JSON.stringify(body) : undefined,
+        signal: controller.signal,
       });
+      clearTimeout(timer);
       break;
     } catch (error) {
+      clearTimeout(timer);
       lastError = error;
-      if (Platform.OS === 'web') {
-        throw new Error('Network/CORS error from Expo web. For full auth testing use Expo Go on iOS/Android, or allow http://localhost:8081 in backend CORS.');
-      }
-
-      const shouldRetry = isTransientNativeNetworkError(error) && attempt < NATIVE_NETWORK_RETRY_ATTEMPTS;
+      const isAbort = error instanceof Error && error.name === 'AbortError';
+      const shouldRetry = (isAbort || isTransientNativeNetworkError(error)) && attempt < NATIVE_NETWORK_RETRY_ATTEMPTS;
       if (!shouldRetry) {
-        throw new Error('Could not connect to the server. Check your connection and try again.');
+        throw new Error(classifyNetworkError(error));
       }
 
       await sleep(NATIVE_NETWORK_RETRY_DELAY_MS * attempt);
@@ -89,9 +108,7 @@ export async function apiRequest<T>(
   }
 
   if (!res) {
-    throw (lastError instanceof Error
-      ? lastError
-      : new Error('Could not connect to the server. Check your connection and try again.'));
+    throw new Error(classifyNetworkError(lastError));
   }
 
   if (!res.ok) {
@@ -107,6 +124,10 @@ export async function apiRequest<T>(
 
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
+}
+
+export async function pingApiHealth(): Promise<{ status: string; timestamp?: string }> {
+  return apiRequest<{ status: string; timestamp?: string }>('/health');
 }
 
 export function resolveMediaUrl(url?: string): string {

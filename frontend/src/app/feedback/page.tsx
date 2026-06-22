@@ -114,7 +114,7 @@ export default function FeedbackPage() {
           <div className="mb-5">
             <h1 className="text-2xl font-black text-gray-900">Feedback</h1>
             <p className="mt-1 text-sm text-gray-500">
-              Help us improve beta quality on phone and desktop.
+              Help us improve product quality on phone and desktop.
             </p>
           </div>
 

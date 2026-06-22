@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationType } from '@prisma/client';
+import { NotificationsService } from '../notifications/notifications.service';
 
 const ACTOR_SELECT = {
   id: true,
@@ -11,7 +12,26 @@ const ACTOR_SELECT = {
 
 @Injectable()
 export class NotificationFeedService {
-  constructor(private prisma: PrismaService) {}
+  constructor(
+    private prisma: PrismaService,
+    private push: NotificationsService,
+  ) {}
+
+  private notificationText(type: NotificationType, actorName?: string) {
+    const actor = actorName?.trim() || 'Someone';
+    switch (type) {
+      case 'FOLLOW':
+        return `${actor} followed you`;
+      case 'LIKE':
+        return `${actor} liked your post`;
+      case 'COMMENT':
+        return `${actor} commented on your post`;
+      case 'MENTION':
+        return `${actor} mentioned you`;
+      default:
+        return `${actor} sent you a notification`;
+    }
+  }
 
   /**
    * Create an in-app notification. Silently no-ops when:
@@ -62,6 +82,24 @@ export class NotificationFeedService {
 
       await this.prisma.notification.create({
         data: { recipientId, actorId, type, postId, commentId },
+      });
+
+      const actor = actorId
+        ? await this.prisma.user.findUnique({
+            where: { id: actorId },
+            select: { username: true, profile: { select: { displayName: true } } },
+          })
+        : null;
+      const actorName = actor?.profile?.displayName ?? actor?.username;
+      void this.push.sendPushToUsers([recipientId], {
+        title: 'NXQ Social',
+        body: this.notificationText(type, actorName),
+        data: {
+          type: 'notification',
+          notificationType: type,
+          postId,
+          commentId,
+        },
       });
     } catch {
       // Never let a notification failure break the underlying action.

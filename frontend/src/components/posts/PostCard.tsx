@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import Link from 'next/link';
 import Image from 'next/image';
+import { useRouter } from 'next/navigation';
 import {
   Heart,
   MessageCircle,
@@ -17,6 +18,10 @@ import {
   HelpCircle,
   Flag,
   CheckCircle2,
+  Star,
+  UserMinus,
+  Link2,
+  ExternalLink,
 } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
@@ -72,6 +77,7 @@ const AI_LABEL_TEXT: Record<string, string> = {
 };
 
 export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCardProps) {
+  const router = useRouter();
   const [liked, setLiked] = useState(post.isLiked);
   const [likeCount, setLikeCount] = useState(post._count.likes);
   const [saved, setSaved] = useState(false);
@@ -88,7 +94,21 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
   const [reportReason, setReportReason] = useState('SPAM');
   const [reporting, setReporting] = useState(false);
   const [reportDone, setReportDone] = useState(false);
+  const [isFollowingAuthor, setIsFollowingAuthor] = useState<boolean | null>(null);
+  const [followBusy, setFollowBusy] = useState(false);
+  const [followStateLoading, setFollowStateLoading] = useState(false);
+  const [favoriteAuthors, setFavoriteAuthors] = useState<string[]>(() => {
+    if (typeof window === 'undefined') return [];
+    try {
+      const raw = window.localStorage.getItem('nxq_favorite_authors');
+      return raw ? (JSON.parse(raw) as string[]) : [];
+    } catch {
+      return [];
+    }
+  });
+  const [favoriteBusy, setFavoriteBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
+  const isFavoriteAuthor = favoriteAuthors.includes(post.author.username);
   const doubleTapRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { user: me } = useAuthStore();
   const isMe = me?.username === post.author.username;
@@ -203,11 +223,12 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
     });
   };
 
+  const postUrl =
+    typeof window !== 'undefined'
+      ? `${window.location.origin}/feed?post=${post.id}`
+      : `/feed?post=${post.id}`;
+
   const sharePost = async () => {
-    const postUrl =
-      typeof window !== 'undefined'
-        ? `${window.location.origin}/feed?post=${post.id}`
-        : `/feed?post=${post.id}`;
     try {
       if (navigator.share) {
         await navigator.share({
@@ -220,6 +241,79 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
       await navigator.clipboard.writeText(postUrl);
     } catch {
       // no-op
+    }
+  };
+
+  const toggleFollowAuthor = async () => {
+    if (followBusy) return;
+    setFollowBusy(true);
+    try {
+      const { data } = await api.post(`/users/${post.author.username}/follow`);
+      setIsFollowingAuthor(!!data?.following);
+      setMenuOpen(false);
+    } catch {
+      // ignore menu action failures
+    } finally {
+      setFollowBusy(false);
+    }
+  };
+
+  const loadFollowState = async () => {
+    if (isMe || isFollowingAuthor !== null || followStateLoading) return;
+    setFollowStateLoading(true);
+    try {
+      const { data } = await api.get(`/users/${post.author.username}`);
+      if (typeof data?.isFollowing === 'boolean') {
+        setIsFollowingAuthor(data.isFollowing);
+      } else {
+        setIsFollowingAuthor(false);
+      }
+    } catch {
+      setIsFollowingAuthor(false);
+    } finally {
+      setFollowStateLoading(false);
+    }
+  };
+
+  const handleMenuToggle = () => {
+    setMenuOpen((open) => {
+      const next = !open;
+      if (next) void loadFollowState();
+      return next;
+    });
+  };
+
+  const toggleFavoriteAuthor = () => {
+    if (favoriteBusy || typeof window === 'undefined') return;
+    setFavoriteBusy(true);
+    try {
+      const raw = window.localStorage.getItem('nxq_favorite_authors');
+      const list = raw ? (JSON.parse(raw) as string[]) : [];
+      const next = isFavoriteAuthor
+        ? list.filter((u) => u !== post.author.username)
+        : Array.from(new Set([...list, post.author.username]));
+      window.localStorage.setItem('nxq_favorite_authors', JSON.stringify(next));
+      setFavoriteAuthors(next);
+      setMenuOpen(false);
+    } catch {
+      // ignore
+    } finally {
+      setFavoriteBusy(false);
+    }
+  };
+
+  const goToPost = () => {
+    setMenuOpen(false);
+    router.push(`/feed?post=${post.id}`);
+  };
+
+  const copyPostLink = async () => {
+    try {
+      await navigator.clipboard.writeText(postUrl);
+    } catch {
+      // ignore
+    } finally {
+      setMenuOpen(false);
     }
   };
 
@@ -264,35 +358,6 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
             {timeAgo(post.createdAt)}
           </p>
         </div>
-        {isMe && (
-          <div className="relative" ref={menuRef}>
-            <button
-              onClick={() => setMenuOpen((o) => !o)}
-              className="p-2 rounded-full text-gray-400 hover:text-gray-600 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
-            >
-              <MoreHorizontal size={18} />
-            </button>
-            {menuOpen && (
-              <div className="absolute right-0 top-9 z-20 w-44 bg-white dark:bg-[#1f2937] rounded-2xl shadow-xl border border-[var(--border)] overflow-hidden animate-slide-up">
-                <button
-                  onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
-                  className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                >
-                  <Trash2 size={15} /> Delete post
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-        {!isMe && (
-          <button
-            onClick={() => setReportOpen(true)}
-            className="p-2 rounded-full text-gray-300 hover:text-orange-500 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
-            title="Report post"
-          >
-            <Flag size={17} />
-          </button>
-        )}
       </div>
 
       {/* ── Media ────────────────────────────────────────────────── */}
@@ -301,6 +366,78 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
           className={cn('bg-black relative overflow-hidden', isVideo ? 'aspect-[4/5] md:aspect-[16/10]' : 'aspect-[4/5]')}
           onDoubleClick={handleDoubleTap}
         >
+          {/* Top-right post actions (Instagram-style) */}
+          <div className="absolute top-3 right-3 z-20" ref={menuRef}>
+            <button
+              onClick={handleMenuToggle}
+              className="p-2 rounded-full text-white bg-black/45 hover:bg-black/60 transition-colors"
+              title="Post actions"
+            >
+              <MoreHorizontal size={18} />
+            </button>
+            {menuOpen && (
+              <div className="absolute right-0 top-10 z-30 w-56 bg-white dark:bg-[#1f2937] rounded-2xl shadow-xl border border-[var(--border)] overflow-hidden animate-slide-up">
+                {isMe ? (
+                  <>
+                    <button
+                      onClick={() => { setMenuOpen(false); setConfirmDelete(true); }}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
+                    >
+                      <Trash2 size={15} /> Delete post
+                    </button>
+                    <button
+                      onClick={goToPost}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+                    >
+                      <ExternalLink size={15} /> Go to post
+                    </button>
+                    <button
+                      onClick={copyPostLink}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+                    >
+                      <Link2 size={15} /> Copy link
+                    </button>
+                  </>
+                ) : (
+                  <>
+                    <button
+                      onClick={() => { setMenuOpen(false); setReportOpen(true); }}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-orange-600 hover:bg-orange-50 dark:hover:bg-orange-900/20 transition-colors"
+                    >
+                      <Flag size={15} /> Report
+                    </button>
+                    <button
+                      onClick={toggleFollowAuthor}
+                      disabled={followBusy || followStateLoading}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-60"
+                    >
+                      <UserMinus size={15} /> {followStateLoading ? 'Loading…' : (followBusy ? 'Please wait…' : (isFollowingAuthor ? 'Unfollow' : 'Follow'))}
+                    </button>
+                    <button
+                      onClick={toggleFavoriteAuthor}
+                      disabled={favoriteBusy}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors disabled:opacity-60"
+                    >
+                      <Star size={15} /> {favoriteBusy ? 'Please wait…' : (isFavoriteAuthor ? 'Remove favorite' : 'Add to favorites')}
+                    </button>
+                    <button
+                      onClick={goToPost}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+                    >
+                      <ExternalLink size={15} /> Go to post
+                    </button>
+                    <button
+                      onClick={copyPostLink}
+                      className="flex items-center gap-2.5 w-full px-4 py-3 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-white/10 transition-colors"
+                    >
+                      <Link2 size={15} /> Copy link
+                    </button>
+                  </>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Blurred bg for non-cover fit */}
           {thumbnailSrc && (
             <Image

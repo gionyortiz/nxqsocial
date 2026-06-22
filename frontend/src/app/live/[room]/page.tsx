@@ -39,6 +39,8 @@ export default function LiveRoomPage() {
   const room = decodeURIComponent(String(params.room ?? ''));
   const host = search.get('host') === '1';
   const guest = search.get('guest') === '1';
+  const mobileToken = search.get('token');
+  const mobileServerUrl = search.get('serverUrl');
   const isOwner = host && !guest;
   const publishOnJoin = host || guest;
 
@@ -47,9 +49,12 @@ export default function LiveRoomPage() {
   const [error, setError] = useState<string | null>(null);
   // Guest pre-join: ask for camera/mic permissions before connecting
   const [guestReady, setGuestReady] = useState(!guest);
+  const effectiveToken = mobileToken ?? token;
+  const effectiveServerUrl = mobileServerUrl ?? serverUrl;
 
   useEffect(() => {
     if (!room) return;
+    if (mobileToken && mobileServerUrl) return;
     let cancelled = false;
     api
       .post('/calls/token', { room, video: host, host })
@@ -78,7 +83,7 @@ export default function LiveRoomPage() {
     return () => {
       cancelled = true;
     };
-  }, [room, host]);
+  }, [room, host, mobileToken, mobileServerUrl]);
 
   const leave = () => router.push('/feed');
 
@@ -98,7 +103,7 @@ export default function LiveRoomPage() {
     );
   }
 
-  if (!token || !serverUrl) {
+  if (!effectiveToken || !effectiveServerUrl) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-black text-white">
         <div className="w-8 h-8 border-2 border-rose-400 border-t-transparent rounded-full animate-spin mb-4" />
@@ -142,8 +147,8 @@ export default function LiveRoomPage() {
   return (
     <div className="h-screen bg-black" data-lk-theme="default">
       <LiveKitRoom
-        token={token}
-        serverUrl={serverUrl}
+        token={effectiveToken}
+        serverUrl={effectiveServerUrl}
         connect
         video={publishOnJoin}
         audio={publishOnJoin}

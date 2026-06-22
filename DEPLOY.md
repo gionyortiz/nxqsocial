@@ -1,5 +1,9 @@
 # NXQ Social � Deployment Guide
 
+## Release Status
+
+Cross-platform Apple + Google Play release tracking is maintained in [docs/NXQ_SOCIAL_RELEASE_STATUS.md](docs/NXQ_SOCIAL_RELEASE_STATUS.md).
+
 > **Target environment:** Docker Compose on a single VPS (e.g., Hetzner CX21, DigitalOcean Droplet, AWS EC2).  
 > Adapting to Kubernetes or managed PaaS is straightforward � the Docker images are self-contained.
 

@@ -31,12 +31,7 @@ export default function NewLivePage() {
             <Radio size={22} />
           </span>
           <div>
-            <h1 className="text-2xl font-black text-gray-900 flex items-center gap-2">
-              Go Live
-              <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase tracking-wide">
-                Beta
-              </span>
-            </h1>
+            <h1 className="text-2xl font-black text-gray-900">Go Live</h1>
             <p className="text-sm text-gray-500">
               Start a live broadcast with video, audio, viewer count and chat.
             </p>

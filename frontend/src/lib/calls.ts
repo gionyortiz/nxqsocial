@@ -41,9 +41,9 @@ export function callHref(room: string, video: boolean): string {
 /**
  * Whether the Call feature should be visible to a given user.
  *
- * Calls are a Beta feature. They are shown when either:
+ * Calls are shown when either:
  *  - the global flag `NEXT_PUBLIC_CALLS_ENABLED` is `'true'` (rollout to all
- *    beta users), or
+ *    users), or
  *  - the current user is an ADMIN (always-on for internal testing).
  *
  * Default (flag unset/false) → admin-only, so Round 1 stays controlled.

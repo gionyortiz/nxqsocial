@@ -16,7 +16,7 @@ export default function MessagesPage() {
       <div className="px-3 sm:px-4 py-4 space-y-4">
         <div className="bg-white rounded-3xl border border-gray-100 shadow-sm p-5">
           <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-600">Messages</p>
-          <h1 className="mt-1 text-2xl font-black text-gray-900">Inbox coming soon</h1>
+          <h1 className="mt-1 text-2xl font-black text-gray-900">Inbox</h1>
           <p className="mt-2 text-sm text-gray-500 max-w-2xl">
             This is the desktop shell for NXQ chat. The real messaging backend can be added next without changing the navigation or layout.
           </p>

@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import {
   Home, Compass, Play, PlusSquare, ShieldCheck,
-  Settings, LogOut, ShieldAlert, Menu as MenuIcon, Phone, Radio, ChevronsLeftRight, MessageSquare,
+  Settings, LogOut, ShieldAlert, Menu as MenuIcon, Radio, ChevronsLeftRight, MessageSquare,
   Bell,
 } from 'lucide-react';
 import { useAuthStore } from '@/store/auth';
@@ -15,16 +15,13 @@ import Logo from '@/components/Logo';
 import { cn } from '@/lib/utils';
 import { api } from '@/lib/api';
 import { useI18n } from '@/lib/i18n';
-import { callsVisible } from '@/lib/calls';
 import { liveVisible } from '@/lib/live';
 import { MenuPanel } from './MenuPanel';
 
 // Primary destinations — every link points to a real page.
-// NOTE: the Call entry is intentionally hidden during beta until the
-// calling feature is fully implemented and tested.
+// NOTE: the Call entry remains feature-gated until the calling flow is fully rolled out.
 const NAV = [
   { href: '/feed',     icon: Home,        tkey: 'nav.home' },
-  { href: '/messages', icon: MessageSquare, tkey: 'nav.messages' },
   { href: '/notifications', icon: Bell, tkey: 'nav.notifications' },
   { href: '/search',   icon: Compass,     tkey: 'nav.explore' },
   { href: '/reels',    icon: Play,        tkey: 'nav.reels' },
@@ -112,7 +109,7 @@ export function Navbar() {
   return (
     <>
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
-      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-white/80 dark:bg-[#111827]/80 backdrop-blur-xl border-r border-white/60 dark:border-white/[0.06] px-3 py-6 gap-1 z-40 shadow-[var(--shadow-sm)]">
+      <nav className="hidden md:flex flex-col fixed right-0 top-0 h-full w-64 bg-white/80 dark:bg-[#111827]/80 backdrop-blur-xl border-l border-white/60 dark:border-white/[0.06] px-3 py-6 gap-1 z-40 shadow-[var(--shadow-sm)]">
 
         {/* Logo */}
         <div className="mb-5 px-2.5 flex items-center justify-between">
@@ -168,27 +165,7 @@ export function Navbar() {
             );
           })}
 
-          {/* Call — Beta feature */}
-          {callsVisible(user?.role) && (
-            <Link
-              href="/call/new"
-              className={cn(
-                'group flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[15px] font-semibold transition-all duration-150',
-                isActive('/call')
-                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white shadow-[var(--shadow-brand)]'
-                  : 'text-gray-600 dark:text-gray-400 hover:bg-purple-50 dark:hover:bg-white/[0.05] hover:text-purple-700',
-              )}
-              title={compact ? 'Call' : undefined}
-            >
-              <span className={cn('flex items-center justify-center w-9 h-9 rounded-xl transition-all flex-shrink-0', isActive('/call') ? 'bg-white/20' : 'bg-gray-100/80 dark:bg-white/[0.06] group-hover:bg-white/80')}>
-                <Phone size={19} strokeWidth={isActive('/call') ? 2.5 : 2} />
-              </span>
-              {!compact && <span className="flex-1">Call</span>}
-              {!compact && <span className="px-2 py-0.5 rounded-full bg-purple-100 dark:bg-purple-900/40 text-purple-700 dark:text-purple-300 text-[10px] font-bold uppercase tracking-wide">Beta</span>}
-            </Link>
-          )}
-
-          {/* Live — Beta feature */}
+          {/* Live */}
           {liveVisible(user?.role) && (
             <Link
               href="/live/new"

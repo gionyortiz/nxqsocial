@@ -475,7 +475,7 @@ export default function AdminPage() {
           <TabBtn active={tab === 'safety'} onClick={() => setTab('safety')} badge={safetyFlags.length}>Safety Flags</TabBtn>
           <TabBtn active={tab === 'audit'} onClick={() => setTab('audit')}>Audit Log</TabBtn>
           <TabBtn active={tab === 'users'} onClick={() => setTab('users')}>User Management</TabBtn>
-          <TabBtn active={tab === 'feedback'} onClick={() => setTab('feedback')} badge={feedbackStats?.open ?? 0}>Beta Feedback</TabBtn>
+          <TabBtn active={tab === 'feedback'} onClick={() => setTab('feedback')} badge={feedbackStats?.open ?? 0}>User Feedback</TabBtn>
           <TabBtn active={tab === 'recovery'} onClick={() => setTab('recovery')}>Account Recovery</TabBtn>
         </div>
       </div>
@@ -684,7 +684,7 @@ export default function AdminPage() {
             </div>
 
             {betaFeedback.length === 0 ? (
-              <p className="text-gray-500">No beta feedback yet.</p>
+              <p className="text-gray-500">No feedback yet.</p>
             ) : (
               <div className="space-y-3">
                 {betaFeedback.map((item) => (

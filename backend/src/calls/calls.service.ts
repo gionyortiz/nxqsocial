@@ -4,6 +4,7 @@ import { AccessToken } from 'livekit-server-sdk';
 import type Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module';
 import { PrismaService } from '../prisma/prisma.service';
+import { NotificationsService } from '../notifications/notifications.service';
 
 interface CallerInfo {
   username: string;
@@ -26,6 +27,7 @@ export class CallsService {
   constructor(
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
+    private readonly notifications: NotificationsService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
@@ -120,6 +122,7 @@ export class CallsService {
     };
 
     const invited: string[] = [];
+    const invitedIds: string[] = [];
     for (const t of targets) {
       if (t.id === callerId) continue;
       await this.redis.set(
@@ -129,7 +132,22 @@ export class CallsService {
         INVITE_TTL_SECONDS,
       );
       invited.push(t.username);
+      invitedIds.push(t.id);
     }
+
+    void this.notifications.sendPushToUsers(invitedIds, {
+      title: invite.video ? 'Incoming video call' : 'Incoming voice call',
+      body: `${invite.caller.displayName} is calling you`,
+      data: {
+        type: 'call_invite',
+        room: invite.room,
+        from: invite.caller.username,
+        video: invite.video,
+        group: invite.group,
+      },
+      sound: 'default',
+    });
+
     return { invited };
   }
 

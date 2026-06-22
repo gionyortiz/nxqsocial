@@ -40,11 +40,11 @@ export class AuthService {
 
   async register(dto: RegisterDto) {
     const normalize = (s?: string) => (s ?? '').trim().toUpperCase();
-    const requiredCode = process.env.BETA_INVITE_CODE;
+    const requiredCode = process.env.INVITE_CODE ?? process.env.BETA_INVITE_CODE;
 
     // Backward compatibility:
     // - If REQUIRE_INVITE_CODE is not set, keep previous behavior and require
-    //   invite only when BETA_INVITE_CODE is configured.
+    //   invite only when an invite code is configured.
     const requireInviteConfigured = envBool(process.env.REQUIRE_INVITE_CODE);
     const requireInvite = requireInviteConfigured ?? !!requiredCode;
 
@@ -53,7 +53,7 @@ export class AuthService {
         throw new ForbiddenException('Registration is invite-only, but invite code is not configured');
       }
       if (normalize(dto.inviteCode) !== normalize(requiredCode)) {
-        throw new ForbiddenException('Invalid invite code — this is a closed beta');
+        throw new ForbiddenException('Invalid invite code');
       }
     }
 

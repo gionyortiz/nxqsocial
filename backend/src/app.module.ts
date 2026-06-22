@@ -27,6 +27,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
 import { FeedbackModule } from './feedback/feedback.module';
 import { FeedModule } from './feed/feed.module';
 import { NotificationFeedModule } from './notification-feed/notification-feed.module';
+import { AiModule } from './ai/ai.module';
 import { getClientIpFromRequest } from './common/network/client-ip';
 
 @Module({
@@ -38,7 +39,7 @@ import { getClientIpFromRequest } from './common/network/client-ip';
       throttlers: [{ name: 'default', ttl: 60000, limit: 60 }],
       skipIf: () => process.env.NODE_ENV === 'test',
       getTracker: (req) => getClientIpFromRequest(req),
-      errorMessage: 'Too many signup attempts. Please wait a few minutes and try again.',
+      errorMessage: 'Too many attempts. Please wait a minute and try again.',
     }),
     StorageModule,
     ServeStaticModule.forRoot({
@@ -75,6 +76,7 @@ import { getClientIpFromRequest } from './common/network/client-ip';
     CallsModule,
     LiveModule,
     AnalyticsModule,
+    AiModule,
     FeedbackModule,
     FeedModule,
     NotificationFeedModule,

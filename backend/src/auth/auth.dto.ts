@@ -1,4 +1,5 @@
 import { IsEmail, IsOptional, IsString, MinLength, MaxLength, Matches } from 'class-validator';
+import { Transform } from 'class-transformer';
 
 // Shared strong-password rules for new and changed passwords.
 const STRONG_PASSWORD = (target: string) => [
@@ -16,7 +17,13 @@ function StrongPassword(target = 'Password') {
   };
 }
 
+function normalizeEmail(value: unknown): unknown {
+  if (typeof value !== 'string') return value;
+  return value.trim().toLowerCase();
+}
+
 export class RegisterDto {
+  @Transform(({ value }) => normalizeEmail(value))
   @IsEmail()
   email: string;
 
@@ -41,6 +48,7 @@ export class RegisterDto {
 }
 
 export class LoginDto {
+  @Transform(({ value }) => normalizeEmail(value))
   @IsEmail()
   email: string;
 
@@ -49,6 +57,7 @@ export class LoginDto {
 }
 
 export class ForgotPasswordDto {
+  @Transform(({ value }) => normalizeEmail(value))
   @IsEmail()
   email: string;
 }

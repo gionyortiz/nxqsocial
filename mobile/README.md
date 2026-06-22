@@ -2,6 +2,10 @@
 
 React Native + Expo mobile app for NXQ Social.
 
+## Release Status
+
+Cross-platform Apple + Google Play release tracking is maintained in [docs/NXQ_SOCIAL_RELEASE_STATUS.md](../docs/NXQ_SOCIAL_RELEASE_STATUS.md).
+
 ## Stack
 
 - React Native

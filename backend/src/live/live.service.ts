@@ -110,6 +110,17 @@ export class LiveService {
   async requestGuestJoin(room: string, userId: string, displayName: string) {
     const key = `live:guestreq:${room}`;
     const req = JSON.stringify({ userId, displayName, ts: Date.now() });
+    const existing = await this.redis.lrange(key, 0, 99);
+    for (const item of existing) {
+      try {
+        const parsed = JSON.parse(item);
+        if (parsed.userId === userId) {
+          await this.redis.lrem(key, 1, item);
+        }
+      } catch {
+        await this.redis.lrem(key, 1, item);
+      }
+    }
     // Store in a Redis list, TTL 5 min
     await this.redis.lpush(key, req);
     await this.redis.expire(key, 300);
@@ -150,6 +161,37 @@ export class LiveService {
       return { approved: true };
     }
     return { approved: false };
+  }
+
+  async guestStatus(room: string, userId: string) {
+    const approved = await this.redis.exists(`live:approved:${room}:${userId}`);
+    const reqKey = `live:guestreq:${room}`;
+    const items = await this.redis.lrange(reqKey, 0, 99);
+    const pending = items.some((item) => {
+      try {
+        return JSON.parse(item).userId === userId;
+      } catch {
+        return false;
+      }
+    });
+    return { pending, approved: approved > 0 };
+  }
+
+  async clearGuestState(room: string, userId: string) {
+    const reqKey = `live:guestreq:${room}`;
+    const items = await this.redis.lrange(reqKey, 0, 99);
+    for (const item of items) {
+      try {
+        const parsed = JSON.parse(item);
+        if (parsed.userId === userId) {
+          await this.redis.lrem(reqKey, 1, item);
+        }
+      } catch {
+        await this.redis.lrem(reqKey, 1, item);
+      }
+    }
+    await this.redis.del(`live:approved:${room}:${userId}`);
+    return { ok: true };
   }
 
   private shape(s: {

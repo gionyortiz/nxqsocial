@@ -84,4 +84,22 @@ export class LiveController {
   checkApproval(@CurrentUser() user: any, @Param('room') room: string) {
     return this.live.checkApproval(room, user.id);
   }
+
+  /** Guest checks current join request state without consuming approval. */
+  @Get(':room/guest-status')
+  guestStatus(@CurrentUser() user: any, @Param('room') room: string) {
+    return this.live.guestStatus(room, user.id);
+  }
+
+  /** Guest leaves/cancels stage request so they can request again later. */
+  @Post(':room/guest-leave')
+  guestLeave(@CurrentUser() user: any, @Param('room') room: string) {
+    return this.live.clearGuestState(room, user.id);
+  }
+
+  /** Host clears a viewer's stale/rejected guest request. */
+  @Post(':room/guest-clear')
+  guestClear(@Param('room') room: string, @Body() dto: ApproveGuestDto) {
+    return this.live.clearGuestState(room, dto.userId);
+  }
 }

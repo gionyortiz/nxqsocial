@@ -1,7 +1,7 @@
 /**
- * Live streaming (Beta) helpers.
+ * Live streaming helpers.
  *
- * Live is a one-broadcaster → many-viewers feature, distinct from 1:1/group
+ * Live is a one-broadcaster -> many-viewers feature, distinct from 1:1/group
  * calls. It is gated separately from calls so it can be rolled out on its own.
  */
 import { api } from '@/lib/api';

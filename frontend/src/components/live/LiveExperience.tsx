@@ -95,11 +95,21 @@ interface GuestRequest {
   name: string;
 }
 
+interface GuestRequestRecord {
+  userId: string;
+  displayName?: string;
+  name?: string;
+}
+
 const encoder = new TextEncoder();
 const decoder = new TextDecoder();
 
+function nowMs() {
+  return new Date().getTime();
+}
+
 function randomId() {
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
+  return `${nowMs().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
 export function LiveExperience({
@@ -147,12 +157,19 @@ export function LiveExperience({
   const battleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
-  const liveStartedAtRef = useRef<number>(Date.now());
+  const liveStartedAtRef = useRef<number>(0);
   const peakViewersRef = useRef<number>(0);
   const chatCountRef = useRef<number>(0);
   // Keep a ref to user.id so handleData always has the latest value (avoids stale closure)
   const userIdRef = useRef<string | undefined>(user?.id);
   useEffect(() => { userIdRef.current = user?.id; }, [user?.id]);
+
+  const buildGuestJoinHref = useCallback(() => {
+    const search = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
+    search.set('host', '1');
+    search.set('guest', '1');
+    return `/live/${encodeURIComponent(room)}?${search.toString()}`;
+  }, [room]);
 
   // Viewers = everyone except the broadcaster(s) (camera publishers).
   const publishers = new Set(cameraTracks.map((t) => t.participant?.identity));
@@ -227,7 +244,7 @@ export function LiveExperience({
         case 'guest-approve':
           // Use ref to avoid stale closure on user?.id
           if (!host && (evt.userId === userIdRef.current || evt.userId === user?.id)) {
-            router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
+            router.push(buildGuestJoinHref());
           }
           break;
         case 'battle-start':
@@ -261,7 +278,7 @@ export function LiveExperience({
           break;
       }
     },
-    [addFloatingReaction, addGiftBurst, isOwner, host, room, router],
+    [addFloatingReaction, addGiftBurst, isOwner, host, room, router, buildGuestJoinHref],
   );
 
   const { send } = useDataChannel(handleData);
@@ -287,7 +304,7 @@ export function LiveExperience({
   useEffect(() => {
     if (!isOwner) return;
     let stopped = false;
-    liveStartedAtRef.current = Date.now();
+    liveStartedAtRef.current = nowMs();
     peakViewersRef.current = viewers;
     chatCountRef.current = 0;
     void startLiveSession(room);
@@ -321,7 +338,7 @@ export function LiveExperience({
       window.removeEventListener('beforeunload', handleUnload);
       window.removeEventListener('pagehide', handleUnload);
       void endLiveSession(room);
-      const durationSec = Math.max(0, Math.round((Date.now() - liveStartedAtRef.current) / 1000));
+      const durationSec = Math.max(0, Math.round((nowMs() - liveStartedAtRef.current) / 1000));
       const payload = {
         room,
         durationSec,
@@ -337,7 +354,7 @@ export function LiveExperience({
   // ---- Actions -----------------------------------------------------------
   const sendReaction = (emoji: string) => {
     addFloatingReaction(emoji);
-    broadcast({ kind: 'reaction', id: randomId(), emoji, ts: Date.now() }, false);
+    broadcast({ kind: 'reaction', id: randomId(), emoji, ts: nowMs() }, false);
   };
 
   const playMusic = (trackId: string) => {
@@ -392,7 +409,7 @@ export function LiveExperience({
   const sendGift = (emoji: string) => {
     const name = user?.displayName ?? user?.username ?? 'Someone';
     addGiftBurst(emoji, name);
-    broadcast({ kind: 'gift', id: randomId(), emoji, name, ts: Date.now() }, true);
+    broadcast({ kind: 'gift', id: randomId(), emoji, name, ts: nowMs() }, true);
     setShowGifts(false);
   };
 
@@ -404,7 +421,7 @@ export function LiveExperience({
       name: user?.displayName ?? user?.username ?? 'You',
       username: user?.username ?? 'you',
       text: text.slice(0, 300),
-      ts: Date.now(),
+      ts: nowMs(),
     };
     setMessages((prev) => [...prev, evt].slice(-MAX_CHAT));
     chatCountRef.current += 1;
@@ -414,6 +431,26 @@ export function LiveExperience({
 
   // sessionStorage key so polling survives page refreshes within the same tab
   const ssRequestKey = `nxq_live_req:${room}`;
+
+  const clearMyGuestState = useCallback(async (updateLocal = true) => {
+    if (isOwner || !userIdRef.current) return;
+    try {
+      sessionStorage.removeItem(ssRequestKey);
+    } catch {
+      // ignore
+    }
+    if (updateLocal) setRequestedToJoin(false);
+    try {
+      await api.post(`/live/${encodeURIComponent(room)}/guest-leave`);
+    } catch {
+      // best-effort cleanup
+    }
+  }, [isOwner, room, ssRequestKey]);
+
+  const leaveLive = useCallback(() => {
+    void clearMyGuestState();
+    onLeave();
+  }, [clearMyGuestState, onLeave]);
 
   const requestToJoin = async () => {
     if (!user) return;
@@ -433,7 +470,7 @@ export function LiveExperience({
           id: randomId(),
           userId: user.id,
           name: user.displayName ?? user.username,
-          ts: Date.now(),
+          ts: nowMs(),
         },
         true,
       );
@@ -445,7 +482,7 @@ export function LiveExperience({
         id: randomId(),
         userId: user.id,
         name: user.displayName ?? user.username,
-        ts: Date.now(),
+        ts: nowMs(),
       },
       true,
     );
@@ -457,12 +494,21 @@ export function LiveExperience({
       await api.post(`/live/${encodeURIComponent(room)}/guest-approve`, { userId: g.userId });
     } catch { /* ignore */ }
     // Also send via data channel as backup
-    broadcast({ kind: 'guest-approve', id: randomId(), userId: g.userId, ts: Date.now() }, true);
+    broadcast({ kind: 'guest-approve', id: randomId(), userId: g.userId, ts: nowMs() }, true);
     setGuestRequests((prev) => prev.filter((r) => r.userId !== g.userId));
   };
 
+  const rejectGuest = async (g: GuestRequest) => {
+    setGuestRequests((prev) => prev.filter((r) => r.userId !== g.userId));
+    try {
+      await api.post(`/live/${encodeURIComponent(room)}/guest-clear`, { userId: g.userId });
+    } catch {
+      // best-effort cleanup
+    }
+  };
+
   const startBattle = (durationSec = 60) => {
-    const evt = { kind: 'battle-start' as const, id: randomId(), durationSec, ts: Date.now() };
+    const evt = { kind: 'battle-start' as const, id: randomId(), durationSec, ts: nowMs() };
     setBattleActive(true);
     setBattleScores([0, 0]);
     setBattleTimeLeft(durationSec);
@@ -480,12 +526,12 @@ export function LiveExperience({
     setBattleActive(false);
     setBattleTimeLeft(0);
     if (battleTimerRef.current) clearInterval(battleTimerRef.current);
-    broadcast({ kind: 'battle-end', id: randomId(), ts: Date.now() }, true);
+    broadcast({ kind: 'battle-end', id: randomId(), ts: nowMs() }, true);
   };
 
   const sendBattleVote = (side: 0 | 1, emoji: string) => {
     const name = user?.displayName ?? user?.username ?? 'Someone';
-    broadcast({ kind: 'battle-vote', id: randomId(), side, name, emoji, ts: Date.now() }, true);
+    broadcast({ kind: 'battle-vote', id: randomId(), side, name, emoji, ts: nowMs() }, true);
     setBattleScores(prev => { const n: [number, number] = [...prev] as [number, number]; n[side] += 1; return n; });
     addGiftBurst(emoji, name);
   };
@@ -499,11 +545,13 @@ export function LiveExperience({
     const poll = async () => {
       try {
         const { data } = await api.get(`/live/${encodeURIComponent(room)}/guest-requests`);
-        if (Array.isArray(data) && data.length > 0) {
-          setGuestRequests(prev => {
-            const newReqs = data.filter((d: any) => !prev.some(p => p.userId === d.userId));
-            return newReqs.length > 0 ? [...prev, ...newReqs.map((d: any) => ({ userId: d.userId, name: d.displayName }))] : prev;
-          });
+        if (Array.isArray(data)) {
+          setGuestRequests(
+            (data as GuestRequestRecord[]).map((d) => ({
+              userId: d.userId,
+              name: d.displayName ?? d.name ?? 'Viewer',
+            })),
+          );
         }
       } catch { /* ignore */ }
     };
@@ -512,26 +560,36 @@ export function LiveExperience({
     return () => clearInterval(id);
   }, [isOwner, room]);
 
-  // On mount: restore pending-request flag from sessionStorage (survives page refresh)
-  // and do a one-time immediate check in case we were approved while the page was reloading
+  // On mount/re-entry: ask backend for real guest status so stale local state
+  // does not permanently hide the Join button.
   useEffect(() => {
     if (host || isOwner || !user?.id) return;
-    const ssKey = `nxq_live_req:${room}`;
-    const hadPendingRequest = !!sessionStorage.getItem(ssKey);
-    if (hadPendingRequest) {
-      setRequestedToJoin(true);
-    }
-    // One-shot check regardless of pending flag — catches stale approvals
-    api.get(`/live/${encodeURIComponent(room)}/guest-check`)
+    let cancelled = false;
+    api.get(`/live/${encodeURIComponent(room)}/guest-status`)
       .then(({ data }) => {
+        if (cancelled) return;
         if (data?.approved) {
-          sessionStorage.removeItem(ssKey);
-          router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
+          sessionStorage.removeItem(ssRequestKey);
+          router.push(buildGuestJoinHref());
+          return;
         }
+        if (data?.pending) {
+          sessionStorage.setItem(ssRequestKey, '1');
+          setRequestedToJoin(true);
+          return;
+        }
+        sessionStorage.removeItem(ssRequestKey);
+        setRequestedToJoin(false);
       })
-      .catch(() => {});
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [host, isOwner, room, user?.id]); // intentionally omit router to avoid re-running on nav
+      .catch(() => {
+        if (!cancelled && sessionStorage.getItem(ssRequestKey)) {
+          setRequestedToJoin(true);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [host, isOwner, room, user?.id, router, buildGuestJoinHref, ssRequestKey]);
 
   // Guest: poll backend every 2s to check if host approved them
   useEffect(() => {
@@ -545,7 +603,7 @@ export function LiveExperience({
         if (data?.approved && !redirected) {
           redirected = true;
           sessionStorage.removeItem(ssKey);
-          router.push(`/live/${encodeURIComponent(room)}?host=1&guest=1`);
+          router.push(buildGuestJoinHref());
         }
       } catch (err) {
         // Log in dev so we can see auth/network errors
@@ -555,7 +613,9 @@ export function LiveExperience({
     poll(); // poll immediately
     const id = setInterval(poll, 2000);
     return () => clearInterval(id);
-  }, [requestedToJoin, host, room, router, user?.id]);
+  }, [requestedToJoin, host, room, router, user?.id, buildGuestJoinHref]);
+
+  useEffect(() => () => { void clearMyGuestState(false); }, [clearMyGuestState]);
 
   const reportLive = async () => {
     if (!hostIdentity || hostIdentity === user?.id) return;
@@ -750,7 +810,7 @@ export function LiveExperience({
             <span className="hidden sm:inline">{copied ? 'Copied' : 'Share'}</span>
           </button>
           <button
-            onClick={onLeave}
+            onClick={leaveLive}
             className="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-rose-500 hover:bg-rose-600 text-xs font-semibold"
           >
             <X size={14} /> {isOwner ? 'End' : 'Leave'}
@@ -776,9 +836,7 @@ export function LiveExperience({
                   <UserPlus size={13} /> Add
                 </button>
                 <button
-                  onClick={() =>
-                    setGuestRequests((prev) => prev.filter((r) => r.userId !== g.userId))
-                  }
+                  onClick={() => { void rejectGuest(g); }}
                   className="px-2 py-1 rounded-lg bg-white/10 hover:bg-white/20 text-white text-xs"
                 >
                   Dismiss
@@ -891,7 +949,7 @@ export function LiveExperience({
                       ✓ Add
                     </button>
                     <button
-                      onClick={() => setGuestRequests(prev => prev.filter(r => r.userId !== g.userId))}
+                      onClick={() => { void rejectGuest(g); }}
                       className="px-2 py-1.5 rounded-full bg-white/10 hover:bg-white/20 text-white text-xs"
                     >
                       ✕

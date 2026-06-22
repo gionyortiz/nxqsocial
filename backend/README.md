@@ -25,6 +25,10 @@
 
 [Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
 
+## Release Status
+
+Cross-platform Apple + Google Play release tracking is maintained in [docs/NXQ_SOCIAL_RELEASE_STATUS.md](../docs/NXQ_SOCIAL_RELEASE_STATUS.md).
+
 ## Project setup
 
 ```bash

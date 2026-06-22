@@ -9,10 +9,10 @@ const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const bcrypt = require('bcryptjs');
 
-const EMAIL = 'appreview@nxqsocial.com';
-const USERNAME = 'appreview';
-const DISPLAY_NAME = 'App Review';
-const PASSWORD = 'NxqAppReview!2026';
+const EMAIL = process.env.APP_REVIEW_EMAIL || 'appreview@nxqsocial.com';
+const USERNAME = process.env.APP_REVIEW_USERNAME || 'appreview';
+const DISPLAY_NAME = process.env.APP_REVIEW_DISPLAY_NAME || 'App Review';
+const PASSWORD = process.env.APP_REVIEW_PASSWORD || 'NxqAppReview!2026';
 
 async function main() {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });

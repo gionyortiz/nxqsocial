@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiRequest, User } from './api';
+import { unregisterPushToken } from './push';
 
 const TOKEN_KEY = 'nxq.mobile.token';
 const USER_KEY = 'nxq.mobile.user';
@@ -75,10 +76,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, [persistSession]);
 
   const logout = useCallback(async () => {
+    const currentToken = token;
     setToken(null);
     setUser(null);
     await Promise.all([AsyncStorage.removeItem(TOKEN_KEY), AsyncStorage.removeItem(USER_KEY)]);
-  }, []);
+    await unregisterPushToken(currentToken);
+  }, [token]);
 
   const value = useMemo(
     () => ({ token, user, loading, login, register, logout }),

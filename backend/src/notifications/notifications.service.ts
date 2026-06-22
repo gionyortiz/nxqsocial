@@ -1,14 +1,103 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
+import type Redis from 'ioredis';
+import { REDIS_CLIENT } from '../redis/redis.module';
+
+type PushPayload = {
+  title: string;
+  body: string;
+  data?: Record<string, unknown>;
+  sound?: 'default' | null;
+};
+
+const PUSH_TOKEN_SET = (userId: string) => `push:tokens:${userId}`;
+
+function isExpoPushToken(token: string): boolean {
+  return /^ExponentPushToken\[[^\]]+\]$/.test(token) || /^ExpoPushToken\[[^\]]+\]$/.test(token);
+}
 
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
   private resend: Resend;
 
-  constructor(private config: ConfigService) {
+  constructor(
+    private config: ConfigService,
+    @Inject(REDIS_CLIENT) private readonly redis: Redis,
+  ) {
     this.resend = new Resend(this.config.get<string>('RESEND_API_KEY', 're_placeholder'));
+  }
+
+  async registerPushToken(userId: string, token: string) {
+    const normalized = token?.trim();
+    if (!normalized || !isExpoPushToken(normalized)) {
+      return { ok: false, reason: 'invalid token format' };
+    }
+    await this.redis.sadd(PUSH_TOKEN_SET(userId), normalized);
+    await this.redis.expire(PUSH_TOKEN_SET(userId), 60 * 60 * 24 * 90);
+    return { ok: true };
+  }
+
+  async unregisterPushToken(userId: string, token: string) {
+    const normalized = token?.trim();
+    if (!normalized) return { ok: true };
+    await this.redis.srem(PUSH_TOKEN_SET(userId), normalized);
+    return { ok: true };
+  }
+
+  async sendPushToUsers(userIds: string[], payload: PushPayload) {
+    if (!userIds.length) return;
+
+    const tokenGroups = await Promise.all(userIds.map((userId) => this.redis.smembers(PUSH_TOKEN_SET(userId))));
+    const tokens = Array.from(new Set(tokenGroups.flat().filter(Boolean)));
+    if (!tokens.length) return;
+
+    const headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      Accept: 'application/json',
+    };
+    const accessToken = this.config.get<string>('EXPO_ACCESS_TOKEN', '');
+    if (accessToken) {
+      headers.Authorization = `Bearer ${accessToken}`;
+    }
+
+    const messages = tokens.map((to) => ({
+      to,
+      title: payload.title,
+      body: payload.body,
+      data: payload.data ?? {},
+      sound: payload.sound ?? 'default',
+      priority: 'high',
+      channelId: 'default',
+    }));
+
+    try {
+      const res = await fetch('https://exp.host/--/api/v2/push/send', {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(messages),
+      });
+      if (!res.ok) {
+        const text = await res.text();
+        this.logger.warn(`Expo push send failed (${res.status}): ${text}`);
+        return;
+      }
+
+      const json = (await res.json()) as { data?: Array<{ status?: string; details?: { error?: string } }> };
+      const tickets = json?.data ?? [];
+      for (let i = 0; i < tickets.length; i += 1) {
+        const ticket = tickets[i];
+        const token = tokens[i];
+        if (!token) continue;
+        const error = ticket?.details?.error;
+        if (ticket?.status === 'error' && (error === 'DeviceNotRegistered' || error === 'InvalidCredentials')) {
+          await Promise.all(userIds.map((userId) => this.redis.srem(PUSH_TOKEN_SET(userId), token)));
+        }
+      }
+    } catch (err: any) {
+      this.logger.warn(`Expo push exception: ${err?.message ?? 'unknown error'}`);
+    }
   }
 
   async sendEmailOtp(to: string, code: string, username: string) {

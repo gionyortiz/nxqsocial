@@ -28,8 +28,6 @@ const schema = z.object({
 });
 type FormData = z.infer<typeof schema>;
 
-const IS_BETA = process.env.NEXT_PUBLIC_BETA_MODE === 'true';
-
 export default function RegisterPage() {
   const router = useRouter();
   const { setAuth } = useAuthStore();
@@ -92,9 +90,7 @@ export default function RegisterPage() {
             <Input label="Email" type="email" placeholder="you@example.com" error={errors.email?.message} {...register('email')} />
             <Input label="Password" type="password" placeholder="Min 12 chars, mixed case, number & symbol" error={errors.password?.message} {...register('password')} />
 
-            {IS_BETA && (
-              <Input label="Invite Code" placeholder="Enter your invite code" error={errors.inviteCode?.message} {...register('inviteCode')} />
-            )}
+            <Input label="Invite Code (optional)" placeholder="Enter your invite code" error={errors.inviteCode?.message} {...register('inviteCode')} />
 
             {/* EULA — required by Apple Guideline 1.2 */}
             <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">

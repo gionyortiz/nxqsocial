@@ -11,7 +11,7 @@ export class AuthController {
   constructor(private authService: AuthService) {}
 
   @Post('register')
-  // Beta traffic can include retries from shared/mobile networks.
+  // Registration traffic can include retries from shared/mobile networks.
   // Keep abuse protection, but allow a smoother onboarding flow.
   @Throttle({ default: { limit: 20, ttl: 600000 } })
   register(@Body() dto: RegisterDto) {
@@ -19,7 +19,7 @@ export class AuthController {
   }
 
   @Post('login')
-  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @Throttle({ default: { limit: 20, ttl: 60000 } })
   @HttpCode(HttpStatus.OK)
   login(@Body() dto: LoginDto) {
     return this.authService.login(dto);

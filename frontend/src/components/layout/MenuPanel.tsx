@@ -20,7 +20,6 @@ interface Props {
 
 const SHORTCUTS = [
   { href: '/feed',     icon: Home,        label: 'Home',     desc: 'Your main feed of posts and reels' },
-  { href: '/messages', icon: MessageSquare, label: 'Messages', desc: 'Your inbox and chat threads' },
   { href: '/notifications', icon: Bell,    label: 'Notifications', desc: 'Likes, comments and follow activity' },
   { href: '/search',   icon: Compass,     label: 'Explore',  desc: 'Discover people and content' },
   { href: '/reels',    icon: Play,        label: 'Reels',    desc: 'Full-screen short videos' },
@@ -122,7 +121,7 @@ export function MenuPanel({ onClose }: Props) {
                 </button>
               ))}
 
-              {/* Call — Beta feature, gated by flag/role */}
+              {/* Call entry, gated by flag/role */}
               {callsVisible(user?.role) && (
                 <button
                   onClick={() => go('/call/new')}
@@ -132,16 +131,13 @@ export function MenuPanel({ onClose }: Props) {
                     <Phone size={20} />
                   </span>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-bold text-gray-900">Call</p>
-                      <span className="px-1.5 py-0.5 rounded-full bg-purple-100 text-purple-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
-                    </div>
+                    <p className="text-sm font-bold text-gray-900">Call</p>
                     <p className="text-xs text-gray-400 leading-snug">Start a voice or video call</p>
                   </div>
                 </button>
               )}
 
-              {/* Live — Beta feature, gated by flag/role */}
+              {/* Live entry, gated by flag/role */}
               {liveVisible(user?.role) && (
                 <button
                   onClick={() => go('/live/new')}
@@ -151,10 +147,7 @@ export function MenuPanel({ onClose }: Props) {
                     <Radio size={20} />
                   </span>
                   <div className="min-w-0">
-                    <div className="flex items-center gap-1.5">
-                      <p className="text-sm font-bold text-gray-900">Live</p>
-                      <span className="px-1.5 py-0.5 rounded-full bg-rose-100 text-rose-700 text-[10px] font-bold uppercase tracking-wide">Beta</span>
-                    </div>
+                    <p className="text-sm font-bold text-gray-900">Live</p>
                     <p className="text-xs text-gray-400 leading-snug">Broadcast live to your followers</p>
                   </div>
                 </button>

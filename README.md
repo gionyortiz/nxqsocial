@@ -4,6 +4,10 @@ A trust-first social platform for verified humans — safer feeds, creator-first
 
 > **Status: Private Beta** — invite-only access. Production deployment in progress.
 
+## Release Status
+
+Current Apple + Google Play release tracking lives in [docs/NXQ_SOCIAL_RELEASE_STATUS.md](docs/NXQ_SOCIAL_RELEASE_STATUS.md).
+
 ## Stack
 
 | Layer | Tech |

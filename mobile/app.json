@@ -15,7 +15,22 @@
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "NXQ Social uses the camera so you can capture photos and videos for your posts, reels, stories, and profile picture.",
         "NSMicrophoneUsageDescription": "NXQ Social uses the microphone to record audio for the videos and reels you create.",
-        "NSPhotoLibraryUsageDescription": "NXQ Social needs access to your photo library so you can upload photos and videos to your posts, reels, stories, and profile."
+        "NSPhotoLibraryUsageDescription": "NXQ Social needs access to your photo library so you can upload photos and videos to your posts, reels, stories, and profile.",
+        "NSAppTransportSecurity": {
+          "NSAllowsArbitraryLoads": false,
+          "NSExceptionDomains": {
+            "api.nxqsocial.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionMinimumTLSVersion": "TLSv1.2",
+              "NSIncludesSubdomains": true
+            },
+            "nxqsocial.com": {
+              "NSExceptionAllowsInsecureHTTPLoads": false,
+              "NSExceptionMinimumTLSVersion": "TLSv1.2",
+              "NSIncludesSubdomains": true
+            }
+          }
+        }
       }
     },
     "android": {
@@ -44,7 +59,10 @@
           "backgroundColor": "#0b1020"
         }
       ],
-      "expo-video"
+      "expo-notifications",
+      "expo-video",
+      "expo-font",
+      "@config-plugins/react-native-webrtc"
     ],
     "experiments": {
       "typedRoutes": true
@@ -54,6 +72,12 @@
       "eas": {
         "projectId": "a4f27391-f0b4-4b73-9a2d-a1f87f68c77c"
       }
+    },
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/a4f27391-f0b4-4b73-9a2d-a1f87f68c77c"
     }
   }
 }

@@ -9,7 +9,8 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
-        "EXPO_PUBLIC_USE_RN_FETCH": "true"
+        "EXPO_PUBLIC_USE_RN_FETCH": "false",
+        "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
       }
     },
     "preview": {
@@ -19,14 +20,35 @@
       },
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
-        "EXPO_PUBLIC_USE_RN_FETCH": "true"
+        "EXPO_PUBLIC_USE_RN_FETCH": "false",
+        "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
+      }
+    },
+    "compiletest": {
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
+        "EXPO_PUBLIC_USE_RN_FETCH": "false",
+        "EXPO_PUBLIC_LIVE_NATIVE_ENABLED": "false",
+        "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
+      }
+    },
+    "livetest": {
+      "distribution": "store",
+      "env": {
+        "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
+        "EXPO_PUBLIC_USE_RN_FETCH": "false",
+        "EXPO_PUBLIC_LIVE_NATIVE_ENABLED": "true",
+        "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
       }
     },
     "production": {
       "autoIncrement": true,
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
-        "EXPO_PUBLIC_USE_RN_FETCH": "true"
+        "EXPO_PUBLIC_USE_RN_FETCH": "false",
+        "EXPO_PUBLIC_LIVE_NATIVE_ENABLED": "false",
+        "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
       }
     }
   },
