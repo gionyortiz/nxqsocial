@@ -18,7 +18,7 @@ const STRIPE_LEVEL_MAP: Record<string, string> = {
 @Injectable()
 export class VerificationService {
   private readonly logger = new Logger(VerificationService.name);
-  private stripe!: InstanceType<typeof Stripe>;
+  private stripe?: InstanceType<typeof Stripe>;
 
   constructor(
     private prisma: PrismaService,
@@ -26,9 +26,21 @@ export class VerificationService {
     private trustEngine: TrustEngineService,
     private audit: AuditService,
   ) {
-    this.stripe = new Stripe(this.config.get<string>('STRIPE_SECRET_KEY', 'sk_test_placeholder'), {
-      apiVersion: '2025-04-30.basil' as any,
-    });
+    const stripeSecretKey = this.config.get<string>('STRIPE_SECRET_KEY', '').trim();
+    if (stripeSecretKey) {
+      this.stripe = new Stripe(stripeSecretKey, {
+        apiVersion: '2025-04-30.basil' as any,
+      });
+    } else {
+      this.logger.warn('Stripe verification is not configured; identity verification is disabled');
+    }
+  }
+
+  private requireStripeClient(): InstanceType<typeof Stripe> {
+    if (!this.stripe) {
+      throw new BadRequestException('Stripe verification is not configured');
+    }
+    return this.stripe;
   }
 
   async getStatus(userId: string) {
@@ -84,9 +96,10 @@ export class VerificationService {
    * Used for ID_VERIFIED tier.
    */
   async startStripeIdentityCheck(userId: string) {
+    const stripe = this.requireStripeClient();
     const appUrl = this.config.get<string>('APP_BASE_URL', 'http://localhost:3001');
 
-    const session = await this.stripe.identity.verificationSessions.create({
+    const session = await stripe.identity.verificationSessions.create({
       type: 'document',
       metadata: { nxqsocial_user_id: userId },
       options: { document: { allowed_types: ['driving_license', 'passport', 'id_card'], require_id_number: false } },
@@ -112,11 +125,15 @@ export class VerificationService {
    * Validates the signature before processing.
    */
   async handleStripeWebhook(rawBody: Buffer, signature: string) {
+    const stripe = this.requireStripeClient();
     const webhookSecret = this.config.get<string>('STRIPE_WEBHOOK_SECRET', '');
+    if (!webhookSecret) {
+      throw new BadRequestException('Stripe webhook secret is not configured');
+    }
     let event: any;
 
     try {
-      event = this.stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+      event = stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
     } catch (err) {
       this.logger.error('Stripe webhook signature verification failed', err);
       throw new BadRequestException('Invalid webhook signature');

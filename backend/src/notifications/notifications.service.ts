@@ -20,13 +20,18 @@ function isExpoPushToken(token: string): boolean {
 @Injectable()
 export class NotificationsService {
   private readonly logger = new Logger(NotificationsService.name);
-  private resend: Resend;
+  private resend?: Resend;
 
   constructor(
     private config: ConfigService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {
-    this.resend = new Resend(this.config.get<string>('RESEND_API_KEY', 're_placeholder'));
+    const resendApiKey = this.config.get<string>('RESEND_API_KEY', '').trim();
+    if (resendApiKey) {
+      this.resend = new Resend(resendApiKey);
+    } else {
+      this.logger.warn('Resend is not configured; email OTP delivery is disabled');
+    }
   }
 
   async registerPushToken(userId: string, token: string) {
@@ -101,6 +106,10 @@ export class NotificationsService {
   }
 
   async sendEmailOtp(to: string, code: string, username: string) {
+    if (!this.resend) {
+      throw new Error('Email OTP delivery is not configured');
+    }
+
     const from = this.config.get<string>('EMAIL_FROM', 'noreply@nxqsocial.com');
     try {
       await this.resend.emails.send({

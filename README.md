@@ -80,7 +80,7 @@ cd backend
 cp .env.example .env      # fill required values
 npm install
 npx prisma migrate dev
-npx prisma db seed        # creates admin user
+npx prisma db seed        # creates admin user; set ADMIN_PASSWORD in production
 npm run start:dev         # port 3000
 ```
 

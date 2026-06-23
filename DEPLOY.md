@@ -50,7 +50,9 @@ Critical values to set before going live:
 | `STRIPE_SECRET_KEY` | From your Stripe dashboard |
 | `STRIPE_WEBHOOK_SECRET` | After configuring the webhook endpoint (step 7) |
 | `AWS_*` / `S3_*` | From your AWS / Cloudflare R2 credentials |
-| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Used by the seed script (step 5) |
+| `ADMIN_EMAIL` / `ADMIN_PASSWORD` | Required by the admin seed script (step 5) |
+| `DEMO_USER_PASSWORD` | Required only when running demo seeding in production |
+| `APP_REVIEW_PASSWORD` | Required only when running the App Review seeder in production |
 
 ### Frontend
 
@@ -121,7 +123,15 @@ docker compose -f docker-compose.prod.yml exec backend npx prisma db seed
 
 This creates the admin user using the `ADMIN_EMAIL`, `ADMIN_USERNAME`, and `ADMIN_PASSWORD` values from `backend/.env.prod`.
 
+If `NODE_ENV=production` and `ADMIN_PASSWORD` is missing, the seed now fails instead of falling back to a default password.
+
 > After seeding, log in at `https://yourdomain.com/login` and change the admin password immediately.
+
+For demo/App Review data in production, provide both `DEMO_USER_PASSWORD` and `APP_REVIEW_PASSWORD` before running the JS seeder inside the backend container:
+
+```bash
+docker compose -f docker-compose.prod.yml exec backend node prisma/seed-demo.js
+```
 
 ---
 

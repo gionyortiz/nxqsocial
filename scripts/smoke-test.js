@@ -16,6 +16,7 @@ if (!BASE) {
 }
 
 const API = BASE.replace(/\/$/, '') + '/api';
+const SMOKE_PASSWORD = process.env.SMOKE_TEST_PASSWORD ?? `Smoke-${Date.now()}-Aa1!`;
 
 let passed = 0;
 let failed = 0;
@@ -78,7 +79,7 @@ console.log(`\nNXQ Social smoke test → ${API}\n`);
   const id = uid();
   const email = `smoke_${id}@nxqsocial-test.invalid`;
   const username = `smoke_${id}`;
-  const password = 'SmokePa$$1!9';
+  const password = SMOKE_PASSWORD;
   let token;
 
   await check('POST /auth/register creates a new user', async () => {

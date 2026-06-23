@@ -8,6 +8,12 @@ const bcrypt = require('bcryptjs');
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
 
+function generateSeedPassword(prefix) {
+  return `${prefix}-${Date.now()}-Aa1!`;
+}
+
+const isProduction = process.env.NODE_ENV === 'production';
+
 const DEMO_USERS = [
   { username: 'maya_rivera', displayName: 'Maya Rivera',   bio: 'Photographer · chasing golden hour 🌅',          avatar: 1,  status: 'ID_VERIFIED',       trust: 96 },
   { username: 'leo_chen',    displayName: 'Leo Chen',      bio: 'Building things at NXQ ⚡ | coffee addict',       avatar: 12, status: 'HUMAN_VERIFIED',    trust: 88 },
@@ -46,19 +52,28 @@ const VIDEOS = [
 ];
 
 // Dedicated account for Apple App Review (Guideline 2.1.0 — App Completeness).
-// These credentials are intended to be shared with the reviewer in App Store
-// Connect → App Review Information, so they are deliberately fixed/known.
+// Provide APP_REVIEW_PASSWORD when preparing review so the reviewer credentials
+// are deterministic and can be copied into App Store Connect.
 const REVIEW_ACCOUNT = {
   email: 'appreview@nxqsocial.com',
   username: 'appreview',
-  password: 'NxqAppReview!2026',
+  password: process.env.APP_REVIEW_PASSWORD,
   displayName: 'App Review',
   bio: 'Apple App Review demo account — full access to NXQ Social.',
   avatar: 7,
 };
 
 async function seedReviewAccount() {
-  const passwordHash = await bcrypt.hash(REVIEW_ACCOUNT.password, 12);
+  if (isProduction && !REVIEW_ACCOUNT.password) {
+    throw new Error('APP_REVIEW_PASSWORD is required when NODE_ENV=production.');
+  }
+
+  const reviewPassword = REVIEW_ACCOUNT.password ?? generateSeedPassword('AppReview');
+  if (!isProduction && !REVIEW_ACCOUNT.password) {
+    console.warn(`\nWARNING: Using generated App Review password for non-production seed: ${reviewPassword}\nSet APP_REVIEW_PASSWORD to keep it stable.\n`);
+  }
+
+  const passwordHash = await bcrypt.hash(reviewPassword, 12);
   const reviewer = await prisma.user.upsert({
     where: { email: REVIEW_ACCOUNT.email },
     // Always reset the password so the reviewer login is guaranteed to work,
@@ -109,12 +124,22 @@ async function seedReviewAccount() {
     });
   }
 
-  console.log(`App Review account ready: ${REVIEW_ACCOUNT.email} / ${REVIEW_ACCOUNT.password}`);
+  console.log(`App Review account ready: ${REVIEW_ACCOUNT.email} / ${reviewPassword}`);
 }
 
 async function main() {
   await seedReviewAccount();
-  const passwordHash = await bcrypt.hash('DemoPass123!', 12);
+  const demoPasswordEnv = process.env.DEMO_USER_PASSWORD;
+  if (isProduction && !demoPasswordEnv) {
+    throw new Error('DEMO_USER_PASSWORD is required when NODE_ENV=production.');
+  }
+
+  const demoPassword = demoPasswordEnv ?? generateSeedPassword('Demo');
+  if (!isProduction && !demoPasswordEnv) {
+    console.warn(`\nWARNING: Using generated demo user password for non-production seed: ${demoPassword}\nSet DEMO_USER_PASSWORD to keep it stable.\n`);
+  }
+
+  const passwordHash = await bcrypt.hash(demoPassword, 12);
   let posts = 0;
 
   for (let i = 0; i < DEMO_USERS.length; i++) {

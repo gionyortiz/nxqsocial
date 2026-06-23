@@ -12,13 +12,24 @@ import * as bcrypt from 'bcryptjs';
 
 const prisma = new PrismaClient();
 
+function generateSeedPassword(prefix: string) {
+  return `${prefix}-${Date.now()}-Aa1!`;
+}
+
 async function main() {
   const email = process.env.ADMIN_EMAIL ?? 'admin@nxqsocial.com';
   const username = process.env.ADMIN_USERNAME ?? 'nexaadmin';
-  const password = process.env.ADMIN_PASSWORD ?? 'ChangeMe123!';
+  const envPassword = process.env.ADMIN_PASSWORD;
+  const isProduction = process.env.NODE_ENV === 'production';
 
-  if (password === 'ChangeMe123!') {
-    console.warn('\n⚠️  WARNING: Using default admin password. Set ADMIN_PASSWORD env var before seeding production!\n');
+  if (isProduction && !envPassword) {
+    throw new Error('ADMIN_PASSWORD is required when NODE_ENV=production. Refusing to seed with a default password.');
+  }
+
+  const password = envPassword ?? generateSeedPassword('Admin');
+
+  if (!isProduction && !envPassword) {
+    console.warn(`\n⚠️  WARNING: Using generated admin password for non-production seed: ${password}\nSet ADMIN_PASSWORD to override.\n`);
   }
 
   const passwordHash = await bcrypt.hash(password, 12);
@@ -76,7 +87,18 @@ const DEMO_CAPTIONS = [
 
 async function seedDemoContent() {
   console.log('🌱 Seeding demo content...');
-  const passwordHash = await bcrypt.hash('DemoPass123!', 12);
+  const demoPasswordEnv = process.env.DEMO_USER_PASSWORD;
+  const isProduction = process.env.NODE_ENV === 'production';
+  if (isProduction && !demoPasswordEnv) {
+    throw new Error('DEMO_USER_PASSWORD is required when NODE_ENV=production and SEED_DEMO=true.');
+  }
+
+  const demoPassword = demoPasswordEnv ?? generateSeedPassword('Demo');
+  if (!isProduction && !demoPasswordEnv) {
+    console.warn('\n⚠️  WARNING: Using generated demo user password for non-production seed. Set DEMO_USER_PASSWORD to keep it stable.\n');
+  }
+
+  const passwordHash = await bcrypt.hash(demoPassword, 12);
   let postCount = 0;
 
   for (const [i, u] of DEMO_USERS.entries()) {
