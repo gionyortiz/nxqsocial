@@ -29,6 +29,14 @@ type UploadErrorView = {
   retryable: boolean;
 };
 
+type Audience = 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
+
+const AUDIENCES: { value: Audience; label: string; desc: string; icon: keyof typeof MaterialCommunityIcons.glyphMap }[] = [
+  { value: 'PUBLIC', label: 'Public', desc: 'Anyone on NXQ', icon: 'earth' },
+  { value: 'FOLLOWERS', label: 'Followers', desc: 'Only your followers', icon: 'account-group' },
+  { value: 'PRIVATE', label: 'Only me', desc: 'Visible to you only', icon: 'lock' },
+];
+
 function mapUploadError(rawMessage: string, isVideo: boolean): UploadErrorView {
   const msg = rawMessage.toLowerCase();
 
@@ -135,10 +143,12 @@ export default function CreateScreen() {
   const [imageOffsetX, setImageOffsetX] = useState(0);
   const [imageOffsetY, setImageOffsetY] = useState(0);
   const [caption, setCaption] = useState('');
+  const [visibility, setVisibility] = useState<Audience>('PUBLIC');
   const [posting, setPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [uploadStatusMessage, setUploadStatusMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<UploadErrorView | null>(null);
+  const [publishedType, setPublishedType] = useState<'image' | 'video' | null>(null);
   const previewHeight = 260;
 
   const resetComposer = () => {
@@ -153,6 +163,7 @@ export default function CreateScreen() {
     setImageOffsetX(0);
     setImageOffsetY(0);
     setCaption('');
+    setVisibility('PUBLIC');
     setUploadProgress(0);
     setUploadStatusMessage(null);
     setUploadError(null);
@@ -177,6 +188,7 @@ export default function CreateScreen() {
     setImageOffsetX(0);
     setImageOffsetY(0);
     setUploadError(null);
+    setPublishedType(null);
   };
 
   const onPreviewLayout = (event: LayoutChangeEvent) => {
@@ -341,7 +353,7 @@ export default function CreateScreen() {
         const form = new FormData();
         form.append('caption', caption);
         form.append('type', isVideo ? 'VIDEO' : 'PHOTO');
-        form.append('visibility', 'PUBLIC');
+        form.append('visibility', visibility);
         form.append('media', { uri: finalUri, name: filename, type: finalMime } as any);
 
         const fbRes = await fetch(`${API_BASE_URL}/posts`, {
@@ -357,8 +369,9 @@ export default function CreateScreen() {
         }
         setUploadProgress(100);
         setUploadStatusMessage('Published');
+        const postedTypeFallback = assetType;
         resetComposer();
-        Alert.alert('Posted', 'Your content is now live on NXQ Social.');
+        setPublishedType(postedTypeFallback);
         return;
       }
 
@@ -432,7 +445,7 @@ export default function CreateScreen() {
         body: JSON.stringify({
           caption,
           type: assetType === 'video' ? 'VIDEO' : 'PHOTO',
-          visibility: 'PUBLIC',
+          visibility,
           mediaId: uploadTarget.mediaId,
         }),
       });
@@ -452,8 +465,9 @@ export default function CreateScreen() {
 
       setUploadProgress(100);
       setUploadStatusMessage('Published');
+      const postedType = assetType;
       resetComposer();
-      Alert.alert('Posted', 'Your content is now live on NXQ Social.');
+      setPublishedType(postedType);
     } catch (e: any) {
       const rawMessage = String(e?.message || 'Could not publish post.');
       const mapped = mapUploadError(rawMessage, assetType === 'video');
@@ -487,6 +501,26 @@ export default function CreateScreen() {
                 <MaterialCommunityIcons name="plus" size={26} color="#fff" />
               </View>
             </View>
+
+            {publishedType && !assetUri ? (
+              <View style={{ backgroundColor: '#0f2a1c', borderRadius: 16, padding: 16, borderWidth: 1, borderColor: '#15803d', gap: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                  <MaterialCommunityIcons name="check-circle" size={26} color="#4ade80" />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#bbf7d0', fontWeight: '900', fontSize: 16 }}>Posted!</Text>
+                    <Text style={{ color: '#86efac', marginTop: 2, fontSize: 13 }}>
+                      Your {publishedType === 'video' ? 'reel' : 'photo'} is now live on NXQ Social.
+                    </Text>
+                  </View>
+                </View>
+                <Pressable
+                  onPress={() => setPublishedType(null)}
+                  style={{ backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>Create another post</Text>
+                </Pressable>
+              </View>
+            ) : null}
 
             {posting && uploadStatusMessage ? (
               <View style={{ backgroundColor: '#111827', borderRadius: 12, padding: 10 }}>
@@ -600,8 +634,43 @@ export default function CreateScreen() {
               placeholder="Write a caption"
               placeholderTextColor="#8790ab"
               multiline
+              maxLength={2200}
               style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 16, padding: 14, minHeight: 104, textAlignVertical: 'top', borderWidth: 1, borderColor: '#28324a' }}
             />
+            <Text style={{ color: '#5b6680', fontSize: 12, textAlign: 'right', marginTop: -4 }}>{caption.length}/2200</Text>
+
+            <View style={{ gap: 8 }}>
+              <Text style={{ color: '#93a1bd', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>AUDIENCE</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {AUDIENCES.map((a) => {
+                  const active = visibility === a.value;
+                  return (
+                    <Pressable
+                      key={a.value}
+                      onPress={() => setVisibility(a.value)}
+                      disabled={posting}
+                      style={{
+                        flex: 1,
+                        alignItems: 'center',
+                        gap: 4,
+                        paddingVertical: 12,
+                        borderRadius: 14,
+                        borderWidth: 2,
+                        borderColor: active ? '#7c3aed' : '#28324a',
+                        backgroundColor: active ? '#241b45' : '#151d33',
+                        opacity: posting ? 0.6 : 1,
+                      }}
+                    >
+                      <MaterialCommunityIcons name={a.icon} size={18} color={active ? '#c4b5fd' : '#8790ab'} />
+                      <Text style={{ color: active ? '#ddd6fe' : '#93a1bd', fontWeight: '700', fontSize: 12 }}>{a.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={{ color: '#5b6680', fontSize: 12 }}>
+                {AUDIENCES.find((a) => a.value === visibility)?.desc}
+              </Text>
+            </View>
 
             <Pressable
               onPress={submit}
