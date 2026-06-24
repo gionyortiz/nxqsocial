@@ -109,7 +109,7 @@ export function Navbar() {
   return (
     <>
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
-      <nav className="hidden md:flex flex-col fixed right-0 top-0 h-full w-64 bg-white/80 dark:bg-[#111827]/80 backdrop-blur-xl border-l border-white/60 dark:border-white/[0.06] px-3 py-6 gap-1 z-40 shadow-[var(--shadow-sm)]">
+      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-white/80 dark:bg-[#111827]/80 backdrop-blur-xl border-r border-white/60 dark:border-white/[0.06] px-3 py-6 gap-1 z-40 shadow-[var(--shadow-sm)]">
 
         {/* Logo */}
         <div className="mb-5 px-2.5 flex items-center justify-between">

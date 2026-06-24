@@ -13,7 +13,7 @@ export function AppShell({
     <div className="min-h-screen" style={{ background: 'var(--background)' }}>
       <Navbar />
       {/* Extra bottom padding on mobile for the floating pill nav */}
-      <main className="pb-28 md:pb-0 min-h-screen md:pr-64 overflow-x-hidden">
+      <main className="pb-28 md:pb-0 min-h-screen md:pl-64 overflow-x-hidden">
         <div className="mx-auto max-w-[1600px] w-full min-w-0 flex justify-center gap-5 lg:gap-6 xl:gap-8 px-2 sm:px-4 xl:px-6">
           <div className="w-full min-w-0 max-w-[680px]">{children}</div>
           {aside && (
