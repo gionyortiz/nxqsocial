@@ -493,13 +493,52 @@ export default function CreateScreen() {
             keyboardShouldPersistTaps="handled"
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View>
-                <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>Create</Text>
-                <Text style={{ color: '#93a1bd', marginTop: 2 }}>Share a photo or reel</Text>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>Create Post</Text>
+                  <View style={{ backgroundColor: '#7c3aed', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
+                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>NEW</Text>
+                  </View>
+                </View>
+                <Text style={{ color: '#93a1bd', marginTop: 2 }}>Pick your audience, add a caption, and share</Text>
               </View>
               <View style={{ width: 44, height: 44, borderRadius: 16, backgroundColor: '#312e81', alignItems: 'center', justifyContent: 'center' }}>
                 <MaterialCommunityIcons name="plus" size={26} color="#fff" />
               </View>
+            </View>
+
+            {/* Audience selector pinned to the top so it is immediately visible */}
+            <View style={{ gap: 8, backgroundColor: '#141b30', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#2c2f63' }}>
+              <Text style={{ color: '#c4b5fd', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>WHO CAN SEE THIS</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {AUDIENCES.map((a) => {
+                  const active = visibility === a.value;
+                  return (
+                    <Pressable
+                      key={a.value}
+                      onPress={() => setVisibility(a.value)}
+                      disabled={posting}
+                      style={{
+                        flex: 1,
+                        alignItems: 'center',
+                        gap: 4,
+                        paddingVertical: 12,
+                        borderRadius: 14,
+                        borderWidth: 2,
+                        borderColor: active ? '#7c3aed' : '#28324a',
+                        backgroundColor: active ? '#241b45' : '#151d33',
+                        opacity: posting ? 0.6 : 1,
+                      }}
+                    >
+                      <MaterialCommunityIcons name={a.icon} size={18} color={active ? '#c4b5fd' : '#8790ab'} />
+                      <Text style={{ color: active ? '#ddd6fe' : '#93a1bd', fontWeight: '700', fontSize: 12 }}>{a.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={{ color: '#5b6680', fontSize: 12 }}>
+                {AUDIENCES.find((a) => a.value === visibility)?.desc}
+              </Text>
             </View>
 
             {publishedType && !assetUri ? (
@@ -638,39 +677,6 @@ export default function CreateScreen() {
               style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 16, padding: 14, minHeight: 104, textAlignVertical: 'top', borderWidth: 1, borderColor: '#28324a' }}
             />
             <Text style={{ color: '#5b6680', fontSize: 12, textAlign: 'right', marginTop: -4 }}>{caption.length}/2200</Text>
-
-            <View style={{ gap: 8 }}>
-              <Text style={{ color: '#93a1bd', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>AUDIENCE</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {AUDIENCES.map((a) => {
-                  const active = visibility === a.value;
-                  return (
-                    <Pressable
-                      key={a.value}
-                      onPress={() => setVisibility(a.value)}
-                      disabled={posting}
-                      style={{
-                        flex: 1,
-                        alignItems: 'center',
-                        gap: 4,
-                        paddingVertical: 12,
-                        borderRadius: 14,
-                        borderWidth: 2,
-                        borderColor: active ? '#7c3aed' : '#28324a',
-                        backgroundColor: active ? '#241b45' : '#151d33',
-                        opacity: posting ? 0.6 : 1,
-                      }}
-                    >
-                      <MaterialCommunityIcons name={a.icon} size={18} color={active ? '#c4b5fd' : '#8790ab'} />
-                      <Text style={{ color: active ? '#ddd6fe' : '#93a1bd', fontWeight: '700', fontSize: 12 }}>{a.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={{ color: '#5b6680', fontSize: 12 }}>
-                {AUDIENCES.find((a) => a.value === visibility)?.desc}
-              </Text>
-            </View>
 
             <Pressable
               onPress={submit}
