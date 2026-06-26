@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { runUploadPipeline, getMediaStatus } from '@/lib/media';
+import type { CompleteUploadResponse, MediaStatusResponse } from '@/lib/media';
 import { trackEvent, trackFirstEvent } from '@/lib/analytics';
 
 type Phase =
@@ -64,6 +65,10 @@ export default function UploadPage() {
   const [moderationStatus, setModerationStatus] = useState<string | null>(null);
   const [scanTimedOut, setScanTimedOut] = useState(false);
 
+  const getApiMessage = (err: unknown): string | undefined => {
+    return (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  };
+
   const isVideo = file?.type.startsWith('video/');
 
   const pickFile = useCallback((f: File) => {
@@ -106,17 +111,16 @@ export default function UploadPage() {
     for (let i = 0; i < 20; i++) {
       await new Promise((r) => setTimeout(r, 3000));
       try {
-        const status = await getMediaStatus(id);
-        const details = status as any;
-        setModerationStatus(details?.moderationStatus ?? null);
-        setStatusMessage(details?.message ?? '');
+        const status: MediaStatusResponse = await getMediaStatus(id);
+        setModerationStatus(status.moderationStatus ?? null);
+        setStatusMessage(status.message ?? '');
         if (status.uploadStatus === 'PUBLISHED') {
           setScanTimedOut(false);
           setPhase('ready');
           return;
         }
         if (status.uploadStatus === 'REJECTED') {
-          setError(details?.message ?? 'This video could not be processed. Please upload MP4/H.264.');
+          setError(status.message ?? 'This video could not be processed. Please upload MP4/H.264.');
           setPhase('rejected');
           return;
         }
@@ -129,23 +133,22 @@ export default function UploadPage() {
   const refreshStatus = useCallback(async () => {
     if (!mediaId) return;
     try {
-      const status = await getMediaStatus(mediaId);
-      const details = status as any;
-      setModerationStatus(details?.moderationStatus ?? null);
-      setStatusMessage(details?.message ?? '');
+      const status: MediaStatusResponse = await getMediaStatus(mediaId);
+      setModerationStatus(status.moderationStatus ?? null);
+      setStatusMessage(status.message ?? '');
       if (status.uploadStatus === 'PUBLISHED') {
         setScanTimedOut(false);
         setPhase('ready');
         return;
       }
       if (status.uploadStatus === 'REJECTED') {
-        setError(details?.message ?? 'This video could not be processed. Please upload MP4/H.264.');
+        setError(status.message ?? 'This video could not be processed. Please upload MP4/H.264.');
         setPhase('rejected');
         return;
       }
       setPhase('scanning');
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Unable to refresh video status');
+    } catch (err: unknown) {
+      setError(getApiMessage(err) ?? 'Unable to refresh video status');
     }
   }, [mediaId]);
 
@@ -157,8 +160,8 @@ export default function UploadPage() {
     try {
       await api.delete(`/media/${mediaId}`);
       reset();
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Unable to remove video');
+    } catch (err: unknown) {
+      setError(getApiMessage(err) ?? 'Unable to remove video');
     }
   }, [mediaId, reset]);
 
@@ -171,24 +174,24 @@ export default function UploadPage() {
     setModerationStatus(null);
     setScanTimedOut(false);
     try {
-      const result = await runUploadPipeline(file, (pct) => setProgress(pct));
-      const details = result as any;
+      const result: CompleteUploadResponse = await runUploadPipeline(file, (pct) => setProgress(pct));
       setMediaId(result.id);
 
       if (result.uploadStatus === 'REJECTED') {
-        setError(details?.message ?? 'This video could not be processed. Please upload MP4/H.264.');
+        setError(result.message ?? 'This video could not be processed. Please upload MP4/H.264.');
         setPhase('rejected');
         return;
       }
       if (result.uploadStatus === 'SCANNING') {
         setPhase('scanning');
-        setStatusMessage(details?.message ?? 'Processing video…');
+        setStatusMessage(result.message ?? 'Processing video…');
         await pollUntilReady(result.id);
         return;
       }
       setPhase('ready');
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? err.message ?? 'Upload failed');
+    } catch (err: unknown) {
+      const fallback = (err as { message?: string })?.message;
+      setError(getApiMessage(err) ?? fallback ?? 'Upload failed');
       setPhase('error');
     }
   };
@@ -215,8 +218,8 @@ export default function UploadPage() {
 
       setPhase('done');
       setTimeout(() => router.push('/feed'), 1500);
-    } catch (err: any) {
-      setError(err.response?.data?.message ?? 'Failed to create post');
+    } catch (err: unknown) {
+      setError(getApiMessage(err) ?? 'Failed to create post');
       setPhase('ready');
     }
   };

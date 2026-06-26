@@ -69,13 +69,6 @@ const AI_LABEL_CONFIG: Record<string, { text: string; icon: React.ElementType; c
   SOURCE_UNKNOWN:{ text: 'Source unverified',    icon: HelpCircle, color: 'bg-amber-50 border-amber-200 text-amber-700' },
 };
 
-// Legacy fallback
-const AI_LABEL_TEXT: Record<string, string> = {
-  AI_GENERATED: '🤖 AI-generated content',
-  AI_EDITED: '✏️ AI-edited content',
-  SOURCE_UNKNOWN: '❓ Source unverified',
-};
-
 export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCardProps) {
   const router = useRouter();
   const [liked, setLiked] = useState(post.isLiked);
@@ -109,7 +102,6 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
   const [favoriteBusy, setFavoriteBusy] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
   const isFavoriteAuthor = favoriteAuthors.includes(post.author.username);
-  const doubleTapRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const { user: me } = useAuthStore();
   const isMe = me?.username === post.author.username;
   const isVerified = post.author.verificationStatus === 'ID_VERIFIED';
@@ -186,7 +178,6 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
     (firstMedia?.mimeType?.startsWith('video/') ?? false) ||
     post.type === 'VIDEO' ||
     post.type === 'SHORT_VIDEO';
-  const commentCount = post._count.comments ?? 0;
   const caption = post.caption?.trim() ?? '';
   const shouldTruncateCaption = caption.length > 140;
   const captionText = shouldTruncateCaption && !captionExpanded ? `${caption.slice(0, 140).trim()}...` : caption;

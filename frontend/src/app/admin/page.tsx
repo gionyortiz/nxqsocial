@@ -115,6 +115,28 @@ interface BetaFeedbackStats {
   resolved: number;
 }
 
+interface PasswordResetHistoryEntry {
+  createdAt: string;
+  usedAt?: string | null;
+  expiresAt: string;
+}
+
+interface AccountRecoveryAuditLog {
+  createdAt: string;
+  actionType: string;
+  reason?: string;
+  admin?: { username?: string };
+  meta?: { action?: string };
+}
+
+interface AccountRecoveryDetail extends AdminUser {
+  phone?: string;
+  registrationMethod?: string;
+  signupSource?: string;
+  passwordResetHistory?: PasswordResetHistoryEntry[];
+  auditLog?: AccountRecoveryAuditLog[];
+}
+
 // ── Constants ─────────────────────────────────────────────────────────────────
 
 const REASON_LABELS: Record<string, string> = {
@@ -304,19 +326,16 @@ type Tab = 'reports' | 'verifications' | 'safety' | 'audit' | 'users' | 'feedbac
 export default function AdminPage() {
   const user = useAuthStore((s) => s.user);
   const router = useRouter();
-  const [tab, setTab] = useState<Tab>('reports');
+  const initialUserFromQuery =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('user')
+      : null;
+  const [tab, setTab] = useState<Tab>(initialUserFromQuery ? 'recovery' : 'reports');
   const [loading, setLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [noticeType, setNoticeType] = useState<'success' | 'error'>('success');
 
-  // Auto-open Account Recovery tab if ?user= param is present
-  const [initialRecoveryUser, setInitialRecoveryUser] = useState<string | null>(null);
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    const u = params.get('user');
-    if (u) { setTab('recovery'); setInitialRecoveryUser(u); }
-  }, []);
+  const [initialRecoveryUser] = useState<string | null>(initialUserFromQuery);
 
   const [reports, setReports] = useState<Report[]>([]);
   const [verifications, setVerifications] = useState<Verification[]>([]);
@@ -362,7 +381,13 @@ export default function AdminPage() {
     finally { setLoading(false); }
   }, [showNotice]);
 
-  useEffect(() => { if (isAdmin) load(tab); }, [tab, isAdmin, load]);
+  useEffect(() => {
+    if (!isAdmin) return;
+    const id = window.setTimeout(() => {
+      void load(tab);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [tab, isAdmin, load]);
 
   useEffect(() => {
     if (!isAdmin) return;
@@ -757,43 +782,20 @@ function KpiCard({ label, value }: { label: string; value: number }) {
 function AccountRecoveryTab({ initialUser }: { initialUser?: string | null }) {
   const [search, setSearch] = useState(initialUser ?? '');
   const [users, setUsers] = useState<AdminUser[]>([]);
-  const [selected, setSelected] = useState<any | null>(null);
+  const [selected, setSelected] = useState<AccountRecoveryDetail | null>(null);
   const [loading, setLoading] = useState(false);
   const [detailLoading, setDetailLoading] = useState(false);
   const [notice, setNotice] = useState('');
   const [noticeType, setNoticeType] = useState<'ok' | 'err'>('ok');
   const [actionReason, setActionReason] = useState('');
 
-  // Auto-search when opened with a pre-filled username
-  useEffect(() => {
-    if (initialUser) doSearch(initialUser);
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialUser]);
-
-  const showNotice = (msg: string, type: 'ok' | 'err' = 'ok') => {
+  const showNotice = useCallback((msg: string, type: 'ok' | 'err' = 'ok') => {
     setNotice(msg);
     setNoticeType(type);
     setTimeout(() => setNotice(''), 4000);
-  };
+  }, []);
 
-  const doSearch = async (q?: string) => {
-    const term = q ?? search;
-    if (!term.trim()) return;
-    setLoading(true);
-    try {
-      const { data } = await api.get('/users/admin/list', { params: { search: term, take: 10 } });
-      const list = data.data ?? [];
-      setUsers(list);
-      // If exactly one result, auto-load detail
-      if (list.length === 1) loadDetail(list[0].id);
-    } catch {
-      showNotice('Search failed', 'err');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const loadDetail = async (userId: string) => {
+  const loadDetail = useCallback(async (userId: string) => {
     setDetailLoading(true);
     try {
       const { data } = await api.get(`/users/admin/${userId}/detail`);
@@ -803,7 +805,33 @@ function AccountRecoveryTab({ initialUser }: { initialUser?: string | null }) {
     } finally {
       setDetailLoading(false);
     }
-  };
+  }, [showNotice]);
+
+  const doSearch = useCallback(async (q?: string) => {
+    const term = q ?? search;
+    if (!term.trim()) return;
+    setLoading(true);
+    try {
+      const { data } = await api.get('/users/admin/list', { params: { search: term, take: 10 } });
+      const list = data.data ?? [];
+      setUsers(list);
+      // If exactly one result, auto-load detail
+      if (list.length === 1) void loadDetail(list[0].id);
+    } catch {
+      showNotice('Search failed', 'err');
+    } finally {
+      setLoading(false);
+    }
+  }, [search, loadDetail, showNotice]);
+
+  // Auto-search when opened with a pre-filled username.
+  useEffect(() => {
+    if (!initialUser) return;
+    const id = window.setTimeout(() => {
+      void doSearch(initialUser);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [initialUser, doSearch]);
 
   const action = async (userId: string, endpoint: string, label: string) => {
     if (!window.confirm(`${label} for this user?`)) return;
@@ -811,8 +839,9 @@ function AccountRecoveryTab({ initialUser }: { initialUser?: string | null }) {
       const { data } = await api.post(`/users/admin/${userId}/${endpoint}`, { reason: actionReason || undefined });
       showNotice(data.message ?? `${label} done.`, 'ok');
       if (selected?.id === userId) await loadDetail(userId);
-    } catch (e: any) {
-      showNotice(e?.response?.data?.message ?? `${label} failed`, 'err');
+    } catch (e: unknown) {
+      const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      showNotice(message ?? `${label} failed`, 'err');
     }
   };
 
@@ -967,11 +996,11 @@ function AccountRecoveryTab({ initialUser }: { initialUser?: string | null }) {
           </div>
 
           {/* Password reset history */}
-          {selected.passwordResetHistory?.length > 0 && (
+          {(selected.passwordResetHistory?.length ?? 0) > 0 && (
             <div>
               <h4 className="text-sm font-bold text-gray-300 mb-2">Password Reset History (last 5)</h4>
               <div className="space-y-1">
-                {selected.passwordResetHistory.map((r: any, i: number) => (
+                {(selected.passwordResetHistory ?? []).map((r: PasswordResetHistoryEntry, i: number) => (
                   <div key={i} className="text-xs text-gray-400 flex gap-4">
                     <span>Requested: {new Date(r.createdAt).toLocaleString()}</span>
                     <span>Used: {r.usedAt ? new Date(r.usedAt).toLocaleString() : '—'}</span>
@@ -983,17 +1012,17 @@ function AccountRecoveryTab({ initialUser }: { initialUser?: string | null }) {
           )}
 
           {/* Audit log */}
-          {selected.auditLog?.length > 0 && (
+          {(selected.auditLog?.length ?? 0) > 0 && (
             <div>
               <h4 className="text-sm font-bold text-gray-300 mb-2">Admin Action Log</h4>
               <div className="space-y-1 max-h-48 overflow-y-auto">
-                {selected.auditLog.map((l: any, i: number) => (
+                {(selected.auditLog ?? []).map((l: AccountRecoveryAuditLog, i: number) => (
                   <div key={i} className="text-xs text-gray-400 flex gap-3 py-1 border-b border-gray-800">
                     <span className="text-gray-500 shrink-0">{new Date(l.createdAt).toLocaleString()}</span>
                     <span className="text-yellow-400 shrink-0">@{l.admin?.username ?? 'system'}</span>
                     <span>{l.actionType}</span>
                     {l.reason && <span className="text-gray-500">— {l.reason}</span>}
-                    {(l.meta as any)?.action && <span className="text-blue-400">({(l.meta as any).action})</span>}
+                    {l.meta?.action && <span className="text-blue-400">({l.meta.action})</span>}
                   </div>
                 ))}
               </div>

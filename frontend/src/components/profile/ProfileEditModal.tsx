@@ -169,9 +169,9 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
 
       onSaved(updates);
       onClose();
-    } catch (err: any) {
-      const status = err?.response?.status;
-      const data = err?.response?.data;
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number; data?: { message?: string | string[]; error?: string } } })?.response?.status;
+      const data = (err as { response?: { data?: { message?: string | string[]; error?: string } } })?.response?.data;
       const rawMessage = data?.message ?? data?.error;
       const message = Array.isArray(rawMessage) ? rawMessage.join('. ') : rawMessage;
       let friendly: string;
@@ -179,9 +179,8 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
       else if (status === 403) friendly = 'You do not have permission to update this profile.';
       else if (status === 413) friendly = 'Image is too large. Please choose a smaller file.';
       else if (status === 422 || status === 400) friendly = message || 'Some fields are invalid. Please review and try again.';
-      else if (status >= 500) friendly = 'Server error. Please try again in a moment.';
-      else friendly = message || err?.message || 'Failed to save. Please try again.';
-      // eslint-disable-next-line no-console
+      else if (typeof status === 'number' && status >= 500) friendly = 'Server error. Please try again in a moment.';
+      else friendly = message || (err as { message?: string })?.message || 'Failed to save. Please try again.';
       console.error('[ProfileEditModal] save failed', { status, data });
       setError(friendly);
     } finally {

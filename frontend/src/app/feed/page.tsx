@@ -53,12 +53,12 @@ export default function FeedPage() {
     if (idx >= 0) setViewerIndex(idx);
   };
 
-  const fetchPosts = useCallback(async (c?: string | null, feedMode = mode) => {
-    if (loading || (!hasMore && c !== undefined)) return;
+  const fetchPosts = useCallback(async (c?: string | null, feedMode = mode, reset = false) => {
+    if (loading || (!hasMore && c !== undefined && !reset)) return;
     setLoading(true);
     try {
       const { data } = await api.get('/posts/feed', { params: { mode: feedMode, ...(c ? { cursor: c } : {}) } });
-      setPosts((prev) => c ? [...prev, ...data.data] : data.data);
+      setPosts((prev) => (reset ? data.data : c ? [...prev, ...data.data] : data.data));
       setCursor(data.nextCursor);
       setHasMore(!!data.nextCursor);
     } catch {
@@ -69,11 +69,11 @@ export default function FeedPage() {
   }, [loading, hasMore, mode]);
 
   useEffect(() => {
-    setPosts([]);
-    setCursor(null);
-    setHasMore(true);
-    fetchPosts(null, mode);
-  }, [mode]);
+    const id = window.setTimeout(() => {
+      void fetchPosts(null, mode, true);
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [mode, fetchPosts]);
 
   useEffect(() => {
     const obs = new IntersectionObserver(([entry]) => {
@@ -94,7 +94,7 @@ export default function FeedPage() {
               href="/upload"
               className="flex-1 h-11 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors px-4 flex items-center text-sm text-gray-500"
             >
-              What's on your mind?
+              What&apos;s on your mind?
             </Link>
           </div>
           <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-3 gap-2">

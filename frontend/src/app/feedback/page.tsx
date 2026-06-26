@@ -1,6 +1,6 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { api } from '@/lib/api';
@@ -45,35 +45,26 @@ function detectDevice(userAgent: string, width: number): DeviceType {
 
 export default function FeedbackPage() {
   const router = useRouter();
-  const [from, setFrom] = useState('/feed');
+  const initialFrom =
+    typeof window !== 'undefined'
+      ? new URLSearchParams(window.location.search).get('from') || '/feed'
+      : '/feed';
 
   const [type, setType] = useState<FeedbackType>('BUG');
   const [severity, setSeverity] = useState<Severity>('MEDIUM');
-  const [route, setRoute] = useState(from);
-  const [deviceType, setDeviceType] = useState<DeviceType>('DESKTOP');
-  const [browser, setBrowser] = useState('');
+  const [route, setRoute] = useState(initialFrom);
+  const [deviceType, setDeviceType] = useState<DeviceType>(() => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return 'DESKTOP';
+    return detectDevice(navigator.userAgent, window.innerWidth);
+  });
+  const [browser, setBrowser] = useState(() =>
+    typeof navigator !== 'undefined' ? navigator.userAgent.slice(0, 400) : '',
+  );
   const [description, setDescription] = useState('');
   const [screenshotUrl, setScreenshotUrl] = useState('');
   const [submitting, setSubmitting] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const params = new URLSearchParams(window.location.search);
-    setFrom(params.get('from') || '/feed');
-  }, []);
-
-  useEffect(() => {
-    setRoute(from);
-  }, [from]);
-
-  useEffect(() => {
-    const ua = typeof navigator !== 'undefined' ? navigator.userAgent : '';
-    const width = typeof window !== 'undefined' ? window.innerWidth : 0;
-    setBrowser(ua.slice(0, 400));
-    setDeviceType(detectDevice(ua, width));
-  }, []);
 
   async function onSubmit(e: FormEvent) {
     e.preventDefault();
@@ -99,8 +90,8 @@ export default function FeedbackPage() {
       setDescription('');
       setScreenshotUrl('');
       setMessage('Thanks — your feedback was sent.');
-    } catch (err: any) {
-      const msg = err?.response?.data?.message;
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message;
       setError(Array.isArray(msg) ? msg.join(', ') : (msg || 'Could not send feedback. Try again in a moment.'));
     } finally {
       setSubmitting(false);

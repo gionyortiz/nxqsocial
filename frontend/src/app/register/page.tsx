@@ -47,13 +47,15 @@ export default function RegisterPage() {
       setAuth(res.user, res.access_token);
       void trackEvent('signup_completed', { source: 'register_page' }, { isPublic: true });
       router.push('/feed');
-    } catch (err: any) {
-      if (err?.response?.status === 429) {
+    } catch (err: unknown) {
+      const status = (err as { response?: { status?: number; data?: { message?: string } } })?.response?.status;
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      if (status === 429) {
         setServerError('Too many signup attempts. Please wait a few minutes and try again.');
         setRetryInSec(60);
         return;
       }
-      setServerError(err.response?.data?.message ?? 'Registration failed');
+      setServerError(message ?? 'Registration failed');
     }
   };
 

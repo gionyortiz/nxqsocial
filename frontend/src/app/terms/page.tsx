@@ -66,7 +66,7 @@ export default function TermsPage() {
           You may not:
           <ul className="list-disc pl-5 mt-2 space-y-1">
             <li>Scrape, crawl, or otherwise extract data from the platform without written permission.</li>
-            <li>Interfere with or disrupt the platform's infrastructure.</li>
+            <li>Interfere with or disrupt the platform&apos;s infrastructure.</li>
             <li>Attempt to gain unauthorised access to any part of the platform or its systems.</li>
             <li>Use automated tools to create accounts or interact with the platform.</li>
           </ul>

@@ -74,7 +74,15 @@ function ViewerItem({ post, active, muted, onToggleMute, onOpenEngagement }: {
           preload="metadata"
           onLoadedData={() => setPlaybackError(false)}
           onError={() => setPlaybackError(true)}
-          onClick={() => { const v = videoRef.current; if (!v) return; v.paused ? v.play().catch(() => {}) : v.pause(); }}
+          onClick={() => {
+            const v = videoRef.current;
+            if (!v) return;
+            if (v.paused) {
+              v.play().catch(() => {});
+            } else {
+              v.pause();
+            }
+          }}
           poster={firstMedia?.thumbnailUrl ?? undefined}
         />
       )}

@@ -151,9 +151,10 @@ export default function AdminMediaPage() {
   );
 
   useEffect(() => {
-    setItems([]);
-    setNextCursor(null);
-    load();
+    const id = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(id);
   }, [load]);
 
   const act = useCallback(

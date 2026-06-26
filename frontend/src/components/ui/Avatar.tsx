@@ -1,7 +1,7 @@
 'use client';
 
 import Image from 'next/image';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { cn, resolveMediaUrl } from '@/lib/utils';
 
 interface AvatarProps {
@@ -18,12 +18,9 @@ export function Avatar({ src, alt, size = 'md', className }: AvatarProps) {
   const px = sizes[size];
   const initials = (alt || '?').slice(0, 2).toUpperCase();
   const resolved = src ? resolveMediaUrl(src) : '';
-  const [failed, setFailed] = useState(false);
+  const [failedForSrc, setFailedForSrc] = useState<string | null>(null);
 
-  // Reset failure state when src changes (e.g. after a fresh upload).
-  useEffect(() => { setFailed(false); }, [resolved]);
-
-  const showImage = !!resolved && !failed;
+  const showImage = !!resolved && failedForSrc !== resolved;
 
   return (
     <div
@@ -42,7 +39,7 @@ export function Avatar({ src, alt, size = 'md', className }: AvatarProps) {
           height={px}
           className="w-full h-full object-cover"
           unoptimized
-          onError={() => setFailed(true)}
+          onError={() => setFailedForSrc(resolved)}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center text-white font-bold" style={{ fontSize: px * 0.35 }}>

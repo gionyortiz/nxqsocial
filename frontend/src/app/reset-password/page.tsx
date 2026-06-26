@@ -43,8 +43,9 @@ function ResetForm() {
       await api.post('/auth/reset-password', { token, password: data.password });
       setDone(true);
       setTimeout(() => router.push('/login'), 2500);
-    } catch (err: any) {
-      setServerError(err.response?.data?.message ?? 'This reset link is invalid or has expired.');
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setServerError(message ?? 'This reset link is invalid or has expired.');
     }
   };
 

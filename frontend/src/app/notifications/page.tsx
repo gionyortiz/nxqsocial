@@ -76,7 +76,12 @@ export default function NotificationsPage() {
     }
   }, []);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => {
+    const id = window.setTimeout(() => {
+      void load();
+    }, 0);
+    return () => window.clearTimeout(id);
+  }, [load]);
 
   const markAllRead = async () => {
     setMarking(true);

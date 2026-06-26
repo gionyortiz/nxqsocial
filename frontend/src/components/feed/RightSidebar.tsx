@@ -37,10 +37,7 @@ export function RightSidebar() {
   const [profileStats, setProfileStats] = useState<{ followers: number; posts: number } | null>(null);
 
   useEffect(() => {
-    if (!user?.username) {
-      setProfileStats(null);
-      return;
-    }
+    if (!user?.username) return;
     api
       .get(`/users/${user.username}`)
       .then(({ data }) => {

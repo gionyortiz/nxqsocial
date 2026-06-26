@@ -2,7 +2,6 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Radio } from 'lucide-react';
 import { fetchActiveLives, liveHref, type ActiveLive } from '@/lib/live';
 import { Avatar } from '@/components/ui/Avatar';
 

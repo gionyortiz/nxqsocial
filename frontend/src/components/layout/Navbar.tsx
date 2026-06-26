@@ -45,31 +45,22 @@ export function Navbar() {
   const { user, logout } = useAuthStore();
   const { t } = useI18n();
   const [menuOpen, setMenuOpen] = useState(false);
-  const [compact, setCompact] = useState(false);
-  const [seen, setSeen] = useState<Record<string, boolean>>({});
+  const [compact, setCompact] = useState(() =>
+    typeof window !== 'undefined' && window.localStorage.getItem('nxq_nav_compact') === '1',
+  );
+  const [seen] = useState<Record<string, boolean>>(() => {
+    if (typeof window === 'undefined') return {};
+    try {
+      const raw = window.localStorage.getItem(SEEN_KEY);
+      return raw ? (JSON.parse(raw) as Record<string, boolean>) : {};
+    } catch {
+      return {};
+    }
+  });
   const [unreadNotifs, setUnreadNotifs] = useState(0);
 
-  useEffect(() => {
-    const saved = typeof window !== 'undefined' ? window.localStorage.getItem('nxq_nav_compact') : null;
-    if (saved === '1') setCompact(true);
-    try {
-      const raw = typeof window !== 'undefined' ? window.localStorage.getItem(SEEN_KEY) : null;
-      if (raw) setSeen(JSON.parse(raw));
-    } catch {}
-  }, []);
-
-  // Mark a badged path as seen the moment the user opens it.
-  useEffect(() => {
-    if (!pathname) return;
-    if (DEFAULT_BADGES[pathname] && !seen[pathname]) {
-      const next = { ...seen, [pathname]: true };
-      setSeen(next);
-      try { window.localStorage.setItem(SEEN_KEY, JSON.stringify(next)); } catch {}
-    }
-  }, [pathname, seen]);
-
   const badgeFor = (href: string) => {
-    if (href === '/notifications') return unreadNotifs;
+    if (href === '/notifications') return pathname === '/notifications' ? 0 : unreadNotifs;
     return seen[href] ? 0 : (DEFAULT_BADGES[href] ?? 0);
   };
 
@@ -89,11 +80,6 @@ export function Navbar() {
     const id = setInterval(fetchUnread, 30000);
     return () => { active = false; clearInterval(id); };
   }, [user]);
-
-  // Clear the badge as soon as the user opens the notifications page.
-  useEffect(() => {
-    if (pathname === '/notifications') setUnreadNotifs(0);
-  }, [pathname]);
 
   const toggleCompact = () => {
     setCompact((prev) => {

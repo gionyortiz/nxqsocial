@@ -86,13 +86,11 @@ interface I18nValue {
 const I18nContext = createContext<I18nValue | null>(null);
 
 export function I18nProvider({ children }: { children: React.ReactNode }) {
-  const [lang, setLangState] = useState<LangCode>('en');
+  const [lang, setLangState] = useState<LangCode>(() => readLang());
 
-  // Load saved language on mount and keep the <html lang> attribute in sync.
+  // Keep the <html lang> attribute in sync and react to cross-tab updates.
   useEffect(() => {
-    const initial = readLang();
-    setLangState(initial);
-    document.documentElement.lang = initial;
+    document.documentElement.lang = lang;
     // React to changes made in other tabs or components.
     const onChange = () => {
       const next = readLang();
@@ -105,7 +103,7 @@ export function I18nProvider({ children }: { children: React.ReactNode }) {
       window.removeEventListener(EVENT, onChange);
       window.removeEventListener('storage', onChange);
     };
-  }, []);
+  }, [lang]);
 
   const setLang = useCallback((code: LangCode) => {
     window.localStorage.setItem(STORAGE_KEY, code);

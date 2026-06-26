@@ -59,7 +59,15 @@ function ReelItem({ reel, active }: { reel: Reel; active: boolean }) {
           loop
           muted={muted}
           playsInline
-          onClick={() => { const v = videoRef.current; if (!v) return; v.paused ? v.play().catch(() => {}) : v.pause(); }}
+          onClick={() => {
+            const v = videoRef.current;
+            if (!v) return;
+            if (v.paused) {
+              v.play().catch(() => {});
+            } else {
+              v.pause();
+            }
+          }}
           poster={firstMedia?.thumbnailUrl ?? undefined}
         />
       )}

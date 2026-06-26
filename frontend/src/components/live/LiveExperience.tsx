@@ -243,7 +243,7 @@ export function LiveExperience({
           break;
         case 'guest-approve':
           // Use ref to avoid stale closure on user?.id
-          if (!host && (evt.userId === userIdRef.current || evt.userId === user?.id)) {
+          if (!host && evt.userId === userIdRef.current) {
             router.push(buildGuestJoinHref());
           }
           break;
@@ -278,7 +278,7 @@ export function LiveExperience({
           break;
       }
     },
-    [addFloatingReaction, addGiftBurst, isOwner, host, room, router, buildGuestJoinHref],
+    [addFloatingReaction, addGiftBurst, isOwner, host, router, buildGuestJoinHref],
   );
 
   const { send } = useDataChannel(handleData);
@@ -305,7 +305,7 @@ export function LiveExperience({
     if (!isOwner) return;
     let stopped = false;
     liveStartedAtRef.current = nowMs();
-    peakViewersRef.current = viewers;
+    peakViewersRef.current = viewersRef.current;
     chatCountRef.current = 0;
     void startLiveSession(room);
     const beat = () => {

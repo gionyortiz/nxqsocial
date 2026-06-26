@@ -75,7 +75,7 @@ export default function VerifyPage() {
       if (tier === 'ID_VERIFIED') {
         // Use Stripe Identity — redirect to Stripe-hosted verification page
         const { data } = await api.post('/verification/start-identity-check');
-        if (data.url) window.location.href = data.url;
+        if (data.url) window.location.assign(data.url);
         return;
       }
       await api.post('/verification/request', { tier });
@@ -83,8 +83,9 @@ export default function VerifyPage() {
       // refresh
       const { data } = await api.get('/verification/status');
       setStatus(data);
-    } catch (e: any) {
-      setError(e.response?.data?.message ?? 'Request failed');
+    } catch (e: unknown) {
+      const message = (e as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setError(message ?? 'Request failed');
     } finally {
       setRequesting('');
     }
@@ -116,7 +117,7 @@ export default function VerifyPage() {
         {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
 
         <div className="flex flex-col gap-4">
-          {TIERS.map((tier, idx) => {
+          {TIERS.map((tier) => {
             const tierIdx = TIER_ORDER.indexOf(tier.key);
             const isCurrentOrBelow = tierIdx <= currentTierIdx;
             const hasPending = status?.verifications.some((v) => v.level === tier.key && v.status === 'PENDING');

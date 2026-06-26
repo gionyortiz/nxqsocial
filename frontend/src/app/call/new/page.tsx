@@ -26,13 +26,11 @@ export default function NewCallPage() {
   const [results, setResults] = useState<UserLite[]>([]);
   const [selected, setSelected] = useState<UserLite[]>([]);
   const [starting, setStarting] = useState(false);
-  const [preferredType, setPreferredType] = useState<'voice' | 'video'>('video');
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
+  const preferredType = useState<'voice' | 'video'>(() => {
+    if (typeof window === 'undefined') return 'video';
     const param = new URLSearchParams(window.location.search).get('type');
-    setPreferredType(param === 'voice' ? 'voice' : 'video');
-  }, []);
+    return param === 'voice' ? 'voice' : 'video';
+  })[0];
 
   useEffect(() => {
     let active = true;

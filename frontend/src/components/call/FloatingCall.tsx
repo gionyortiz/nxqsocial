@@ -55,7 +55,13 @@ function VoiceCallPanel({
   onEnd: () => void;
 }) {
   const participants = useParticipants();
-  const local = participants.find((p) => p.isLocal) as any;
+  type LocalParticipantControls = {
+    setMicrophoneEnabled?: (enabled: boolean) => Promise<void>;
+    setCameraEnabled?: (enabled: boolean) => Promise<void>;
+  };
+  const local = participants.find((p) => p.isLocal) as
+    | (typeof participants[number] & LocalParticipantControls)
+    | undefined;
   const remoteCount = participants.filter((p) => !p.isLocal).length;
   const [micEnabled, setMicEnabled] = useState(true);
   const [cameraEnabled, setCameraEnabled] = useState(false);
@@ -63,10 +69,7 @@ function VoiceCallPanel({
   const [duration, setDuration] = useState(0);
 
   useEffect(() => {
-    if (!connectedAt) {
-      setDuration(0);
-      return;
-    }
+    if (!connectedAt) return;
     const tick = () => setDuration(Math.max(0, Math.floor((Date.now() - connectedAt) / 1000)));
     tick();
     const id = setInterval(tick, 1000);
@@ -94,7 +97,13 @@ function VoiceCallPanel({
   };
 
   const selectSpeaker = async () => {
-    const selectAudioOutput = (navigator as any)?.mediaDevices?.selectAudioOutput;
+    const selectAudioOutput = (
+      navigator as Navigator & {
+        mediaDevices?: MediaDevices & {
+          selectAudioOutput?: () => Promise<{ label?: string }>;
+        };
+      }
+    )?.mediaDevices?.selectAudioOutput;
     if (typeof selectAudioOutput !== 'function') return;
     try {
       const device = await selectAudioOutput();
@@ -172,8 +181,6 @@ function OneToOneVideoStage({
   const pipTrack = localMain ? remoteTrack : localTrack;
   const mainLabel = localMain ? 'You' : (remoteTrack?.participant.name || remoteTrack?.participant.identity || peerName);
   const pipLabel = localMain ? (remoteTrack?.participant.name || remoteTrack?.participant.identity || peerName) : 'You';
-  const remoteDisplayName =
-    remoteTrack?.participant.name || remoteTrack?.participant.identity || peerName;
 
   return (
     <div className="relative h-full w-full bg-black overflow-hidden">
@@ -334,20 +341,10 @@ export function FloatingCall() {
 
   useEffect(() => {
     if (!room) {
-      setToken(null);
-      setServerUrl(null);
-      setError(null);
-      setPos(null);
-      setConnectedAt(null);
-      setAppBackgrounded(false);
-      setShowReturnBanner(false);
       endedRef.current = false;
       return;
     }
     let cancelled = false;
-    setToken(null);
-    setServerUrl(null);
-    setError(null);
     api
       .post('/calls/token', { room, video })
       .then(({ data }) => {

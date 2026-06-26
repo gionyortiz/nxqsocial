@@ -96,6 +96,10 @@ export default function SettingsPage() {
   const [deleteConfirm, setDeleteConfirm] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  const getApiMessage = (err: unknown): string | undefined => {
+    return (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+  };
+
   useEffect(() => {
     api.get('/users/me/settings')
       .then(({ data }) => { setEmailNotifications(data.emailNotifications); })
@@ -164,8 +168,8 @@ export default function SettingsPage() {
       setPwDone(true);
       setCurrentPassword(''); setNewPassword(''); setConfirmPassword('');
       setTimeout(() => { setPwOpen(false); setPwDone(false); }, 1800);
-    } catch (err: any) {
-      setPwError(err.response?.data?.message ?? 'Could not change password. Please try again.');
+    } catch (err: unknown) {
+      setPwError(getApiMessage(err) ?? 'Could not change password. Please try again.');
     } finally {
       setPwSaving(false);
     }
@@ -187,7 +191,7 @@ export default function SettingsPage() {
     }
   };
 
-  const handleProfileSaved = (updates: any) => {
+  const handleProfileSaved = (updates: Parameters<typeof updateUser>[0]) => {
     updateUser(updates);
   };
 
@@ -426,7 +430,7 @@ export default function SettingsPage() {
       {/* ── Edit profile modal ─────────────────────────────────────── */}
       {editOpen && (
         <ProfileEditModal
-          profile={user as any}
+          profile={user}
           onClose={() => setEditOpen(false)}
           onSaved={handleProfileSaved}
         />

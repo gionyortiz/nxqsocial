@@ -121,10 +121,7 @@ export function IncomingCallModal() {
 
   useEffect(() => {
     // Don't poll when logged out, on a call page, or already inside a call.
-    if (!user || pathname?.startsWith('/call/') || activeRoom) {
-      setInvite(null);
-      return;
-    }
+    if (!user || pathname?.startsWith('/call/') || activeRoom) return;
     let active = true;
     const tick = async () => {
       try {
@@ -184,7 +181,7 @@ export function IncomingCallModal() {
     }
   };
 
-  if (!invite) return null;
+  if (!invite || !user || pathname?.startsWith('/call/') || activeRoom) return null;
 
   return (
     <div className="fixed z-[120] bottom-4 right-4 left-4 sm:left-auto sm:w-80 pointer-events-none">

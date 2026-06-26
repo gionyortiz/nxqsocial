@@ -182,7 +182,14 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
 
   const handleProfileSaved = (updates: Partial<Profile>) => {
     setProfile((prev) => prev ? { ...prev, ...updates } : prev);
-    updateUser(updates as any);
+    updateUser(updates as Partial<{
+      displayName: string;
+      bio: string;
+      location: string;
+      website: string;
+      avatarUrl: string;
+      bannerUrl: string;
+    }>);
   };
 
   const startProfileCall = async (callType: 'voice' | 'video') => {

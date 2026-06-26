@@ -33,8 +33,9 @@ export default function LoginPage() {
       const { data: res } = await api.post('/auth/login', data);
       setAuth(res.user, res.access_token);
       router.push('/feed');
-    } catch (err: any) {
-      setServerError(err.response?.data?.message ?? 'Login failed');
+    } catch (err: unknown) {
+      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
+      setServerError(message ?? 'Login failed');
     }
   };
 

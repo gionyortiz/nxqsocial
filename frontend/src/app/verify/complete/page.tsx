@@ -15,13 +15,17 @@ function VerifyCompleteContent() {
   const router = useRouter();
   const params = useSearchParams();
   const sessionId = params.get('session_id');
-  const [state, setState] = useState<'processing' | 'done' | 'error'>('processing');
+  const [state, setState] = useState<'processing' | 'done' | 'error'>(() =>
+    sessionId ? 'processing' : 'error',
+  );
 
   useEffect(() => {
-    if (!sessionId) { setState('error'); return; }
+    if (!sessionId) return;
     // Trigger a trust score refresh so UI shows updated score
-    api.post('/trust/recalculate').catch(() => {});
-    setState('done');
+    api
+      .post('/trust/recalculate')
+      .catch(() => {})
+      .finally(() => setState('done'));
   }, [sessionId]);
 
   return (
