@@ -1,6 +1,7 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
+import Image from 'next/image';
 import { ArrowLeft } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 
@@ -12,10 +13,14 @@ export interface InfoSection {
 interface Props {
   title: string;
   subtitle?: string;
+  poster?: {
+    src: string;
+    alt: string;
+  };
   sections: InfoSection[];
 }
 
-export function InfoPage({ title, subtitle, sections }: Props) {
+export function InfoPage({ title, subtitle, poster, sections }: Props) {
   const router = useRouter();
 
   return (
@@ -27,6 +32,17 @@ export function InfoPage({ title, subtitle, sections }: Props) {
         >
           <ArrowLeft size={16} /> Back
         </button>
+
+        {poster && (
+          <Image
+            src={poster.src}
+            alt={poster.alt}
+            width={1254}
+            height={1254}
+            priority
+            className="mb-5 h-auto w-full rounded-lg border border-white/10 shadow-[0_24px_70px_rgba(124,58,237,0.26)]"
+          />
+        )}
 
         <div className="rounded-3xl bg-white ring-1 ring-gray-100 shadow-sm overflow-hidden">
           <div className="px-6 py-7 bg-gradient-to-br from-purple-600 to-fuchsia-600 text-white">

@@ -5,6 +5,10 @@ export default function AboutPage() {
     <InfoPage
       title="About NXQ Social"
       subtitle="A trust-first social network built for real people and real connections."
+      poster={{
+        src: '/brand/nxq-social-poster.png',
+        alt: 'NXQ Social official brand poster',
+      }}
       sections={[
         {
           heading: 'Our mission',

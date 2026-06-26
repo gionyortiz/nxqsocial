@@ -1,28 +1,16 @@
 'use client';
 
-/**
- * NexaQuantum brand logo — a layered hexagonal "quantum core" emblem rendered
- * entirely in SVG so it stays crisp at any size and needs no image asset.
- *
- * Usage:
- *   <Logo size={40} />                      // just the mark
- *   <Logo size={32} withWordmark />         // mark + "NexaQuantum" wordmark
- *   <Logo size={32} withWordmark wordmark="NXQ Social" />
- */
+import { useId } from 'react';
 
 type LogoProps = {
-  /** Pixel size of the square mark. */
   size?: number;
-  /** Show the text wordmark beside the mark. */
   withWordmark?: boolean;
-  /** Override the wordmark text. */
   wordmark?: string;
   className?: string;
 };
 
 export function LogoMark({ size = 40, className }: { size?: number; className?: string }) {
-  // Unique id suffix so multiple instances don't clash on gradient/filter ids.
-  const uid = `nxq-${size}`;
+  const uid = `nxq-${useId().replace(/:/g, '')}`;
 
   return (
     <svg
@@ -33,160 +21,106 @@ export function LogoMark({ size = 40, className }: { size?: number; className?: 
       xmlns="http://www.w3.org/2000/svg"
       className={className}
       role="img"
-      aria-label="NexaQuantum logo"
+      aria-label="NXQ Social logo"
     >
       <defs>
-        {/* Light-catching steel for top/left facets */}
-        <linearGradient id={`${uid}-steelLight`} x1="30" y1="8" x2="90" y2="80" gradientUnits="userSpaceOnUse">
+        <linearGradient id={`${uid}-bg`} x1="0" y1="0" x2="120" y2="120" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#32116d" />
+          <stop offset="0.45" stopColor="#120827" />
+          <stop offset="1" stopColor="#071b3d" />
+        </linearGradient>
+        <radialGradient id={`${uid}-aura`} cx="50%" cy="46%" r="58%">
+          <stop offset="0" stopColor="#d946ef" stopOpacity="0.95" />
+          <stop offset="0.45" stopColor="#7c3aed" stopOpacity="0.55" />
+          <stop offset="1" stopColor="#22d3ee" stopOpacity="0" />
+        </radialGradient>
+        <linearGradient id={`${uid}-neon`} x1="17" y1="17" x2="103" y2="103" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#f5d0fe" />
+          <stop offset="0.38" stopColor="#a855f7" />
+          <stop offset="0.72" stopColor="#4f46e5" />
+          <stop offset="1" stopColor="#22d3ee" />
+        </linearGradient>
+        <linearGradient id={`${uid}-steelLight`} x1="31" y1="15" x2="91" y2="80" gradientUnits="userSpaceOnUse">
           <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.4" stopColor="#d7deeb" />
-          <stop offset="1" stopColor="#9aa7bd" />
+          <stop offset="0.42" stopColor="#e8edf7" />
+          <stop offset="1" stopColor="#8b95ad" />
         </linearGradient>
-        {/* Darker steel for bottom/right facets */}
-        <linearGradient id={`${uid}-steelDark`} x1="40" y1="40" x2="100" y2="116" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#7c8aa3" />
-          <stop offset="0.6" stopColor="#4a566b" />
-          <stop offset="1" stopColor="#2b3445" />
+        <linearGradient id={`${uid}-steelDark`} x1="37" y1="38" x2="96" y2="107" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#8790aa" />
+          <stop offset="0.52" stopColor="#33405c" />
+          <stop offset="1" stopColor="#141a2b" />
         </linearGradient>
-        <linearGradient id={`${uid}-glow`} x1="60" y1="22" x2="60" y2="98" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#a5f3fc" />
-          <stop offset="0.5" stopColor="#22d3ee" />
-          <stop offset="1" stopColor="#0ea5e9" />
-        </linearGradient>
-        <radialGradient id={`${uid}-cavity`} cx="50%" cy="50%" r="55%">
-          <stop offset="0" stopColor="#0b3a5c" />
-          <stop offset="0.7" stopColor="#0a2740" />
-          <stop offset="1" stopColor="#06121f" />
-        </radialGradient>
-        <radialGradient id={`${uid}-core`} cx="42%" cy="38%" r="62%">
+        <radialGradient id={`${uid}-core`} cx="42%" cy="35%" r="65%">
           <stop offset="0" stopColor="#ffffff" />
-          <stop offset="0.3" stopColor="#cdeeff" />
-          <stop offset="0.65" stopColor="#38bdf8" />
-          <stop offset="1" stopColor="#075985" />
+          <stop offset="0.28" stopColor="#e9d5ff" />
+          <stop offset="0.62" stopColor="#818cf8" />
+          <stop offset="1" stopColor="#1d4ed8" />
         </radialGradient>
-        <radialGradient id={`${uid}-aura`} cx="50%" cy="50%" r="50%">
-          <stop offset="0" stopColor="#a855f7" stopOpacity="0.9" />
-          <stop offset="0.55" stopColor="#7c3aed" stopOpacity="0.45" />
-          <stop offset="1" stopColor="#7c3aed" stopOpacity="0" />
-        </radialGradient>
-        <linearGradient id={`${uid}-purple`} x1="20" y1="10" x2="100" y2="110" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#d8b4fe" />
-          <stop offset="0.5" stopColor="#a855f7" />
-          <stop offset="1" stopColor="#6d28d9" />
-        </linearGradient>
-        <filter id={`${uid}-shadow`} x="-40%" y="-40%" width="180%" height="180%">
-          <feDropShadow dx="0" dy="2" stdDeviation="3.5" floodColor="#a855f7" floodOpacity="0.7" />
+        <filter id={`${uid}-blur`} x="-50%" y="-50%" width="200%" height="200%">
+          <feGaussianBlur stdDeviation="2.8" />
         </filter>
-        <filter id={`${uid}-soft`} x="-50%" y="-50%" width="200%" height="200%">
-          <feGaussianBlur stdDeviation="2.5" />
+        <filter id={`${uid}-shadow`} x="-45%" y="-45%" width="190%" height="190%">
+          <feDropShadow dx="0" dy="5" stdDeviation="6" floodColor="#3b0764" floodOpacity="0.8" />
         </filter>
       </defs>
 
-      {/* Purple aura glow behind the mark */}
-      <circle cx="60" cy="60" r="58" fill={`url(#${uid}-aura)`} />
+      <rect width="120" height="120" rx="24" fill="#07071a" />
+      <rect x="7" y="7" width="106" height="106" rx="26" fill={`url(#${uid}-bg)`} stroke={`url(#${uid}-neon)`} strokeWidth="1.8" />
+      <circle cx="60" cy="58" r="53" fill={`url(#${uid}-aura)`} />
+      <circle cx="60" cy="58" r="44" fill="#a855f7" opacity="0.24" filter={`url(#${uid}-blur)`} />
 
-      {/* ── Outer hexagon: split into light + dark facets for a 3D bevel ── */}
-      {/* dark base (full) */}
-      <polygon
-        points="60,5 109,32.5 109,87.5 60,115 11,87.5 11,32.5"
-        fill={`url(#${uid}-steelDark)`}
-        stroke={`url(#${uid}-purple)`}
-        strokeWidth="3"
-        filter={`url(#${uid}-shadow)`}
-      />
-      {/* light facet over the top-left half */}
-      <polygon
-        points="60,5 109,32.5 60,60 11,32.5"
-        fill={`url(#${uid}-steelLight)`}
-        opacity="0.95"
-      />
-      <polygon
-        points="11,32.5 60,60 11,87.5"
-        fill={`url(#${uid}-steelLight)`}
-        opacity="0.55"
-      />
+      <g filter={`url(#${uid}-shadow)`}>
+        <polygon points="60,13 103,37 103,83 60,107 17,83 17,37" fill={`url(#${uid}-steelDark)`} stroke={`url(#${uid}-neon)`} strokeWidth="3" />
+        <polygon points="60,13 103,37 60,60 17,37" fill={`url(#${uid}-steelLight)`} opacity="0.98" />
+        <polygon points="17,37 60,60 17,83" fill={`url(#${uid}-steelLight)`} opacity="0.45" />
+        <polygon points="103,37 60,60 103,83" fill="#1b2140" opacity="0.82" />
+        <polygon points="60,24 92,42 92,78 60,96 28,78 28,42" fill="none" stroke="#f5d0fe" strokeWidth="1.1" opacity="0.72" />
+        <polygon points="60,28 87,44 87,76 60,92 33,76 33,44" fill="#120827" stroke="#8b5cf6" strokeWidth="2.2" />
+        <polygon points="60,38 78,49 78,71 60,82 42,71 42,49" fill="#0b1027" stroke="#c4b5fd" strokeWidth="2.1" />
+        <polygon points="60,44 73,52 73,68 60,76 47,68 47,52" fill="#172554" stroke="#22d3ee" strokeWidth="1.6" />
 
-      {/* Beveled inner edge of the metal ring */}
-      <polygon
-        points="60,18 98,39 98,81 60,102 22,81 22,39"
-        fill="none"
-        stroke="#e8edf5"
-        strokeWidth="1.5"
-        opacity="0.6"
-      />
-
-      {/* ── Circuit traces etched into the metal ── */}
-      <g stroke="#0ea5e9" strokeWidth="1.4" strokeLinecap="round" opacity="0.55">
-        <path d="M60 8 V20" />
-        <path d="M88 24 L80 38" />
-        <path d="M104 50 L92 56 M104 50 L99 44" />
-        <path d="M104 70 L92 64" />
-        <path d="M88 96 L80 82" />
-        <path d="M32 96 L40 82" />
-        <path d="M16 70 L28 64" />
-        <path d="M16 50 L28 56 M16 50 L21 44" />
-        <path d="M32 24 L40 38" />
+        <g stroke="#d946ef" strokeWidth="1.15" strokeLinecap="round" opacity="0.82">
+          <path d="M31 49 H44" />
+          <path d="M76 49 H89" />
+          <path d="M31 71 H44" />
+          <path d="M76 71 H89" />
+          <path d="M45 31 L52 43" />
+          <path d="M75 31 L68 43" />
+          <path d="M45 89 L52 77" />
+          <path d="M75 89 L68 77" />
+          <path d="M21 57 H30" />
+          <path d="M90 57 H99" />
+          <path d="M21 63 H30" />
+          <path d="M90 63 H99" />
+        </g>
+        <g fill="#c084fc" stroke="#f5d0fe" strokeWidth="0.7">
+          <circle cx="31" cy="49" r="3.2" />
+          <circle cx="89" cy="49" r="3.2" />
+          <circle cx="31" cy="71" r="3.2" />
+          <circle cx="89" cy="71" r="3.2" />
+          <circle cx="45" cy="31" r="2.6" />
+          <circle cx="75" cy="31" r="2.6" />
+          <circle cx="45" cy="89" r="2.6" />
+          <circle cx="75" cy="89" r="2.6" />
+        </g>
+        <circle cx="60" cy="60" r="18" fill="#7c3aed" opacity="0.55" filter={`url(#${uid}-blur)`} />
+        <circle cx="60" cy="60" r="13.5" fill={`url(#${uid}-core)`} stroke="#f5f3ff" strokeWidth="1.7" />
+        <circle cx="60" cy="60" r="8" fill="#312e81" opacity="0.38" />
+        <ellipse cx="55.5" cy="55.5" rx="4.8" ry="3.5" fill="#ffffff" opacity="0.94" />
       </g>
-      <g fill="#67e8f9">
-        <circle cx="80" cy="38" r="1.9" /><circle cx="92" cy="56" r="1.9" />
-        <circle cx="92" cy="64" r="1.9" /><circle cx="80" cy="82" r="1.9" />
-        <circle cx="40" cy="82" r="1.9" /><circle cx="28" cy="64" r="1.9" />
-        <circle cx="28" cy="56" r="1.9" /><circle cx="40" cy="38" r="1.9" />
-      </g>
-
-      {/* Glowing cyan rim hexagon */}
-      <polygon
-        points="60,22 94,41 94,79 60,98 26,79 26,41"
-        fill="none"
-        stroke={`url(#${uid}-glow)`}
-        strokeWidth="3.2"
-      />
-      <polygon
-        points="60,22 94,41 94,79 60,98 26,79 26,41"
-        fill="none"
-        stroke="#a5f3fc"
-        strokeWidth="6"
-        opacity="0.35"
-        filter={`url(#${uid}-soft)`}
-      />
-
-      {/* Recessed dark cavity */}
-      <polygon
-        points="60,33 85,47.5 85,72.5 60,87 35,72.5 35,47.5"
-        fill={`url(#${uid}-cavity)`}
-        stroke={`url(#${uid}-glow)`}
-        strokeWidth="2"
-      />
-
-      {/* Inner stepped hexagon */}
-      <polygon
-        points="60,41 78,51.5 78,68.5 60,79 42,68.5 42,51.5"
-        fill="none"
-        stroke="#38bdf8"
-        strokeWidth="1.6"
-        opacity="0.8"
-      />
-
-      {/* Core glow halo */}
-      <circle cx="60" cy="60" r="20" fill="#22d3ee" opacity="0.35" filter={`url(#${uid}-soft)`} />
-
-      {/* Quantum core orb */}
-      <circle cx="60" cy="60" r="13.5" fill={`url(#${uid}-core)`} />
-      <circle cx="60" cy="60" r="13.5" fill="none" stroke="#e0f2fe" strokeWidth="1.5" opacity="0.8" />
-      <ellipse cx="55.5" cy="55" rx="4.5" ry="3.2" fill="#ffffff" opacity="0.92" />
     </svg>
   );
 }
 
-export default function Logo({ size = 40, withWordmark = false, wordmark = 'NexaQuantum', className }: LogoProps) {
+export default function Logo({ size = 40, withWordmark = false, wordmark = 'NXQ Social', className }: LogoProps) {
   if (!withWordmark) return <LogoMark size={size} className={className} />;
 
   return (
     <span className={`inline-flex items-center gap-2 ${className ?? ''}`}>
       <LogoMark size={size} />
       <span
-        className="font-black tracking-tight bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent"
-        style={{ fontSize: size * 0.55 }}
+        className="font-black bg-gradient-to-r from-white via-fuchsia-300 to-cyan-300 bg-clip-text text-transparent"
+        style={{ fontSize: size * 0.55, letterSpacing: 0 }}
       >
         {wordmark}
       </span>
