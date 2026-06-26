@@ -331,6 +331,8 @@ export default function FeedScreen() {
           Alert.alert('Link copied', 'Share is not available in this browser, so we copied the post link.');
           return;
         }
+        Alert.alert('Share unavailable', 'This browser cannot open the share sheet.');
+        return;
       }
 
       await Share.share({ message });

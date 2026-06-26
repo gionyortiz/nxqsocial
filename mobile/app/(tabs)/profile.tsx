@@ -88,6 +88,8 @@ export default function ProfileScreen() {
           Alert.alert('Link copied', 'Profile link copied to clipboard.');
           return;
         }
+        Alert.alert('Share unavailable', 'This browser cannot open the share sheet.');
+        return;
       }
       await Share.share({ message });
     } catch {
