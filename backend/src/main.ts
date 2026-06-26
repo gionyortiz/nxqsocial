@@ -24,7 +24,10 @@ async function bootstrap() {
   app.useGlobalPipes(new ValidationPipe({ whitelist: true, forbidNonWhitelisted: true }));
 
   // ── CORS ─────────────────────────────────────────────────────────────────
-  const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3001').split(',').map((s) => s.trim());
+  const allowedOrigins = (process.env.FRONTEND_URL ?? 'http://localhost:3001,http://localhost:8081')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
   app.enableCors({ origin: allowedOrigins.length === 1 ? allowedOrigins[0] : allowedOrigins, credentials: true });
 
   app.setGlobalPrefix('api');

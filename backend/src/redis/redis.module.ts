@@ -13,7 +13,7 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
       useFactory: (config: ConfigService) => {
         const url = config.get<string>('REDIS_URL', 'redis://localhost:6379');
         const client = new Redis(url, {
-          maxRetriesPerRequest: 3,
+          maxRetriesPerRequest: null,
           enableReadyCheck: true,
           lazyConnect: true,
         });

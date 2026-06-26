@@ -213,7 +213,7 @@ describe('Auth E2E', () => {
 
       await request(app.getHttpServer())
         .post('/api/auth/register')
-        .send({ email, username: `badpwuser_${id}`, password: 'Correct_Pass!', displayName: 'Bad PW' })
+        .send({ email, username: `badpwuser_${id}`, password: 'Correct_Pass1!', displayName: 'Bad PW' })
         .expect(201);
 
       await request(app.getHttpServer())

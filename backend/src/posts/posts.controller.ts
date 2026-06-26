@@ -48,8 +48,12 @@ export class PostsController {
   }
 
   @Get('reels')
-  getReels(@CurrentUser() user: any, @Query('cursor') cursor?: string) {
-    return this.postsService.getReels(user.id, cursor);
+  getReels(
+    @CurrentUser() user: any,
+    @Query('mode') mode?: string,
+    @Query('cursor') cursor?: string,
+  ) {
+    return this.postsService.getReels(user.id, mode ?? 'FOR_YOU', cursor);
   }
 
   @Get('user/:username')

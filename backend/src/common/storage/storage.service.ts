@@ -18,15 +18,25 @@ export class StorageService {
   private readonly enabled: boolean;
 
   constructor() {
-    const endpoint = process.env.S3_ENDPOINT;
+    const endpoint = process.env.S3_ENDPOINT?.trim();
     // S3_BUCKET_NAME (AWS S3) takes precedence over S3_BUCKET (R2/MinIO)
     const bucket = process.env.S3_BUCKET_NAME ?? process.env.S3_BUCKET;
     const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
     const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
+    const hasPlaceholderEndpoint = !!endpoint && /[<>]/.test(endpoint);
+    const hasInvalidEndpoint = !!endpoint && (() => {
+      try {
+        // Validate endpoint early so bad env values do not crash upload routes.
+        new URL(endpoint);
+        return false;
+      } catch {
+        return true;
+      }
+    })();
     // Native AWS S3 needs a real region; R2/MinIO uses 'auto'
     const region = process.env.AWS_REGION ?? (endpoint ? 'auto' : 'us-east-1');
 
-    this.enabled = !!(bucket && accessKeyId && secretAccessKey);
+    this.enabled = !!(bucket && accessKeyId && secretAccessKey) && !hasPlaceholderEndpoint && !hasInvalidEndpoint;
     this.bucket = bucket ?? '';
 
     if (this.enabled) {
@@ -51,6 +61,9 @@ export class StorageService {
     } else {
       this.client = null as any;
       this.publicBase = '';
+      if (hasPlaceholderEndpoint || hasInvalidEndpoint) {
+        this.logger.warn('StorageService: invalid S3_ENDPOINT value detected — falling back to local disk storage');
+      }
       this.logger.warn('StorageService: no S3 env vars — falling back to local disk storage');
     }
   }

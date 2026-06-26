@@ -10,7 +10,7 @@ export interface TestAppContext {
   app: INestApplication;
   module: TestingModule;
   notificationsMock: jest.Mocked<Pick<NotificationsService, 'sendEmailOtp' | 'sendPhoneOtp'>>;
-  mediaSafetyMock: jest.Mocked<Pick<MediaSafetyService, 'scanImage' | 'scanImageFromS3' | 'startVideoScan' | 'statusFromScan' | 'isEnabled'>>;
+  mediaSafetyMock: jest.Mocked<Pick<MediaSafetyService, 'scanImage' | 'scanImageFromS3' | 'startVideoScan' | 'startVideoScanJob' | 'pollVideoScan' | 'statusFromScan' | 'isEnabled'>>;
   storageMock: jest.Mocked<Pick<StorageService, 'upload' | 'delete' | 'isEnabled'>>;
 }
 
@@ -28,6 +28,8 @@ export async function createTestApp(
     scanImage: jest.fn().mockResolvedValue({ safe: true, labels: [], maxConfidence: 0, provider: 'none' }),
     scanImageFromS3: jest.fn().mockResolvedValue({ safe: true, labels: [], maxConfidence: 0, provider: 'none' }),
     startVideoScan: jest.fn().mockResolvedValue(null),
+    startVideoScanJob: jest.fn().mockResolvedValue({ status: 'BYPASSED', jobId: null }),
+    pollVideoScan: jest.fn().mockResolvedValue({ status: 'IN_PROGRESS' }),
     getVideoScanResult: jest.fn().mockResolvedValue(null),
     statusFromScan: jest.fn().mockReturnValue('PUBLISHED'),
   };

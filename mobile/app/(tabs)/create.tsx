@@ -325,7 +325,43 @@ export default function CreateScreen() {
         ? (assetName || 'mobile-upload.mp4')
         : 'mobile-upload.jpg';
 
-      const uploadFile = new File(finalUri);
+      const webBlob = Platform.OS === 'web' ? await (await fetch(finalUri)).blob() : null;
+      const uploadFile = Platform.OS === 'web' ? null : new File(finalUri);
+
+      // For local development APIs, skip presigned storage and post multipart directly.
+      const useDirectUpload = !API_BASE_URL.includes('localhost');
+      if (!useDirectUpload) {
+        setUploadProgress(55);
+        setUploadStatusMessage('Uploading media...');
+        const form = new FormData();
+        form.append('caption', caption);
+        form.append('type', isVideo ? 'VIDEO' : 'PHOTO');
+        form.append('visibility', visibility);
+        if (Platform.OS === 'web') {
+          if (!webBlob) throw new Error('Could not read selected media in browser.');
+          form.append('media', webBlob, filename);
+        } else {
+          form.append('media', { uri: finalUri, name: filename, type: finalMime } as any);
+        }
+
+        const fbRes = await fetch(`${API_BASE_URL}/posts`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          body: form,
+        });
+        const fbStatus = fbRes.status;
+        const fbBody = await fbRes.text();
+        if (fbStatus < 200 || fbStatus >= 300) {
+          const err = (() => { try { return JSON.parse(fbBody || '{}'); } catch { return {} as any; } })();
+          throw new Error(err?.message || `Failed to create post (${fbStatus})`);
+        }
+        setUploadProgress(100);
+        setUploadStatusMessage('Published');
+        const postedTypeFallback = assetType;
+        resetComposer();
+        setPublishedType(postedTypeFallback);
+        return;
+      }
 
       // Try presigned direct upload first (requires S3/R2 on server).
       // Fall back to multipart POST /posts if server returns 400/not-configured.
@@ -340,7 +376,7 @@ export default function CreateScreen() {
         },
         body: JSON.stringify({
           mimeType: finalMime,
-          size: assetSize ?? uploadFile.size,
+          size: assetSize ?? webBlob?.size ?? uploadFile?.size,
         }),
       });
 
@@ -354,7 +390,12 @@ export default function CreateScreen() {
         form.append('caption', caption);
         form.append('type', isVideo ? 'VIDEO' : 'PHOTO');
         form.append('visibility', visibility);
-        form.append('media', { uri: finalUri, name: filename, type: finalMime } as any);
+        if (Platform.OS === 'web') {
+          if (!webBlob) throw new Error('Could not read selected media in browser.');
+          form.append('media', webBlob, filename);
+        } else {
+          form.append('media', { uri: finalUri, name: filename, type: finalMime } as any);
+        }
 
         const fbRes = await fetch(`${API_BASE_URL}/posts`, {
           method: 'POST',
@@ -382,16 +423,26 @@ export default function CreateScreen() {
 
       setUploadProgress(55);
       setUploadStatusMessage('Uploading media...');
-      const uploadResult = await uploadFile.upload(uploadTarget.uploadUrl, {
+      const uploadResult = uploadFile ? await uploadFile.upload(uploadTarget.uploadUrl, {
         httpMethod: 'PUT',
         uploadType: UploadType.BINARY_CONTENT,
         mimeType: finalMime,
         headers: { 'Content-Type': finalMime },
         sessionType: 'foreground',
-      });
+      }) : null;
 
-      if (uploadResult.status < 200 || uploadResult.status >= 300) {
-        throw new Error(`Storage upload failed (${uploadResult.status})`);
+      if (Platform.OS === 'web') {
+        if (!webBlob) throw new Error('Storage upload failed (missing blob)');
+        const webUploadRes = await fetch(uploadTarget.uploadUrl, {
+          method: 'PUT',
+          headers: { 'Content-Type': finalMime },
+          body: webBlob,
+        });
+        if (!webUploadRes.ok) {
+          throw new Error(`Storage upload failed (${webUploadRes.status})`);
+        }
+      } else if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
+        throw new Error(`Storage upload failed (${uploadResult?.status ?? 'unknown'})`);
       }
 
       setUploadProgress(75);

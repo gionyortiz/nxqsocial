@@ -1,6 +1,6 @@
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Alert, Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
+import { Alert, Platform, Pressable, SafeAreaView, ScrollView, Share, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { apiRequest } from '@/lib/api';
 
@@ -54,6 +54,11 @@ export default function ProfileScreen() {
   };
 
   const openSafetyPrompt = () => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Block user', 'Username entry prompt is not supported in this web runtime yet. Please use mobile app for block/report input.');
+      return;
+    }
+
     Alert.prompt(
       'Block / Report User',
       'Enter the username you want to block.',
@@ -67,6 +72,27 @@ export default function ProfileScreen() {
       ],
       'plain-text',
     );
+  };
+
+  const shareProfile = async () => {
+    const message = `Check out @${user?.username || 'nxq'} on NXQ Social\nhttps://nxqsocial.com/user/${user?.username || ''}`;
+    try {
+      if (Platform.OS === 'web') {
+        const webNavigator = typeof navigator !== 'undefined' ? (navigator as any) : undefined;
+        if (webNavigator?.share) {
+          await webNavigator.share({ text: message });
+          return;
+        }
+        if (webNavigator?.clipboard?.writeText) {
+          await webNavigator.clipboard.writeText(message);
+          Alert.alert('Link copied', 'Profile link copied to clipboard.');
+          return;
+        }
+      }
+      await Share.share({ message });
+    } catch {
+      Alert.alert('Share unavailable', 'This browser cannot open the share sheet.');
+    }
   };
 
   const initials = (user?.displayName || user?.username || 'NX').slice(0, 2).toUpperCase();
@@ -110,10 +136,13 @@ export default function ProfileScreen() {
           </View>
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
-            <Pressable style={{ flex: 1, backgroundColor: '#2563eb', borderRadius: 14, padding: 12 }}>
+            <Pressable
+              onPress={() => Alert.alert('Edit profile', 'Profile editing will be available in the next update.')}
+              style={{ flex: 1, backgroundColor: '#2563eb', borderRadius: 14, padding: 12 }}
+            >
               <Text style={{ color: '#fff', fontWeight: '900', textAlign: 'center' }}>Edit profile</Text>
             </Pressable>
-            <Pressable style={{ flex: 1, backgroundColor: '#1f2937', borderRadius: 14, padding: 12 }}>
+            <Pressable onPress={shareProfile} style={{ flex: 1, backgroundColor: '#1f2937', borderRadius: 14, padding: 12 }}>
               <Text style={{ color: '#fff', fontWeight: '900', textAlign: 'center' }}>Share profile</Text>
             </Pressable>
           </View>

@@ -103,7 +103,9 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
         <Stack.Screen name="explore" options={{ title: 'Explore' }} />
+        <Stack.Screen name="user/[username]" options={{ title: 'Profile' }} />
         <Stack.Screen name="live" options={{ title: 'Live' }} />
+        <Stack.Screen name="live-room" options={{ title: 'Live Room' }} />
         <Stack.Screen name="live-native" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       </Stack>
     </ThemeProvider>

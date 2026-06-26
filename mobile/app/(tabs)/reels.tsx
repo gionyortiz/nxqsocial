@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Pressable, RefreshControl, SafeAreaView, Share, Text, View } from 'react-native';
-import { useFocusEffect } from 'expo-router';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, Pressable, RefreshControl, SafeAreaView, Share, Text, View } from 'react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
@@ -23,6 +23,7 @@ function ReelVideo({ uri }: { uri: string }) {
 }
 
 export default function ReelsScreen() {
+  const router = useRouter();
   const { token, user } = useAuth();
   const [items, setItems] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -30,12 +31,15 @@ export default function ReelsScreen() {
   const [error, setError] = useState<string | null>(null);
   const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
   const [savedPostIds, setSavedPostIds] = useState<Record<string, boolean>>({});
+  const [followedCreators, setFollowedCreators] = useState<Record<string, boolean>>({});
+  const [followBusy, setFollowBusy] = useState<Record<string, boolean>>({});
+  const [mode, setMode] = useState<'FOR_YOU' | 'FOLLOWING'>('FOR_YOU');
 
   const load = async () => {
     if (!token) return;
     setError(null);
     try {
-      const data = await apiRequest<{ data: PostItem[] }>('/posts/reels', { token });
+      const data = await apiRequest<{ data: PostItem[] }>(`/posts/reels?mode=${mode}`, { token });
       setItems(data.data || []);
     } catch (e: any) {
       setError(e?.message ?? 'Could not load reels right now. Pull to refresh.');
@@ -47,13 +51,29 @@ export default function ReelsScreen() {
 
   useEffect(() => {
     load();
-  }, [token]);
+  }, [token, mode]);
 
   useFocusEffect(
     useCallback(() => {
       load();
-    }, [token]),
+    }, [token, mode]),
   );
+
+  const followCreator = async (username: string) => {
+    if (!token || followBusy[username] || followedCreators[username]) return;
+    setFollowBusy((prev) => ({ ...prev, [username]: true }));
+    try {
+      const data = await apiRequest<{ following: boolean }>(`/users/${username}/follow`, {
+        method: 'POST',
+        token,
+      });
+      setFollowedCreators((prev) => ({ ...prev, [username]: !!data.following }));
+    } catch (e: any) {
+      Alert.alert('Follow failed', e?.message ?? 'Could not follow this creator right now.');
+    } finally {
+      setFollowBusy((prev) => ({ ...prev, [username]: false }));
+    }
+  };
 
   const confirmDeletePost = (postId: string) => {
     Alert.alert(
@@ -108,6 +128,11 @@ export default function ReelsScreen() {
   };
 
   const promptComment = (post: PostItem) => {
+    if (Platform.OS === 'web') {
+      Alert.alert('Comments on web', 'Opening the text prompt is not supported in this web runtime yet. Please comment from the mobile app build.');
+      return;
+    }
+
     Alert.prompt(
       'Add comment',
       `Reply to @${post.author.username}`,
@@ -135,13 +160,43 @@ export default function ReelsScreen() {
   };
 
   const sharePost = async (post: PostItem) => {
-    await Share.share({
-      message: `${post.caption || 'Check out this reel on NXQ Social'}\nhttps://nxqsocial.com/feed?post=${post.id}`,
-    });
+    const message = `${post.caption || 'Check out this reel on NXQ Social'}\nhttps://nxqsocial.com/feed?post=${post.id}`;
+    try {
+      if (Platform.OS === 'web') {
+        const webNavigator = typeof navigator !== 'undefined' ? (navigator as any) : undefined;
+        if (webNavigator?.share) {
+          await webNavigator.share({ text: message });
+          return;
+        }
+        if (webNavigator?.clipboard?.writeText) {
+          await webNavigator.clipboard.writeText(message);
+          Alert.alert('Link copied', 'Share is not available in this browser, so we copied the reel link.');
+          return;
+        }
+      }
+
+      await Share.share({ message });
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return;
+      Alert.alert('Share unavailable', 'This browser cannot open the share sheet.');
+    }
   };
 
-  const toggleSave = (postId: string) => {
-    setSavedPostIds((prev) => ({ ...prev, [postId]: !prev[postId] }));
+  const toggleSave = async (postId: string) => {
+    if (!token) return;
+    const previous = !!savedPostIds[postId];
+    setSavedPostIds((prev) => ({ ...prev, [postId]: !previous }));
+    try {
+      const data = await apiRequest<{ saved: boolean }>(`/posts/${postId}/save`, { method: 'POST', token });
+      setSavedPostIds((prev) => ({ ...prev, [postId]: !!data.saved }));
+    } catch (e: any) {
+      setSavedPostIds((prev) => ({ ...prev, [postId]: previous }));
+      Alert.alert('Save failed', e?.message ?? 'Could not update saved state.');
+    }
+  };
+
+  const openUserProfile = (username: string) => {
+    router.push({ pathname: '/user/[username]', params: { username } });
   };
 
   const reportPost = async (post: PostItem, reason: 'SPAM' | 'HARASSMENT' | 'NUDITY' | 'SCAM' | 'OTHER') => {
@@ -207,7 +262,43 @@ export default function ReelsScreen() {
   if (!items.length) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <Text style={{ color: '#fff', textAlign: 'center' }}>{error || 'No reels yet.'}</Text>
+        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
+          <Pressable
+            onPress={() => setMode('FOR_YOU')}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 999,
+              backgroundColor: mode === 'FOR_YOU' ? 'rgba(99,102,241,0.95)' : 'rgba(15,23,42,0.65)',
+              borderWidth: 1,
+              borderColor: mode === 'FOR_YOU' ? '#818cf8' : 'rgba(148,163,184,0.35)',
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>For You</Text>
+          </Pressable>
+          <Pressable
+            onPress={() => setMode('FOLLOWING')}
+            style={{
+              paddingHorizontal: 10,
+              paddingVertical: 6,
+              borderRadius: 999,
+              backgroundColor: mode === 'FOLLOWING' ? 'rgba(99,102,241,0.95)' : 'rgba(15,23,42,0.65)',
+              borderWidth: 1,
+              borderColor: mode === 'FOLLOWING' ? '#818cf8' : 'rgba(148,163,184,0.35)',
+            }}
+          >
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Following</Text>
+          </Pressable>
+        </View>
+        <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '900', fontSize: 18 }}>No reels yet</Text>
+        <Text style={{ color: '#93a1bd', textAlign: 'center', marginTop: 8 }}>
+          {error || (mode === 'FOLLOWING' ? 'Follow more creators to unlock your Following reel stream.' : 'Start posting short videos to light up this tab.')}
+        </Text>
+        <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
+          <Pressable onPress={load} style={{ backgroundColor: '#1f2937', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }}>
+            <Text style={{ color: '#fff', fontWeight: '800' }}>Refresh</Text>
+          </Pressable>
+        </View>
       </SafeAreaView>
     );
   }
@@ -227,9 +318,39 @@ export default function ReelsScreen() {
             <View style={{ height: h, backgroundColor: '#000' }}>
               <ReelVideo uri={src} />
               <View style={{ position: 'absolute', top: 50, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 8 }}>Reels</Text>
+                <View>
+                  <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 8 }}>Reels</Text>
+                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
+                    <Pressable
+                      onPress={() => setMode('FOR_YOU')}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 999,
+                        backgroundColor: mode === 'FOR_YOU' ? 'rgba(99,102,241,0.95)' : 'rgba(15,23,42,0.65)',
+                        borderWidth: 1,
+                        borderColor: mode === 'FOR_YOU' ? '#818cf8' : 'rgba(148,163,184,0.35)',
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>For You</Text>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => setMode('FOLLOWING')}
+                      style={{
+                        paddingHorizontal: 10,
+                        paddingVertical: 6,
+                        borderRadius: 999,
+                        backgroundColor: mode === 'FOLLOWING' ? 'rgba(99,102,241,0.95)' : 'rgba(15,23,42,0.65)',
+                        borderWidth: 1,
+                        borderColor: mode === 'FOLLOWING' ? '#818cf8' : 'rgba(148,163,184,0.35)',
+                      }}
+                    >
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Following</Text>
+                    </Pressable>
+                  </View>
+                </View>
                 <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(15,23,42,0.65)', alignItems: 'center', justifyContent: 'center' }}>
-                  <MaterialCommunityIcons name="tune-variant" size={22} color="#fff" />
+                  <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
                 </View>
               </View>
               <Pressable
@@ -271,7 +392,18 @@ export default function ReelsScreen() {
                 </Pressable>
               </View>
               <View style={{ position: 'absolute', left: 14, right: 84, bottom: 88 }}>
-                <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>@{item.author.username}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <Text onPress={() => openUserProfile(item.author.username)} style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>@{item.author.username}</Text>
+                  {!followedCreators[item.author.username] && item.author.id !== user?.id && mode !== 'FOLLOWING' ? (
+                    <Pressable
+                      onPress={() => followCreator(item.author.username)}
+                      disabled={!!followBusy[item.author.username]}
+                      style={{ backgroundColor: 'rgba(255,255,255,0.95)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, opacity: followBusy[item.author.username] ? 0.7 : 1 }}
+                    >
+                      <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11 }}>{followBusy[item.author.username] ? '...' : 'Follow'}</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
                 {item.caption ? <Text numberOfLines={2} style={{ color: '#e5e7eb', marginTop: 6, fontWeight: '600' }}>{item.caption}</Text> : null}
               </View>
             </View>

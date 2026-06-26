@@ -48,6 +48,7 @@ interface StoryCandidate {
   avatarUrl: string | null;
   isLive: boolean;
   hasRecentPost: boolean;
+  liveRoom?: string | null;
 }
 
 @Injectable()
@@ -272,6 +273,7 @@ export class PostsService {
         avatarUrl: person.profile?.avatarUrl ?? null,
         isLive: false,
         hasRecentPost: recentAuthorIds.has(person.id),
+        liveRoom: null,
       });
     }
 
@@ -281,6 +283,7 @@ export class PostsService {
       const existing = candidates.get(host.id);
       if (existing) {
         existing.isLive = true;
+        existing.liveRoom = session.room;
       } else {
         candidates.set(host.id, {
           id: host.id,
@@ -289,6 +292,7 @@ export class PostsService {
           avatarUrl: host.profile?.avatarUrl ?? null,
           isLive: true,
           hasRecentPost: false,
+          liveRoom: session.room,
         });
       }
     }
@@ -336,9 +340,24 @@ export class PostsService {
     };
   }
 
-  async getReels(userId: string, cursor?: string, take = 10) {
+  async getReels(userId: string, mode = 'FOR_YOU', cursor?: string, take = 10) {
+    let where: any = {
+      status: 'PUBLISHED',
+      visibility: 'PUBLIC',
+      type: { in: ['VIDEO', 'SHORT_VIDEO'] },
+    };
+
+    if (mode === 'FOLLOWING') {
+      const following = await this.prisma.follow.findMany({
+        where: { followerId: userId },
+        select: { followingId: true },
+      });
+      const ids = [userId, ...following.map((f) => f.followingId)];
+      where = { ...where, authorId: { in: ids } };
+    }
+
     const posts = await this.prisma.post.findMany({
-      where: { status: 'PUBLISHED', visibility: 'PUBLIC', type: { in: ['VIDEO', 'SHORT_VIDEO'] } },
+      where,
       select: postSelect(userId),
       orderBy: { createdAt: 'desc' },
       take: take + 1,
@@ -347,7 +366,7 @@ export class PostsService {
 
     const hasMore = posts.length > take;
     const data = posts.slice(0, take).map(mapPost);
-    return { data, nextCursor: hasMore ? data[data.length - 1].id : null };
+    return { data, nextCursor: hasMore ? data[data.length - 1].id : null, mode };
   }
 
   async getUserPosts(username: string, userId: string, cursor?: string) {

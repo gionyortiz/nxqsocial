@@ -66,10 +66,10 @@ describe('Auth Security E2E', () => {
       const user = await registerUser(app);
       const row = await prisma.user.findUnique({ where: { id: user.id } });
       expect(row).toBeTruthy();
-      expect(row!.password).not.toBe(user.password);
-      expect(row!.password.startsWith('$2')).toBe(true);
-      expect(await bcrypt.compare(user.password, row!.password)).toBe(true);
-      expect(await bcrypt.compare('wrong-password', row!.password)).toBe(false);
+      expect(row!.passwordHash).not.toBe(user.password);
+      expect(row!.passwordHash.startsWith('$2')).toBe(true);
+      expect(await bcrypt.compare(user.password, row!.passwordHash)).toBe(true);
+      expect(await bcrypt.compare('wrong-password', row!.passwordHash)).toBe(false);
     });
   });
 
@@ -115,7 +115,7 @@ describe('Auth Security E2E', () => {
     it('triggers a 429 after exceeding the login rate limit', async () => {
       const email = `rl_${uid()}@nexasocial.test`;
       let got429 = false;
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 30; i++) {
         const res = await request(app.getHttpServer())
           .post('/api/auth/login')
           .send({ email, password: 'P@ssw0rd_Test!' });
