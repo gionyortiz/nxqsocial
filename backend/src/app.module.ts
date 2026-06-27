@@ -28,6 +28,7 @@ import { FeedbackModule } from './feedback/feedback.module';
 import { FeedModule } from './feed/feed.module';
 import { NotificationFeedModule } from './notification-feed/notification-feed.module';
 import { AiModule } from './ai/ai.module';
+import { MessagesModule } from './messages/messages.module';
 import { getClientIpFromRequest } from './common/network/client-ip';
 
 @Module({
@@ -80,6 +81,7 @@ import { getClientIpFromRequest } from './common/network/client-ip';
     FeedbackModule,
     FeedModule,
     NotificationFeedModule,
+    MessagesModule,
   ],
 })
 export class AppModule {}

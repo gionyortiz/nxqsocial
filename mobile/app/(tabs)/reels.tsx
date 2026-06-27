@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Platform, Pressable, RefreshControl, SafeAreaView, Share, Text, View } from 'react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Platform, Pressable, RefreshControl, SafeAreaView, Share, Text, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -8,16 +8,27 @@ import { useAuth } from '@/lib/auth';
 
 const h = Dimensions.get('window').height;
 
-function ReelVideo({ uri }: { uri: string }) {
+function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
   });
+
+  useEffect(() => {
+    if (focused) {
+      player.currentTime = 0;
+      player.play();
+      return;
+    }
+
+    player.pause();
+  }, [focused, player]);
+
   return (
     <VideoView
       player={player}
       style={{ width: '100%', height: '100%' }}
       contentFit="cover"
-      nativeControls
+      nativeControls={false}
     />
   );
 }
@@ -34,6 +45,13 @@ export default function ReelsScreen() {
   const [followedCreators, setFollowedCreators] = useState<Record<string, boolean>>({});
   const [followBusy, setFollowBusy] = useState<Record<string, boolean>>({});
   const [mode, setMode] = useState<'FOR_YOU' | 'FOLLOWING'>('FOR_YOU');
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item: PostItem }> }) => {
+    const nextActive = viewableItems[0]?.item?.id ?? null;
+    setActivePostId(nextActive);
+  }).current;
 
   const load = async () => {
     if (!token) return;
@@ -52,6 +70,12 @@ export default function ReelsScreen() {
   useEffect(() => {
     load();
   }, [token, mode]);
+
+  useEffect(() => {
+    if (items.length > 0 && !activePostId) {
+      setActivePostId(items[0].id);
+    }
+  }, [items, activePostId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -311,14 +335,32 @@ export default function ReelsScreen() {
         data={items}
         pagingEnabled
         keyExtractor={(item) => item.id}
+        viewabilityConfig={viewabilityConfig}
+        onViewableItemsChanged={onViewableItemsChanged}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
         renderItem={({ item }) => {
-          const src = resolveMediaUrl(item.media?.[0]?.url);
+          const preferredVideo = item.media?.find((asset) => (asset.mimeType || '').startsWith('video/') && !!asset.url);
+          const primaryAsset = preferredVideo ?? item.media?.find((asset) => !!asset.url) ?? item.media?.[0];
+          const src = resolveMediaUrl(primaryAsset?.url || '');
+          const fallbackImage = resolveMediaUrl(primaryAsset?.thumbnailUrl || primaryAsset?.url || '');
+          const isPlayableVideo = !!src && (primaryAsset?.mimeType || '').startsWith('video/');
           const isOwnPost = item.author.id === user?.id;
           const deleting = deletingPostId === item.id;
+          const focused = activePostId === item.id;
           return (
             <View style={{ height: h, backgroundColor: '#000' }}>
-              <ReelVideo uri={src} />
+              {isPlayableVideo ? (
+                <ReelVideo uri={src} focused={focused} />
+              ) : fallbackImage ? (
+                <Image source={{ uri: fallbackImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+              ) : (
+                <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
+                  <MaterialCommunityIcons name="video-off-outline" size={34} color="#94a3b8" />
+                  <Text style={{ color: '#cbd5e1', marginTop: 10, textAlign: 'center' }}>
+                    Reel video is still processing. Pull to refresh in a moment.
+                  </Text>
+                </View>
+              )}
               <View style={{ position: 'absolute', top: 50, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View>
                   <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 8 }}>Reels</Text>
