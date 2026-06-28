@@ -288,6 +288,17 @@ export default function UserProfileScreen() {
                 </View>
               ) : null}
 
+              {/* ALWAYS-VISIBLE DEBUG TEST SECTION */}
+              <View style={{ backgroundColor: '#2a3f4d', borderRadius: 8, padding: 12, marginTop: 12, marginHorizontal: 0, borderWidth: 1, borderColor: '#4a5f6d' }}>
+                <Text style={{ color: '#67e8f9', fontWeight: '900', marginBottom: 8 }}>TEST: Button Response</Text>
+                <Pressable
+                  onPress={() => Alert.alert('SUCCESS', 'This button IS clickable! Call button issue is NOT about button responsiveness.')}
+                  style={{ backgroundColor: '#0ea5e9', borderRadius: 8, padding: 12, alignItems: 'center' }}
+                >
+                  <Text style={{ color: '#fff', fontWeight: '900' }}>Tap Here to Test</Text>
+                </Pressable>
+              </View>
+
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 10 }}>
                 <Text style={{ color: '#f8fafc', fontWeight: '900', fontSize: 18, letterSpacing: -0.2 }}>Posts</Text>
                 <Text style={{ color: '#93a1bd', fontSize: 12 }}>{profile?._count?.posts ?? posts.length} total</Text>
