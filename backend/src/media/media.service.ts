@@ -12,6 +12,7 @@ import { StorageService } from '../common/storage/storage.service';
 import { MediaSafetyService } from '../safety/media-safety.service';
 import {
   ALLOWED_MIME_TYPES,
+  AUDIO_SIZE_LIMIT,
   IMAGE_SIZE_LIMIT,
   VIDEO_SIZE_LIMIT,
 } from './media.dto';
@@ -28,12 +29,17 @@ function extFromMime(mime: string): string {
     'video/mp4': '.mp4',
     'video/webm': '.webm',
     'video/quicktime': '.mov',
+    'audio/mp4': '.m4a',
   };
   return map[mime] ?? '';
 }
 
 function isVideo(mime: string): boolean {
   return mime.startsWith('video/');
+}
+
+function isAudio(mime: string): boolean {
+  return mime.startsWith('audio/');
 }
 
 function videoStartFailureData(reason?: string, userMessage?: string) {
@@ -75,7 +81,11 @@ export class MediaService {
       throw new BadRequestException(`Unsupported mime type: ${mimeType}`);
     }
 
-    const sizeLimit = isVideo(mimeType) ? VIDEO_SIZE_LIMIT : IMAGE_SIZE_LIMIT;
+    const sizeLimit = isVideo(mimeType)
+      ? VIDEO_SIZE_LIMIT
+      : isAudio(mimeType)
+        ? AUDIO_SIZE_LIMIT
+        : IMAGE_SIZE_LIMIT;
     if (size > sizeLimit) {
       throw new BadRequestException(
         `File size ${size} exceeds limit of ${sizeLimit} bytes for ${mimeType}`,
@@ -163,6 +173,20 @@ export class MediaService {
         url: updated.url,
         ...(scanStart.status === 'FAILED' ? { message: scanStart.userMessage } : {}),
       };
+    }
+
+    if (isAudio(asset.mimeType)) {
+      const updated = await this.prisma.mediaAsset.update({
+        where: { id: mediaId },
+        data: {
+          url: publicUrl,
+          uploadStatus: 'PUBLISHED',
+          moderationStatus: 'APPROVED',
+          safetyResult: { status: 'BYPASSED' } as any,
+        },
+      });
+
+      return { id: updated.id, uploadStatus: updated.uploadStatus, url: updated.url };
     }
 
     // Sync image scan — download from S3 to scan

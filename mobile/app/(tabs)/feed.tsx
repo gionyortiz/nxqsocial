@@ -124,14 +124,14 @@ function PostCard({
   const mediaUrl = resolveMediaUrl(first?.thumbnailUrl || first?.url);
   const initials = (post.author.displayName || post.author.username || 'NX').slice(0, 2).toUpperCase();
   return (
-    <View style={{ backgroundColor: '#111827', borderRadius: 18, marginBottom: 14, overflow: 'hidden', borderWidth: 1, borderColor: '#1f2937' }}>
+    <View style={{ backgroundColor: '#0f172a', borderRadius: 16, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#263246' }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 12 }}>
-        <View style={{ width: 44, height: 44, borderRadius: 22, backgroundColor: '#312e81', alignItems: 'center', justifyContent: 'center' }}>
+        <View style={{ width: 44, height: 44, borderRadius: 16, backgroundColor: '#1e293b', alignItems: 'center', justifyContent: 'center' }}>
           <Text style={{ color: '#ddd6fe', fontWeight: '900' }}>{initials}</Text>
         </View>
         <Pressable onPress={() => onOpenAuthor(post.author.username)} style={{ flex: 1 }}>
           <Text style={{ color: '#fff', fontWeight: '900', fontSize: 15 }}>{post.author.displayName}</Text>
-          <Text style={{ color: '#93a1bd', marginTop: 2 }}>@{post.author.username}</Text>
+          <Text style={{ color: '#9fb0cb', marginTop: 2, fontSize: 12 }}>@{post.author.username}</Text>
         </Pressable>
         <Pressable
           onPress={() => onOpenActions(post)}
@@ -160,9 +160,9 @@ function PostCard({
             <MaterialCommunityIcons name={saved ? 'bookmark' : 'bookmark-outline'} size={25} color={saved ? '#a78bfa' : '#f8fafc'} />
           </Pressable>
         </View>
-        <Text style={{ color: '#f8fafc', marginTop: 8, fontWeight: '800' }}>{post._count?.likes ?? 0} likes</Text>
+        <Text style={{ color: '#f8fafc', marginTop: 8, fontWeight: '800', fontSize: 13 }}>{post._count?.likes ?? 0} likes</Text>
         {post.caption ? (
-          <Text style={{ color: '#e5e7eb', marginTop: 5 }}>
+          <Text style={{ color: '#dbe5f5', marginTop: 5, lineHeight: 20 }}>
             <Text onPress={() => onOpenAuthor(post.author.username)} style={{ fontWeight: '900', color: '#fff' }}>{post.author.username} </Text>
             {post.caption}
           </Text>
@@ -190,6 +190,7 @@ export default function FeedScreen() {
   const [followBusy, setFollowBusy] = useState<Record<string, boolean>>({});
   const [mode, setMode] = useState<FeedMode>('FOR_YOU');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
+  const [showInsights, setShowInsights] = useState(false);
 
   const trendingTopics = useMemo(() => buildTrendingTopics(items), [items]);
   const activeCreators = useMemo(() => new Set(items.map((item) => item.author.id)).size, [items]);
@@ -404,6 +405,12 @@ export default function FeedScreen() {
   const openUserProfile = (username: string) => {
     router.push({ pathname: '/user/[username]', params: { username } });
   };
+  const openCreateAction = (mode: 'photo' | 'reel') => {
+    router.push({ pathname: '/create', params: { mode } });
+  };
+  const showLiveUnavailable = () => {
+    Alert.alert('Live unavailable', 'Live is not available in this build yet.');
+  };
 
   const openLiveRoom = (story: StoryCandidate) => {
     if (story.liveRoom) {
@@ -440,23 +447,23 @@ export default function FeedScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#080f22' }}>
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#8b5cf6" />
+          <ActivityIndicator color="#22d3ee" />
         </View>
       ) : (
         <FlatList
           data={visibleItems}
           keyExtractor={(item) => item.id}
-          contentContainerStyle={{ padding: 14, paddingBottom: 28 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
+          contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 28 }}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#22d3ee" />}
           ListHeaderComponent={(
             <View style={{ marginBottom: 12, gap: 12 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View>
-                  <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>{mode === 'FOR_YOU' ? 'For You' : 'Following'}</Text>
-                  <Text style={{ color: '#93a1bd', marginTop: 2 }}>
+                  <Text style={{ color: '#f8fafc', fontSize: 32, fontWeight: '900', letterSpacing: -0.6 }}>{mode === 'FOR_YOU' ? 'For You' : 'Following'}</Text>
+                  <Text style={{ color: '#9fb0cb', marginTop: 2, fontSize: 14 }}>
                     {mode === 'FOR_YOU' ? 'Fresh posts from your world' : 'Latest posts from creators you follow'}
                   </Text>
                   <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
@@ -466,9 +473,9 @@ export default function FeedScreen() {
                         paddingHorizontal: 10,
                         paddingVertical: 6,
                         borderRadius: 999,
-                        backgroundColor: mode === 'FOR_YOU' ? '#4f46e5' : '#111827',
+                        backgroundColor: mode === 'FOR_YOU' ? '#0ea5e9' : '#0f172a',
                         borderWidth: 1,
-                        borderColor: mode === 'FOR_YOU' ? '#818cf8' : '#374151',
+                        borderColor: mode === 'FOR_YOU' ? '#67e8f9' : '#334155',
                       }}
                     >
                       <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>For You</Text>
@@ -479,9 +486,9 @@ export default function FeedScreen() {
                         paddingHorizontal: 10,
                         paddingVertical: 6,
                         borderRadius: 999,
-                        backgroundColor: mode === 'FOLLOWING' ? '#4f46e5' : '#111827',
+                        backgroundColor: mode === 'FOLLOWING' ? '#0ea5e9' : '#0f172a',
                         borderWidth: 1,
-                        borderColor: mode === 'FOLLOWING' ? '#818cf8' : '#374151',
+                        borderColor: mode === 'FOLLOWING' ? '#67e8f9' : '#334155',
                       }}
                     >
                       <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Following</Text>
@@ -489,78 +496,159 @@ export default function FeedScreen() {
                   </View>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
-                  <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#111827', borderWidth: 1, borderColor: '#1f2937', alignItems: 'center', justifyContent: 'center' }}>
+                  <Pressable
+                    onPress={() => router.push('/explore')}
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#263246', alignItems: 'center', justifyContent: 'center' }}
+                  >
                     <MaterialCommunityIcons name="magnify" size={21} color="#e5e7eb" />
-                  </View>
-                  <View style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#111827', borderWidth: 1, borderColor: '#1f2937', alignItems: 'center', justifyContent: 'center' }}>
-                    <MaterialCommunityIcons name="bell-outline" size={20} color="#e5e7eb" />
-                  </View>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => router.push('/messages' as never)}
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#263246', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <MaterialCommunityIcons name="send-outline" size={20} color="#e5e7eb" />
+                  </Pressable>
                 </View>
               </View>
 
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 8 }}>
-                <View style={{ alignItems: 'center', width: 72 }}>
-                  <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: '#6366f1', alignItems: 'center', justifyContent: 'center', backgroundColor: '#151d33' }}>
-                    <Text style={{ color: '#a5b4fc', fontWeight: '800' }}>You</Text>
-                  </View>
-                  <Text numberOfLines={1} style={{ marginTop: 6, color: '#c7d2fe', fontSize: 11 }}>Your story</Text>
+              <View style={{ gap: 8 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                  <Text style={{ color: '#e2e8f0', fontSize: 12, fontWeight: '900', letterSpacing: 0.3 }}>Signal lane</Text>
+                  <Text style={{ color: '#94a3b8', fontSize: 11, fontWeight: '700' }}>Live + fresh creator pulses</Text>
                 </View>
-
-                {stories.map((story) => (
-                  <Pressable key={story.id} onPress={() => story.isLive ? openLiveRoom(story) : openUserProfile(story.username)} style={{ alignItems: 'center', width: 72 }}>
-                    <View style={{ padding: 2, borderRadius: 30, backgroundColor: story.isLive ? '#ef4444' : '#8b5cf6' }}>
-                      <View style={{ width: 56, height: 56, borderRadius: 28, backgroundColor: '#0b1020', padding: 2 }}>
-                        {story.avatarUrl ? (
-                          <Image
-                            source={{ uri: resolveMediaUrl(story.avatarUrl) }}
-                            style={{ width: '100%', height: '100%', borderRadius: 26 }}
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View style={{ flex: 1, borderRadius: 26, alignItems: 'center', justifyContent: 'center', backgroundColor: '#1f2937' }}>
-                            <Text style={{ color: '#d1d5db', fontWeight: '800' }}>{story.username.slice(0, 2).toUpperCase()}</Text>
-                          </View>
-                        )}
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 8 }}>
+                  <Pressable onPress={() => openCreateAction('photo')} style={{ width: 88 }}>
+                    <View
+                      style={{
+                        height: 102,
+                        borderRadius: 18,
+                        borderWidth: 1,
+                        borderColor: '#0ea5e9',
+                        backgroundColor: '#102443',
+                        padding: 8,
+                        transform: [{ skewY: '-2deg' }],
+                        overflow: 'hidden',
+                        justifyContent: 'space-between',
+                      }}
+                    >
+                      <View style={{ alignSelf: 'flex-start', backgroundColor: '#0f172a', borderRadius: 10, paddingHorizontal: 8, paddingVertical: 4, transform: [{ skewY: '2deg' }] }}>
+                        <Text style={{ color: '#c7d2fe', fontSize: 10, fontWeight: '900' }}>YOU</Text>
+                      </View>
+                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-end' }}>
+                        <Text style={{ color: '#e0e7ff', fontSize: 11, fontWeight: '800', transform: [{ skewY: '2deg' }] }}>Add pulse</Text>
+                        <MaterialCommunityIcons name="plus" size={16} color="#c7d2fe" style={{ transform: [{ skewY: '2deg' }] }} />
                       </View>
                     </View>
-                    <Text numberOfLines={1} style={{ marginTop: 6, color: '#c7d2fe', fontSize: 11 }}>{story.username}</Text>
-                    <Text style={{ marginTop: 2, color: story.isLive ? '#fca5a5' : '#a5b4fc', fontSize: 10, fontWeight: '800' }}>
-                      {story.isLive ? 'LIVE' : 'NEW'}
-                    </Text>
                   </Pressable>
-                ))}
-              </ScrollView>
 
-              <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
+                  {stories.map((story) => (
+                    <Pressable
+                      key={story.id}
+                      onPress={() => (story.isLive ? openLiveRoom(story) : openUserProfile(story.username))}
+                      style={{ width: 88 }}
+                    >
+                      <View
+                        style={{
+                          height: 102,
+                          borderRadius: 18,
+                          borderWidth: 1,
+                          borderColor: story.isLive ? '#ef4444' : '#334155',
+                          backgroundColor: story.isLive ? '#2a1118' : '#101a32',
+                          padding: 8,
+                          transform: [{ skewY: '-2deg' }],
+                          overflow: 'hidden',
+                        }}
+                      >
+                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', transform: [{ skewY: '2deg' }] }}>
+                          <View style={{ paddingHorizontal: 6, paddingVertical: 3, borderRadius: 8, backgroundColor: story.isLive ? '#7f1d1d' : '#1f2937' }}>
+                            <Text style={{ color: story.isLive ? '#fecaca' : '#cbd5e1', fontSize: 9, fontWeight: '900' }}>
+                              {story.isLive ? 'LIVE' : 'NEW'}
+                            </Text>
+                          </View>
+                          {story.hasRecentPost ? <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: '#60a5fa' }} /> : null}
+                        </View>
+
+                        <View style={{ flex: 1, justifyContent: 'center', transform: [{ skewY: '2deg' }] }}>
+                          <View style={{ width: 40, height: 40, borderRadius: 13, overflow: 'hidden', backgroundColor: '#1f2937', alignItems: 'center', justifyContent: 'center' }}>
+                            {story.avatarUrl ? (
+                              <Image
+                                source={{ uri: resolveMediaUrl(story.avatarUrl) }}
+                                style={{ width: '100%', height: '100%' }}
+                                resizeMode="cover"
+                              />
+                            ) : (
+                              <Text style={{ color: '#d1d5db', fontWeight: '800' }}>{story.username.slice(0, 2).toUpperCase()}</Text>
+                            )}
+                          </View>
+                        </View>
+
+                        <View style={{ transform: [{ skewY: '2deg' }] }}>
+                          <Text numberOfLines={1} style={{ color: '#f8fafc', fontSize: 11, fontWeight: '900' }}>{story.username}</Text>
+                          <Text numberOfLines={1} style={{ color: '#94a3b8', fontSize: 10 }}>{story.displayName || story.username}</Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                  ))}
+                </ScrollView>
+              </View>
+
+              <View style={{ backgroundColor: '#0f172a', borderRadius: 16, borderWidth: 1, borderColor: '#263246', padding: 12, gap: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#312e81', alignItems: 'center', justifyContent: 'center' }}>
                     <Text style={{ color: '#ddd6fe', fontWeight: '900' }}>{(user?.displayName || user?.username || 'NX').slice(0, 2).toUpperCase()}</Text>
                   </View>
                   <Pressable
                     onPress={() => router.push('/create')}
-                    style={{ flex: 1, backgroundColor: '#151d33', borderRadius: 999, borderWidth: 1, borderColor: '#28324a', paddingVertical: 10, paddingHorizontal: 14 }}
+                    style={{ flex: 1, backgroundColor: '#0b1328', borderRadius: 999, borderWidth: 1, borderColor: '#2d3d5e', paddingVertical: 10, paddingHorizontal: 14 }}
                   >
-                    <Text style={{ color: '#93a1bd', fontWeight: '700' }}>What's on your mind?</Text>
+                    <Text style={{ color: '#9fb0cb', fontWeight: '700' }}>What's on your mind?</Text>
                   </Pressable>
                 </View>
                 <View style={{ flexDirection: 'row', gap: 8 }}>
-                  <Pressable onPress={() => router.push('/create')} style={{ flex: 1, borderRadius: 12, backgroundColor: '#151d33', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+                  <Pressable onPress={() => openCreateAction('photo')} style={{ flex: 1, borderRadius: 12, backgroundColor: '#151d33', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
                     <MaterialCommunityIcons name="image-outline" size={16} color="#fda4af" />
                     <Text style={{ color: '#cbd5e1', fontWeight: '700', fontSize: 12 }}>Photo</Text>
                   </Pressable>
-                  <Pressable onPress={() => router.push('/create')} style={{ flex: 1, borderRadius: 12, backgroundColor: '#151d33', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+                  <Pressable onPress={() => openCreateAction('reel')} style={{ flex: 1, borderRadius: 12, backgroundColor: '#151d33', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
                     <MaterialCommunityIcons name="movie-open-play-outline" size={16} color="#93c5fd" />
                     <Text style={{ color: '#cbd5e1', fontWeight: '700', fontSize: 12 }}>Reel</Text>
                   </Pressable>
-                  <Pressable onPress={() => router.push('/more')} style={{ flex: 1, borderRadius: 12, backgroundColor: '#151d33', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+                  <Pressable onPress={showLiveUnavailable} style={{ flex: 1, borderRadius: 12, backgroundColor: '#151d33', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
                     <MaterialCommunityIcons name="video-wireless-outline" size={16} color="#6ee7b7" />
                     <Text style={{ color: '#cbd5e1', fontWeight: '700', fontSize: 12 }}>Live</Text>
                   </Pressable>
                 </View>
               </View>
 
-              {stories.length > 0 || suggestedCreators.length > 0 ? (
-                <View style={{ gap: 10 }}>
+              <Pressable
+                onPress={() => setShowInsights((prev) => !prev)}
+                style={{
+                  backgroundColor: '#0f172a',
+                  borderRadius: 14,
+                  borderWidth: 1,
+                  borderColor: '#243042',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  justifyContent: 'space-between',
+                }}
+              >
+                <View>
+                  <Text style={{ color: '#e2e8f0', fontWeight: '800', fontSize: 13 }}>
+                    {showInsights ? 'Hide discovery panels' : 'Show discovery panels'}
+                  </Text>
+                  <Text style={{ color: '#94a3b8', fontSize: 11, marginTop: 2 }}>
+                    {showInsights ? 'Simplify and focus on core feed.' : 'Recommendations, trends, trust rankings, and live overview.'}
+                  </Text>
+                </View>
+                <MaterialCommunityIcons name={showInsights ? 'chevron-up' : 'chevron-down'} size={18} color="#a5b4fc" />
+              </Pressable>
+
+              {showInsights ? (
+                <>
+                  {stories.length > 0 || suggestedCreators.length > 0 ? (
+                    <View style={{ gap: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                     <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>People you may know</Text>
                     <Pressable onPress={() => router.push('/more')}>
@@ -600,14 +688,14 @@ export default function FeedScreen() {
                         );
                       })}
                   </ScrollView>
-                </View>
-              ) : null}
+                    </View>
+                  ) : null}
 
-              <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
+                  <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Live now</Text>
-                  <Pressable onPress={() => router.push('/live')}>
-                    <Text style={{ color: '#a5b4fc', fontWeight: '800', fontSize: 12 }}>Open live</Text>
+                  <Pressable onPress={showLiveUnavailable}>
+                    <Text style={{ color: '#a5b4fc', fontWeight: '800', fontSize: 12 }}>Live unavailable</Text>
                   </Pressable>
                 </View>
                 {liveNowCreators.length > 0 ? (
@@ -634,14 +722,14 @@ export default function FeedScreen() {
                   <View style={{ backgroundColor: '#151d33', borderRadius: 12, padding: 12, gap: 8 }}>
                     <Text style={{ color: '#e5e7eb', fontWeight: '800' }}>No live broadcasts right now</Text>
                     <Text style={{ color: '#93a1bd', fontSize: 12 }}>When someone goes live, they’ll appear here automatically.</Text>
-                    <Pressable onPress={() => router.push('/live')} style={{ alignSelf: 'flex-start', backgroundColor: '#7c3aed', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }}>
-                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Open Live</Text>
+                    <Pressable onPress={showLiveUnavailable} style={{ alignSelf: 'flex-start', backgroundColor: '#7c3aed', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }}>
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Live unavailable</Text>
                     </Pressable>
                   </View>
                 )}
-              </View>
+                  </View>
 
-              <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
+                  <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>NXQ Pulse</Text>
                   <Text style={{ color: '#93a1bd', fontSize: 11, fontWeight: '700' }}>Blend of your network + trends</Text>
@@ -652,7 +740,7 @@ export default function FeedScreen() {
                     <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18, marginTop: 4 }}>{activeCreators}</Text>
                   </View>
                   <View style={{ flex: 1, backgroundColor: '#151d33', borderRadius: 12, padding: 10 }}>
-                    <Text style={{ color: '#93a1bd', fontSize: 11 }}>Story rings</Text>
+                    <Text style={{ color: '#93a1bd', fontSize: 11 }}>Signal cards</Text>
                     <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18, marginTop: 4 }}>{stories.length}</Text>
                   </View>
                   <View style={{ flex: 1, backgroundColor: '#151d33', borderRadius: 12, padding: 10 }}>
@@ -693,9 +781,9 @@ export default function FeedScreen() {
                     </View>
                   ) : null}
                 </View>
-              </View>
+                  </View>
 
-              <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
+                  <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Trust-ranked creators</Text>
                   <Text style={{ color: '#93a1bd', fontSize: 11, fontWeight: '700' }}>NXQ signature mix</Text>
@@ -737,7 +825,9 @@ export default function FeedScreen() {
                     </Pressable>
                   </View>
                 )}
-              </View>
+                  </View>
+                </>
+              ) : null}
             </View>
           )}
           ListEmptyComponent={(

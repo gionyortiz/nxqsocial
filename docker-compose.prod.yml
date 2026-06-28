@@ -1,6 +1,4 @@
-﻿version: '3.8'
-
-# ── Production Docker Compose ──────────────────────────────────────────────────
+﻿# ── Production Docker Compose ──────────────────────────────────────────────────
 # Usage:
 #   1. Copy backend/.env.example → backend/.env.prod and fill in all values
 #   2. Copy frontend/.env.local.example → frontend/.env.prod and fill in all values

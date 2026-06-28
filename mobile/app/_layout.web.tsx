@@ -5,7 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect } from 'react';
 
 import { useColorScheme } from '@/components/useColorScheme';
-import { AuthProvider, useAuth } from '@/lib/auth';
+import { AuthProvider } from '@/lib/auth';
 
 export { ErrorBoundary } from 'expo-router';
 
@@ -46,8 +46,6 @@ function RootLayoutNav() {
 }
 
 function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefined }) {
-  useAuth();
-
   return (
     <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
       <Stack>

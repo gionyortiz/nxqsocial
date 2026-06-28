@@ -4,9 +4,60 @@
 const { PrismaClient } = require('@prisma/client');
 const { PrismaPg } = require('@prisma/adapter-pg');
 const bcrypt = require('bcryptjs');
+const fs = require('fs');
+const path = require('path');
+const https = require('https');
+const http = require('http');
 
 const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });
 const prisma = new PrismaClient({ adapter });
+
+// ── Helper: Download file from URL and save to disk ─────────────────────────
+async function downloadAndSaveVideo(externalUrl, localPath) {
+  return new Promise((resolve, reject) => {
+    const protocol = externalUrl.startsWith('https') ? https : http;
+    const dir = path.dirname(localPath);
+    
+    // Ensure directory exists
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    // If file already exists, skip download (avoid re-downloading on re-seed)
+    if (fs.existsSync(localPath)) {
+      console.log(`Video already cached: ${localPath}`);
+      return resolve(localPath);
+    }
+
+    const file = fs.createWriteStream(localPath);
+    const request = protocol.get(externalUrl, { timeout: 30000 }, (response) => {
+      if (response.statusCode === 301 || response.statusCode === 302) {
+        // Follow redirects
+        return downloadAndSaveVideo(response.headers.location, localPath).then(resolve).catch(reject);
+      }
+      if (response.statusCode !== 200) {
+        fs.unlink(localPath, () => {}); // Clean up partial file
+        return reject(new Error(`Download failed: HTTP ${response.statusCode} for ${externalUrl}`));
+      }
+      response.pipe(file);
+      file.on('finish', () => {
+        file.close();
+        console.log(`Downloaded: ${externalUrl} → ${localPath}`);
+        resolve(localPath);
+      });
+    });
+    
+    request.on('error', (err) => {
+      fs.unlink(localPath, () => {}); // Clean up partial file
+      reject(err);
+    });
+    
+    file.on('error', (err) => {
+      fs.unlink(localPath, () => {}); // Clean up partial file
+      reject(err);
+    });
+  });
+}
 
 function generateSeedPassword(prefix) {
   return `${prefix}-${Date.now()}-Aa1!`;
@@ -110,18 +161,44 @@ async function seedReviewAccount() {
   }
   const videoCount = await prisma.post.count({ where: { authorId: reviewer.id, type: 'SHORT_VIDEO' } });
   if (videoCount < 1) {
-    await prisma.post.create({
-      data: {
-        authorId: reviewer.id,
-        caption: 'A quick look at the Reels feed 🎥 sound on!',
-        type: 'SHORT_VIDEO', visibility: 'PUBLIC', status: 'PUBLISHED', aiLabel: 'NONE',
-        media: { create: {
-          userId: reviewer.id, s3Key: 'demo/appreview-reel.mp4', bucket: 'demo',
-          url: VIDEOS[0].url, mimeType: 'video/mp4',
-          size: 0, width: 720, height: 1280, durationSec: 15, uploadStatus: 'PUBLISHED', moderationStatus: 'APPROVED', order: 0,
-        } },
-      },
-    });
+    // Download video to local disk instead of hot-linking external CDN
+    const videoFileName = `${require('crypto').randomUUID()}.mp4`;
+    const videoPath = path.join(process.cwd(), 'uploads', 'videos', videoFileName);
+    const localUrl = `/uploads/videos/${videoFileName}`;
+    
+    try {
+      await downloadAndSaveVideo(VIDEOS[0].url, videoPath);
+      
+      await prisma.post.create({
+        data: {
+          authorId: reviewer.id,
+          caption: 'A quick look at the Reels feed 🎥 sound on!',
+          type: 'SHORT_VIDEO', visibility: 'PUBLIC', status: 'PUBLISHED', aiLabel: 'NONE',
+          media: { create: {
+            userId: reviewer.id, s3Key: 'demo/appreview-reel.mp4', bucket: 'demo',
+            url: localUrl,  // ← Use local path, not external CDN
+            mimeType: 'video/mp4',
+            size: 0, width: 720, height: 1280, durationSec: 15, uploadStatus: 'PUBLISHED', moderationStatus: 'APPROVED', order: 0,
+          } },
+        },
+      });
+    } catch (downloadErr) {
+      console.error('Failed to download review account video:', downloadErr.message);
+      // Fallback: store external URL
+      await prisma.post.create({
+        data: {
+          authorId: reviewer.id,
+          caption: 'A quick look at the Reels feed 🎥 sound on!',
+          type: 'SHORT_VIDEO', visibility: 'PUBLIC', status: 'PUBLISHED', aiLabel: 'NONE',
+          media: { create: {
+            userId: reviewer.id, s3Key: 'demo/appreview-reel.mp4', bucket: 'demo',
+            url: VIDEOS[0].url,  // ← Fallback to external URL
+            mimeType: 'video/mp4',
+            size: 0, width: 720, height: 1280, durationSec: 15, uploadStatus: 'PUBLISHED', moderationStatus: 'APPROVED', order: 0,
+          } },
+        },
+      });
+    }
   }
 
   console.log(`App Review account ready: ${REVIEW_ACCOUNT.email} / ${reviewPassword}`);
@@ -194,30 +271,66 @@ async function main() {
     const vid = VIDEOS[i % VIDEOS.length];
     const videoCount = await prisma.post.count({ where: { authorId: user.id, type: 'SHORT_VIDEO' } });
     if (videoCount < 1) {
-      await prisma.post.create({
-        data: {
-          authorId: user.id,
-          caption: vid.caption,
-          type: 'SHORT_VIDEO',
-          visibility: 'PUBLIC',
-          status: 'PUBLISHED',
-          aiLabel: 'NONE',
-          media: {
-            create: {
-              userId: user.id,
-              s3Key: `demo/${u.username}-reel.mp4`,
-              bucket: 'demo',
-              url: vid.url,
-              mimeType: 'video/mp4',
-              size: 0, width: 720, height: 1280, durationSec: 15,
-              uploadStatus: 'PUBLISHED',
-              moderationStatus: 'APPROVED',
-              order: 0,
+      // Download video to local disk instead of hot-linking external CDN
+      const videoFileName = `${require('crypto').randomUUID()}.mp4`;
+      const videoPath = path.join(process.cwd(), 'uploads', 'videos', videoFileName);
+      const localUrl = `/uploads/videos/${videoFileName}`;
+      
+      try {
+        await downloadAndSaveVideo(vid.url, videoPath);
+        
+        await prisma.post.create({
+          data: {
+            authorId: user.id,
+            caption: vid.caption,
+            type: 'SHORT_VIDEO',
+            visibility: 'PUBLIC',
+            status: 'PUBLISHED',
+            aiLabel: 'NONE',
+            media: {
+              create: {
+                userId: user.id,
+                s3Key: `demo/${u.username}-reel.mp4`,
+                bucket: 'demo',
+                url: localUrl,  // ← Use local path, not external CDN
+                mimeType: 'video/mp4',
+                size: 0, width: 720, height: 1280, durationSec: 15,
+                uploadStatus: 'PUBLISHED',
+                moderationStatus: 'APPROVED',
+                order: 0,
+              },
             },
           },
-        },
-      });
-      posts++;
+        });
+        posts++;
+      } catch (downloadErr) {
+        console.error(`Failed to download video for ${u.username}:`, downloadErr.message);
+        // Fallback: store external URL and let the app try to load it
+        await prisma.post.create({
+          data: {
+            authorId: user.id,
+            caption: vid.caption,
+            type: 'SHORT_VIDEO',
+            visibility: 'PUBLIC',
+            status: 'PUBLISHED',
+            aiLabel: 'NONE',
+            media: {
+              create: {
+                userId: user.id,
+                s3Key: `demo/${u.username}-reel.mp4`,
+                bucket: 'demo',
+                url: vid.url,  // ← Fallback to external URL
+                mimeType: 'video/mp4',
+                size: 0, width: 720, height: 1280, durationSec: 15,
+                uploadStatus: 'PUBLISHED',
+                moderationStatus: 'APPROVED',
+                order: 0,
+              },
+            },
+          },
+        });
+        posts++;
+      }
     } else {
       // Repair: existing demo reels may point at dead URLs — refresh them.
       const updated = await prisma.mediaAsset.updateMany({

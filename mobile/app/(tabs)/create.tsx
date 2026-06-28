@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { File, UploadType } from 'expo-file-system';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -20,6 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
+import { useLocalSearchParams } from 'expo-router';
 import { API_BASE_URL } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
 
@@ -131,6 +132,10 @@ function VideoPreview({ uri }: { uri: string }) {
 
 export default function CreateScreen() {
   const { token } = useAuth();
+  const params = useLocalSearchParams<{ mode?: string }>();
+  const initialModeHandled = useRef(false);
+  const launchMode = typeof params.mode === 'string' ? params.mode : null;
+  const launchModeLabel = launchMode === 'photo' ? 'Photo' : launchMode === 'reel' ? 'Reel' : launchMode === 'live' ? 'Live' : null;
   const [assetUri, setAssetUri] = useState<string | null>(null);
   const [assetType, setAssetType] = useState<'image' | 'video' | null>(null);
   const [assetName, setAssetName] = useState<string | null>(null);
@@ -278,6 +283,28 @@ export default function CreateScreen() {
     if (result.canceled || !result.assets?.length) return;
     storeSelectedAsset(result.assets[0]);
   };
+
+  useEffect(() => {
+    if (initialModeHandled.current) return;
+    const mode = typeof params.mode === 'string' ? params.mode : undefined;
+    if (!mode) return;
+
+    initialModeHandled.current = true;
+
+    if (mode === 'photo') {
+      void pickMedia('image');
+      return;
+    }
+
+    if (mode === 'reel') {
+      void captureMedia('video');
+      return;
+    }
+
+    if (mode === 'live') {
+      Alert.alert('Live unavailable', 'Live is not available in this build yet.');
+    }
+  }, [captureMedia, params.mode, pickMedia]);
 
   const submit = async () => {
     if (!token || !assetUri || !assetType) return;
@@ -546,17 +573,32 @@ export default function CreateScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
               <View style={{ flex: 1 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>Create Post</Text>
+                  <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>
+                    {launchModeLabel ? `Create ${launchModeLabel}` : 'Create Post'}
+                  </Text>
                   <View style={{ backgroundColor: '#7c3aed', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
                     <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>NEW</Text>
                   </View>
                 </View>
-                <Text style={{ color: '#93a1bd', marginTop: 2 }}>Pick your audience, add a caption, and share</Text>
+                <Text style={{ color: '#93a1bd', marginTop: 2 }}>
+                  {launchModeLabel === 'Photo'
+                    ? 'Photo opens straight into your library.'
+                    : launchModeLabel === 'Reel'
+                      ? 'Reel opens straight into the camera.'
+                      : 'Pick your audience, add a caption, and share'}
+                </Text>
               </View>
               <View style={{ width: 44, height: 44, borderRadius: 16, backgroundColor: '#312e81', alignItems: 'center', justifyContent: 'center' }}>
                 <MaterialCommunityIcons name="plus" size={26} color="#fff" />
               </View>
             </View>
+
+            {launchModeLabel ? (
+              <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1f2a44', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#32405f' }}>
+                <MaterialCommunityIcons name={launchModeLabel === 'Reel' ? 'video-outline' : 'image-outline'} size={14} color="#c7d2fe" />
+                <Text style={{ color: '#dbe4ff', fontWeight: '800', fontSize: 12 }}>{launchModeLabel} shortcut</Text>
+              </View>
+            ) : null}
 
             {/* Audience selector pinned to the top so it is immediately visible */}
             <View style={{ gap: 8, backgroundColor: '#141b30', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#2c2f63' }}>
