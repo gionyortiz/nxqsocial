@@ -105,6 +105,12 @@ export default function UserProfileScreen() {
   };
 
   const startDirectCall = async (mode: 'call' | 'video') => {
+    console.log('=== CALL BUTTON PRESSED ===');
+    console.log('Mode:', mode);
+    console.log('Token:', !!token);
+    console.log('Profile:', profile?.username);
+    console.log('User:', user?.username);
+    
     if (!token) {
       Alert.alert('Not signed in', 'Please log in to make calls.');
       return;
@@ -117,11 +123,18 @@ export default function UserProfileScreen() {
       Alert.alert('Cannot call yourself', 'You cannot start a call with yourself.');
       return;
     }
+    
     const safePeer = profile.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const safeMe = (user?.username || 'guest').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const room = `dm_${safeMe}_${safePeer}_${Date.now().toString(36)}`;
+    
+    console.log('Room:', room);
+    console.log('Targets:', [profile.username]);
+    console.log('Video:', mode === 'video');
+    
     try {
-      await apiRequest('/calls/ring', {
+      console.log('Sending /calls/ring request...');
+      const response = await apiRequest('/calls/ring', {
         method: 'POST',
         token,
         body: {
@@ -131,9 +144,14 @@ export default function UserProfileScreen() {
           group: false,
         },
       });
+      console.log('Ring response:', response);
     } catch (e: any) {
+      console.error('Call ring error:', e);
       Alert.alert('Call invite failed', e?.message ?? 'Could not notify this user right now.');
+      return;
     }
+    
+    console.log('Navigating to live-native with room:', room, 'mode:', mode);
     router.push({ pathname: '/live-native' as never, params: { room, mode } as never });
   };
 
@@ -249,20 +267,23 @@ export default function UserProfileScreen() {
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable
                       onPress={() => startDirectCall('call')}
-                      disabled={!profile || profile.username === user?.username || !token}
-                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: (!profile || profile.username === user?.username || !token) ? 0.5 : 1 }}
+                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                     >
                       <MaterialCommunityIcons name="phone-outline" size={16} color="#cbd5e1" />
                       <Text style={{ color: '#cbd5e1', fontWeight: '800' }}>Call</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => startDirectCall('video')}
-                      disabled={!profile || profile.username === user?.username || !token}
-                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: (!profile || profile.username === user?.username || !token) ? 0.5 : 1 }}
+                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                     >
                       <MaterialCommunityIcons name="video-outline" size={16} color="#cbd5e1" />
                       <Text style={{ color: '#cbd5e1', fontWeight: '800' }}>Video</Text>
                     </Pressable>
+                  </View>
+                  <View style={{ backgroundColor: '#1a2332', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#334155' }}>
+                    <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>You: {user?.username || 'loading'}</Text>
+                    <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>Viewing: {profile?.username}</Text>
+                    <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>Auth: {token ? '✓' : '✗'}</Text>
                   </View>
                 </View>
               ) : null}
