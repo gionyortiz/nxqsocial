@@ -23,38 +23,71 @@ async function downloadAndSaveVideo(externalUrl, localPath) {
       fs.mkdirSync(dir, { recursive: true });
     }
 
-    // If file already exists, skip download (avoid re-downloading on re-seed)
+    // If file already exists and has content, skip (avoid re-downloading on re-seed)
     if (fs.existsSync(localPath)) {
-      console.log(`Video already cached: ${localPath}`);
-      return resolve(localPath);
+      const stat = fs.statSync(localPath);
+      if (stat.size > 1000) {  // Only skip if file is > 1KB (not an empty stub)
+        console.log(`Video already cached (${stat.size} bytes): ${localPath}`);
+        return resolve(localPath);
+      }
+      // File exists but is too small - delete it and retry
+      fs.unlinkSync(localPath);
     }
 
+    console.log(`Downloading video from ${externalUrl}...`);
     const file = fs.createWriteStream(localPath);
+    let downloadedBytes = 0;
+    let error = null;
+
     const request = protocol.get(externalUrl, { timeout: 30000 }, (response) => {
       if (response.statusCode === 301 || response.statusCode === 302) {
+        file.destroy();
+        fs.unlink(localPath, () => {});
         // Follow redirects
         return downloadAndSaveVideo(response.headers.location, localPath).then(resolve).catch(reject);
       }
       if (response.statusCode !== 200) {
-        fs.unlink(localPath, () => {}); // Clean up partial file
-        return reject(new Error(`Download failed: HTTP ${response.statusCode} for ${externalUrl}`));
+        error = new Error(`HTTP ${response.statusCode}: ${externalUrl}`);
+        file.destroy();
+        fs.unlink(localPath, () => {});
+        return reject(error);
       }
+      
+      response.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+      });
+      
       response.pipe(file);
       file.on('finish', () => {
         file.close();
-        console.log(`Downloaded: ${externalUrl} → ${localPath}`);
+        const stat = fs.statSync(localPath);
+        if (stat.size < 100) {
+          const err = new Error(`Downloaded file too small (${stat.size} bytes): ${externalUrl}`);
+          fs.unlink(localPath, () => {});
+          return reject(err);
+        }
+        console.log(`✓ Downloaded ${stat.size} bytes: ${externalUrl} → ${localPath}`);
         resolve(localPath);
       });
     });
     
     request.on('error', (err) => {
-      fs.unlink(localPath, () => {}); // Clean up partial file
+      file.destroy();
+      fs.unlink(localPath, () => {});
+      console.error(`✗ Download failed: ${err.message} (${externalUrl})`);
       reject(err);
     });
     
     file.on('error', (err) => {
-      fs.unlink(localPath, () => {}); // Clean up partial file
+      fs.unlink(localPath, () => {});
+      console.error(`✗ File write failed: ${err.message}`);
       reject(err);
+    });
+    
+    request.setTimeout(30000, () => {
+      file.destroy();
+      fs.unlink(localPath, () => {});
+      reject(new Error(`Download timeout: ${externalUrl}`));
     });
   });
 }
