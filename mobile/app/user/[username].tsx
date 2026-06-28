@@ -105,7 +105,18 @@ export default function UserProfileScreen() {
   };
 
   const startDirectCall = async (mode: 'call' | 'video') => {
-    if (!token || !profile || profile.username === user?.username) return;
+    if (!token) {
+      Alert.alert('Not signed in', 'Please log in to make calls.');
+      return;
+    }
+    if (!profile) {
+      Alert.alert('Profile loading', 'Please wait for the profile to load.');
+      return;
+    }
+    if (profile.username === user?.username) {
+      Alert.alert('Cannot call yourself', 'You cannot start a call with yourself.');
+      return;
+    }
     const safePeer = profile.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const safeMe = (user?.username || 'guest').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const room = `dm_${safeMe}_${safePeer}_${Date.now().toString(36)}`;
@@ -238,14 +249,16 @@ export default function UserProfileScreen() {
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable
                       onPress={() => startDirectCall('call')}
-                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      disabled={!profile || profile.username === user?.username || !token}
+                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: (!profile || profile.username === user?.username || !token) ? 0.5 : 1 }}
                     >
                       <MaterialCommunityIcons name="phone-outline" size={16} color="#cbd5e1" />
                       <Text style={{ color: '#cbd5e1', fontWeight: '800' }}>Call</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => startDirectCall('video')}
-                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      disabled={!profile || profile.username === user?.username || !token}
+                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, opacity: (!profile || profile.username === user?.username || !token) ? 0.5 : 1 }}
                     >
                       <MaterialCommunityIcons name="video-outline" size={16} color="#cbd5e1" />
                       <Text style={{ color: '#cbd5e1', fontWeight: '800' }}>Video</Text>
