@@ -238,6 +238,12 @@ async function seedReviewAccount() {
 }
 
 async function main() {
+  // Clean up old demo content (videos, posts, media) before seeding fresh
+  console.log('Cleaning up old demo content...');
+  await prisma.post.deleteMany({where: {type: 'SHORT_VIDEO'}});
+  await prisma.mediaAsset.deleteMany({where: {s3Key: {contains: 'demo'}}});
+  console.log('✓ Cleaned old posts and media');
+  
   await seedReviewAccount();
   const demoPasswordEnv = process.env.DEMO_USER_PASSWORD;
   if (isProduction && !demoPasswordEnv) {
