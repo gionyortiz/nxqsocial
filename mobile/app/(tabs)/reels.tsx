@@ -9,27 +9,57 @@ import { useAuth } from '@/lib/auth';
 const h = Dimensions.get('window').height;
 
 function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
+  const [paused, setPaused] = useState(false);
+  const [errored, setErrored] = useState(false);
+
   const player = useVideoPlayer(uri, (p) => {
     p.loop = true;
   });
 
   useEffect(() => {
-    if (focused) {
+    if (errored) return;
+    if (focused && !paused) {
       player.currentTime = 0;
       player.play();
       return;
     }
-
     player.pause();
-  }, [focused, player]);
+  }, [focused, paused, errored, player]);
+
+  useEffect(() => {
+    const sub = player.addListener('statusChange', (status) => {
+      if ((status as any)?.error || (status as any)?.status === 'error') {
+        setErrored(true);
+      }
+    });
+    return () => sub.remove();
+  }, [player]);
+
+  if (errored) {
+    return (
+      <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' }}>
+        <MaterialCommunityIcons name="video-off-outline" size={40} color="#64748b" />
+        <Text style={{ color: '#64748b', marginTop: 8, fontSize: 12 }}>Could not load video</Text>
+      </View>
+    );
+  }
 
   return (
-    <VideoView
-      player={player}
-      style={{ width: '100%', height: '100%' }}
-      contentFit="cover"
-      nativeControls={false}
-    />
+    <Pressable onPress={() => setPaused((p) => !p)} style={{ width: '100%', height: '100%' }}>
+      <VideoView
+        player={player}
+        style={{ width: '100%', height: '100%' }}
+        contentFit="cover"
+        nativeControls={false}
+      />
+      {paused && (
+        <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
+          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
+            <MaterialCommunityIcons name="play" size={36} color="#fff" />
+          </View>
+        </View>
+      )}
+    </Pressable>
   );
 }
 
@@ -339,11 +369,18 @@ export default function ReelsScreen() {
         onViewableItemsChanged={onViewableItemsChanged}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
         renderItem={({ item }) => {
-          const preferredVideo = item.media?.find((asset) => (asset.mimeType || '').startsWith('video/') && !!asset.url);
-          const primaryAsset = preferredVideo ?? item.media?.find((asset) => !!asset.url) ?? item.media?.[0];
+          const isVideoAsset = (asset: any) => {
+            if (!asset?.url) return false;
+            if ((asset.mimeType || '').startsWith('video/')) return true;
+            // Fallback: detect by URL extension when mimeType is missing
+            const ext = asset.url.split('?')[0].split('.').pop()?.toLowerCase();
+            return ['mp4', 'mov', 'webm', 'm4v', 'avi'].includes(ext || '');
+          };
+          const preferredVideo = item.media?.find(isVideoAsset);
+          const primaryAsset = preferredVideo ?? item.media?.find((asset: any) => !!asset.url) ?? item.media?.[0];
           const src = resolveMediaUrl(primaryAsset?.url || '');
           const fallbackImage = resolveMediaUrl(primaryAsset?.thumbnailUrl || primaryAsset?.url || '');
-          const isPlayableVideo = !!src && (primaryAsset?.mimeType || '').startsWith('video/');
+          const isPlayableVideo = !!src && isVideoAsset(primaryAsset);
           const isOwnPost = item.author.id === user?.id;
           const deleting = deletingPostId === item.id;
           const focused = activePostId === item.id;
