@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { Alert, Animated, Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
@@ -80,6 +80,24 @@ export default function ThreadScreen() {
 
   const messages = useMemo(() => remoteMessages, [remoteMessages]);
 
+  const startCall = async (mode: 'call' | 'video') => {
+    if (!token || !username) return;
+    const safePeer = username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
+    const safeMe = (user?.username || 'guest').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
+    const room = `dm_${safeMe}_${safePeer}_${Date.now().toString(36)}`;
+    try {
+      await apiRequest('/calls/ring', {
+        method: 'POST',
+        token,
+        body: { room, targets: [username], video: mode === 'video', group: false },
+      });
+    } catch (e: any) {
+      Alert.alert('Call failed', e?.message ?? 'Could not reach this user right now.');
+      return;
+    }
+    router.push({ pathname: '/live-native' as never, params: { room, mode } as never });
+  };
+
   const sendMessage = async () => {
     if (!token || !threadId) return;
     const next = text.trim();
@@ -139,10 +157,10 @@ export default function ThreadScreen() {
             <Text style={{ color: PALETTE.ink, fontWeight: '900', fontSize: 16 }}>{name}</Text>
             <Text style={{ color: PALETTE.subInk, fontSize: 11, fontFamily: 'SpaceMono' }}>@{username}  ONLINE</Text>
           </View>
-          <Pressable style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: '#12203a', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#26466d' }}>
+          <Pressable onPress={() => startCall('call')} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: '#12203a', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#26466d' }}>
             <MaterialCommunityIcons name="phone-outline" size={20} color={PALETTE.ink} />
           </Pressable>
-          <Pressable style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: '#12203a', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#26466d' }}>
+          <Pressable onPress={() => startCall('video')} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: '#12203a', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#26466d' }}>
             <MaterialCommunityIcons name="video-outline" size={20} color={PALETTE.ink} />
           </Pressable>
         </View>
