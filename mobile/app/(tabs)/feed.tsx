@@ -405,11 +405,8 @@ export default function FeedScreen() {
   const openUserProfile = (username: string) => {
     router.push({ pathname: '/user/[username]', params: { username } });
   };
-  const openCreateAction = (mode: 'photo' | 'reel') => {
+  const openCreateAction = (mode: 'photo' | 'reel' | 'live') => {
     router.push({ pathname: '/create', params: { mode } });
-  };
-  const showLiveUnavailable = () => {
-    Alert.alert('Live unavailable', 'Live is not available in this build yet.');
   };
 
   const openLiveRoom = (story: StoryCandidate) => {
@@ -613,7 +610,7 @@ export default function FeedScreen() {
                     <MaterialCommunityIcons name="movie-open-play-outline" size={16} color="#93c5fd" />
                     <Text style={{ color: '#cbd5e1', fontWeight: '700', fontSize: 12 }}>Reel</Text>
                   </Pressable>
-                  <Pressable onPress={showLiveUnavailable} style={{ flex: 1, borderRadius: 12, backgroundColor: '#151d33', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
+                  <Pressable onPress={() => openCreateAction('live')} style={{ flex: 1, borderRadius: 12, backgroundColor: '#151d33', paddingVertical: 10, alignItems: 'center', flexDirection: 'row', justifyContent: 'center', gap: 6 }}>
                     <MaterialCommunityIcons name="video-wireless-outline" size={16} color="#6ee7b7" />
                     <Text style={{ color: '#cbd5e1', fontWeight: '700', fontSize: 12 }}>Live</Text>
                   </Pressable>
@@ -694,8 +691,8 @@ export default function FeedScreen() {
                   <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Live now</Text>
-                  <Pressable onPress={showLiveUnavailable}>
-                    <Text style={{ color: '#a5b4fc', fontWeight: '800', fontSize: 12 }}>Live unavailable</Text>
+                  <Pressable onPress={() => openCreateAction('live')}>
+                    <Text style={{ color: '#a5b4fc', fontWeight: '800', fontSize: 12 }}>Start live</Text>
                   </Pressable>
                 </View>
                 {liveNowCreators.length > 0 ? (
@@ -722,8 +719,8 @@ export default function FeedScreen() {
                   <View style={{ backgroundColor: '#151d33', borderRadius: 12, padding: 12, gap: 8 }}>
                     <Text style={{ color: '#e5e7eb', fontWeight: '800' }}>No live broadcasts right now</Text>
                     <Text style={{ color: '#93a1bd', fontSize: 12 }}>When someone goes live, they’ll appear here automatically.</Text>
-                    <Pressable onPress={showLiveUnavailable} style={{ alignSelf: 'flex-start', backgroundColor: '#7c3aed', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }}>
-                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Live unavailable</Text>
+                    <Pressable onPress={() => openCreateAction('live')} style={{ alignSelf: 'flex-start', backgroundColor: '#7c3aed', borderRadius: 10, paddingHorizontal: 10, paddingVertical: 8 }}>
+                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Start broadcasting</Text>
                     </Pressable>
                   </View>
                 )}

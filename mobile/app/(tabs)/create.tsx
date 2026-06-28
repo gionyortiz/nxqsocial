@@ -20,7 +20,7 @@ import {
   View,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
-import { useLocalSearchParams } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { API_BASE_URL } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
 
@@ -131,7 +131,8 @@ function VideoPreview({ uri }: { uri: string }) {
 }
 
 export default function CreateScreen() {
-  const { token } = useAuth();
+  const { token, user } = useAuth();
+  const router = useRouter();
   const params = useLocalSearchParams<{ mode?: string }>();
   const initialModeHandled = useRef(false);
   const launchMode = typeof params.mode === 'string' ? params.mode : null;
@@ -302,9 +303,12 @@ export default function CreateScreen() {
     }
 
     if (mode === 'live') {
-      Alert.alert('Live unavailable', 'Live is not available in this build yet.');
+      // Generate unique room ID for this broadcast
+      const roomId = `live_${user?.id || 'guest'}_${Date.now().toString(36)}`;
+      router.push({ pathname: '/live-native' as never, params: { room: roomId, mode: 'video' } as never });
+      return;
     }
-  }, [captureMedia, params.mode, pickMedia]);
+  }, [captureMedia, params.mode, pickMedia, router]);
 
   const submit = async () => {
     if (!token || !assetUri || !assetType) return;
