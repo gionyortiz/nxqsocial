@@ -62,6 +62,8 @@ function LiveStage({
   isHost,
   displayName,
   initialMode,
+  roomMode,
+  setRoomMode,
   onClose,
 }: {
   room: string;
@@ -69,6 +71,8 @@ function LiveStage({
   isHost: boolean;
   displayName: string;
   initialMode: 'call' | 'video';
+  roomMode: 'call' | 'video';
+  setRoomMode: (mode: 'call' | 'video') => void;
   onClose: () => void;
 }) {
   const participants = useParticipants();
@@ -83,8 +87,7 @@ function LiveStage({
   const [messages, setMessages] = useState<ChatMsg[]>([]);
   const [draft, setDraft] = useState('');
   const [likeBurst, setLikeBurst] = useState(0);
-  const [camOn, setCamOn] = useState(initialMode === 'video');
-  const [roomMode, setRoomMode] = useState<'call' | 'video'>(initialMode);
+  const [camOn, setCamOn] = useState(false);
   const [requested, setRequested] = useState(false);
   const listRef = useRef<FlatList<ChatMsg>>(null);
 
@@ -282,7 +285,7 @@ function LiveStage({
       ) : (
         <View style={[styles.video, styles.center]}>
           <ActivityIndicator color="#fff" />
-          <Text style={styles.dim}>{isHost ? 'Starting camera...' : 'Waiting for broadcaster...'}</Text>
+          <Text style={styles.dim}>{isHost ? (roomMode === 'video' ? 'Starting camera...' : 'Connecting to call...') : 'Waiting for broadcaster...'}</Text>
         </View>
       )}
 
@@ -399,6 +402,7 @@ export default function NativeLiveScreen() {
   const [creds, setCreds] = useState<LiveTokenResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const [roomMode, setRoomMode] = useState<'call' | 'video'>(initialMode);
 
   useEffect(() => {
     const init = async () => {
@@ -416,7 +420,7 @@ export default function NativeLiveScreen() {
         const data = await apiRequest<LiveTokenResponse>('/calls/token', {
           method: 'POST',
           token: authToken,
-          body: { room, video: isHost && initialMode === 'video', host: isHost },
+          body: { room, video: isHost && roomMode === 'video', host: isHost },
         });
         if (!data?.token || !data?.url) {
           throw new Error('Live video is not configured yet.');
@@ -429,7 +433,7 @@ export default function NativeLiveScreen() {
       }
     };
     void init();
-  }, [authToken, room, isHost, initialMode]);
+  }, [authToken, room, isHost, roomMode]);
 
   const closeLive = async () => {
     if (isHost && authToken && room) {
@@ -487,7 +491,7 @@ export default function NativeLiveScreen() {
         token={creds.token}
         connect
         audio={isHost}
-        video={isHost && initialMode === 'video'}
+        video={isHost && roomMode === 'video'}
         options={{ adaptiveStream: true }}
         onError={(e) => setError(e?.message ?? 'Live connection error')}
       >
@@ -497,6 +501,8 @@ export default function NativeLiveScreen() {
           isHost={isHost}
           displayName={displayName}
           initialMode={initialMode}
+          roomMode={roomMode}
+          setRoomMode={setRoomMode}
           onClose={closeLive}
         />
       </LiveKitRoom>
