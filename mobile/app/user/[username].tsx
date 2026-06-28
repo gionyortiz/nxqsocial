@@ -84,23 +84,27 @@ export default function UserProfileScreen() {
   };
 
   const startChat = async () => {
-    if (!token || !profile || profile.username === user?.username) return;
+    if (!token) { Alert.alert('Not signed in', 'Please log in first.'); return; }
+    if (!profile) { Alert.alert('Profile loading', 'Please wait and try again.'); return; }
+    if (profile.username === user?.username) { Alert.alert('Cannot message yourself', 'Open a chat with another user.'); return; }
     try {
       const created = await apiRequest<{ id: string }>('/messages/conversations', {
         method: 'POST',
         token,
         body: { participantUsername: profile.username },
       });
-      router.push((`/messages/${created.id}?username=${encodeURIComponent(profile.username)}&name=${encodeURIComponent(profile.displayName || profile.username)}&avatar=${encodeURIComponent(profile.avatarUrl || '')}`) as never);
+      if (!created?.id) throw new Error('Server did not return a conversation ID.');
+      router.push({
+        pathname: '/messages/[threadId]' as never,
+        params: {
+          threadId: created.id,
+          username: profile.username,
+          name: profile.displayName || profile.username,
+          avatar: profile.avatarUrl || '',
+        },
+      } as never);
     } catch (e: any) {
-      const message = String(e?.message ?? 'Could not open chat right now.');
-      if (message.toLowerCase().includes('cannot message yourself')) {
-        Alert.alert('Chat unavailable', 'You cannot start a chat with yourself.');
-      } else if (message.toLowerCase().includes('user not found')) {
-        Alert.alert('Chat unavailable', 'User was not found. Please refresh and try again.');
-      } else {
-        Alert.alert('Chat unavailable', message);
-      }
+      Alert.alert('Chat unavailable', e?.message ?? 'Could not open chat right now.');
     }
   };
 
