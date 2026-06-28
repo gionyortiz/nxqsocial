@@ -47,12 +47,21 @@ export class CallsService {
     room: string,
     opts: { video?: boolean; host?: boolean } = {},
   ): Promise<{ token: string; url: string; room: string; identity: string }> {
+    console.log('=== createToken called ===');
+    console.log('userId:', userId);
+    console.log('room:', room);
+    console.log('opts:', opts);
+    console.log('apiKey:', !!this.apiKey);
+    console.log('apiSecret:', !!this.apiSecret);
+    console.log('wsUrl:', this.wsUrl);
+    
     if (!this.apiKey || !this.apiSecret) {
       throw new BadRequestException(
         'Calling is not configured. Set LIVEKIT_API_KEY, LIVEKIT_API_SECRET and LIVEKIT_URL on the server.',
       );
     }
     if (!room || !/^[\w.@:-]{3,128}$/.test(room)) {
+      console.log('Invalid room name:', room, 'Regex test:', /^[\w.@:-]{3,128}$/.test(room || ''));
       throw new BadRequestException('Invalid room name.');
     }
 
@@ -83,12 +92,21 @@ export class CallsService {
       canPublishData: true,
     });
 
-    return {
-      token: await at.toJwt(),
+    const jwt = await at.toJwt();
+    const result = {
+      token: jwt,
       url: this.wsUrl,
       room,
       identity: userId,
     };
+    console.log('createToken response:', {
+      hasToken: !!result.token,
+      tokenLength: result.token?.length,
+      url: result.url,
+      room: result.room,
+      identity: result.identity,
+    });
+    return result;
   }
 
   /** Notify one or more users that they're being invited to a call. */
