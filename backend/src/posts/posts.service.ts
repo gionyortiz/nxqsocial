@@ -31,13 +31,26 @@ function postSelect(userId: string) {
   return { ...BASE_POST_SELECT, likes: { where: { userId }, select: { id: true } } };
 }
 
+function resolveMediaUrl(url: string | null): string | null {
+  if (!url) return null;
+  if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  // Convert relative URL to absolute HTTPS URL
+  const apiBase = process.env.API_BASE_URL || 'https://api.nxqsocial.com/api';
+  return `${apiBase}${url}`;
+}
+
 function mapPost(p: any) {
-  const { likes, author, ...rest } = p;
+  const { likes, author, media, ...rest } = p;
   const { profile, ...authorBase } = author;
   return {
     ...rest,
     isLiked: likes?.length > 0,
     author: { ...authorBase, ...(profile ?? {}) },
+    media: media?.map((m: any) => ({
+      ...m,
+      url: resolveMediaUrl(m.url),
+      thumbnailUrl: resolveMediaUrl(m.thumbnailUrl),
+    })) ?? [],
   };
 }
 
