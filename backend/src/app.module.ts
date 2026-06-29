@@ -47,7 +47,7 @@ import { getClientIpFromRequest } from './common/network/client-ip';
       // Serve from <cwd>/uploads so this matches where multer disk storage
       // writes (`./uploads/avatars`) regardless of where compiled JS lives.
       rootPath: join(process.cwd(), 'uploads'),
-      serveRoot: '/uploads',
+      serveRoot: '/api/uploads',
       serveStaticOptions: {
         setHeaders: (res) => {
           // Allow cross-origin <img>/<video> loads from the frontend domain.
