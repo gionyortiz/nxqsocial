@@ -111,6 +111,7 @@ function PostCard({
   onSave,
   onOpenActions,
   onOpenAuthor,
+  shouldPlayMedia,
 }: {
   post: PostItem;
   isOwnPost: boolean;
@@ -122,6 +123,7 @@ function PostCard({
   onSave: (postId: string) => void;
   onOpenActions: (post: PostItem) => void;
   onOpenAuthor: (username: string) => void;
+  shouldPlayMedia: boolean;
 }) {
   const first = post.media?.[0];
   const initials = (post.author.displayName || post.author.username || 'NX').slice(0, 2).toUpperCase();
@@ -143,7 +145,7 @@ function PostCard({
           <MaterialCommunityIcons name={isOwnPost ? 'trash-can-outline' : 'dots-horizontal'} size={18} color={isOwnPost ? '#fca5a5' : '#cbd5e1'} />
         </Pressable>
       </View>
-      <PostMedia asset={first} style={{ height: 330 }} />
+      <PostMedia asset={first} style={{ height: 330 }} shouldPlay={shouldPlayMedia} />
       <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
           <Pressable onPress={() => onLike(post)} hitSlop={10}>
@@ -191,6 +193,7 @@ export default function FeedScreen() {
   const [mode, setMode] = useState<FeedMode>('FOR_YOU');
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [showInsights, setShowInsights] = useState(false);
+  const [screenFocused, setScreenFocused] = useState(false);
 
   const trendingTopics = useMemo(() => buildTrendingTopics(items), [items]);
   const activeCreators = useMemo(() => new Set(items.map((item) => item.author.id)).size, [items]);
@@ -235,7 +238,11 @@ export default function FeedScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setScreenFocused(true);
       load();
+      return () => {
+        setScreenFocused(false);
+      };
     }, [token, mode]),
   );
 
@@ -870,6 +877,7 @@ export default function FeedScreen() {
                 onSave={toggleSave}
                 onOpenActions={openPostActions}
                 onOpenAuthor={openUserProfile}
+                shouldPlayMedia={screenFocused}
               />
               {(index + 1) % 2 === 0 || (items.length === 1 && index === 0) ? (
                 <View style={{ backgroundColor: '#111827', borderRadius: 14, borderWidth: 1, borderColor: '#1f2937', padding: 12, marginBottom: 14, gap: 8 }}>

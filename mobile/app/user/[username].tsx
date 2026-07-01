@@ -1,6 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, SafeAreaView, Text, View } from 'react-native';
-import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
@@ -33,6 +33,7 @@ export default function UserProfileScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [followBusy, setFollowBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [screenFocused, setScreenFocused] = useState(false);
 
   const load = async () => {
     if (!token || !username) return;
@@ -55,6 +56,15 @@ export default function UserProfileScreen() {
   useEffect(() => {
     load();
   }, [token, username]);
+
+  useFocusEffect(
+    useCallback(() => {
+      setScreenFocused(true);
+      return () => {
+        setScreenFocused(false);
+      };
+    }, []),
+  );
 
   const toggleFollow = async () => {
     if (!token || !profile || followBusy || profile.username === user?.username) return;
@@ -320,7 +330,7 @@ export default function UserProfileScreen() {
         renderItem={({ item }) => {
           return (
             <View style={{ backgroundColor: '#0f172a', borderRadius: 18, marginHorizontal: 16, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#233047' }}>
-              <PostMedia asset={item.media?.[0]} style={{ height: 300 }} />
+              <PostMedia asset={item.media?.[0]} style={{ height: 300 }} shouldPlay={screenFocused} />
               <View style={{ padding: 12, gap: 8 }}>
                 {item.caption ? <Text style={{ color: '#e2e8f0', lineHeight: 20 }}>{item.caption}</Text> : null}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>

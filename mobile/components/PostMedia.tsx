@@ -23,7 +23,7 @@ function MediaFallback({ label, style }: { label: string; style?: MediaStyle }) 
   );
 }
 
-function VideoMedia({ uri, style }: { uri: string; style?: MediaStyle }) {
+function VideoMedia({ uri, style, shouldPlay }: { uri: string; style?: MediaStyle; shouldPlay: boolean }) {
   const [errored, setErrored] = useState(false);
   const player = useVideoPlayer(uri, (nextPlayer) => {
     nextPlayer.loop = true;
@@ -31,13 +31,16 @@ function VideoMedia({ uri, style }: { uri: string; style?: MediaStyle }) {
   });
 
   useEffect(() => {
-    mobileProof('Video component props', { component: 'VideoView', uri });
-    if (errored) return;
+    mobileProof('Video component props', { component: 'VideoView', uri, shouldPlay });
+    if (errored || !shouldPlay) {
+      player.pause();
+      return;
+    }
     player.play();
     return () => {
       player.pause();
     };
-  }, [errored, player]);
+  }, [errored, player, shouldPlay, uri]);
 
   useEffect(() => {
     const subscription = player.addListener('statusChange', (status) => {
@@ -63,7 +66,7 @@ function VideoMedia({ uri, style }: { uri: string; style?: MediaStyle }) {
   );
 }
 
-export function PostMedia({ asset, style }: { asset?: MediaAsset | null; style?: MediaStyle }) {
+export function PostMedia({ asset, style, shouldPlay = true }: { asset?: MediaAsset | null; style?: MediaStyle; shouldPlay?: boolean }) {
   const [errored, setErrored] = useState(false);
   const uri = resolveMediaUrl(asset?.thumbnailUrl || asset?.url || '');
 
@@ -74,15 +77,16 @@ export function PostMedia({ asset, style }: { asset?: MediaAsset | null; style?:
       rawUrl: asset?.url,
       resolvedUrl: uri,
       component: asset && isVideoAsset(asset) ? 'VideoView' : 'Image',
+      shouldPlay,
     });
-  }, [asset?.id, asset?.mimeType, asset?.url, uri]);
+  }, [asset?.id, asset?.mimeType, asset?.url, uri, shouldPlay]);
 
   if (!uri || !asset || errored) {
     return <MediaFallback label="Media unavailable" style={style} />;
   }
 
   if (isVideoAsset(asset)) {
-    return <VideoMedia uri={resolveMediaUrl(asset.url)} style={style} />;
+    return <VideoMedia uri={resolveMediaUrl(asset.url)} style={style} shouldPlay={shouldPlay} />;
   }
 
   return (
