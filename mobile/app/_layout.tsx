@@ -10,6 +10,7 @@ import { useColorScheme } from '@/components/useColorScheme';
 import { apiRequest } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
 import { ensurePushRegistration } from '@/lib/push';
+import { mobileProof } from '@/lib/runtimeProof';
 
 // Register LiveKit WebRTC globals once for native in-app Live.
 // Guarded so web/Expo Go (no native module) does not crash on startup.
@@ -44,6 +45,10 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
   }),
 });
+
+function normalizeCallVideoFlag(value: unknown) {
+  return value === true || value === 'true' || value === '1';
+}
 
 export default function RootLayout() {
   const [loaded, error] = useFonts({
@@ -86,6 +91,7 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
   const openIncomingCallPrompt = (payload: { room?: string; from?: string; video?: boolean }) => {
     const room = payload.room || '';
     if (!room) return;
+    mobileProof('Incoming call payload', payload);
     const key = `${room}:${payload.from || ''}`;
     if (lastInviteKey.current === key) return;
     lastInviteKey.current = key;
@@ -111,7 +117,9 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
             apiRequest('/calls/decline', { method: 'POST', token }).catch(() => {
               // best effort clear
             });
-            router.push({ pathname: '/live-native' as never, params: { room, role: 'viewer', mode: payload.video ? 'video' : 'call' } as never });
+            const mode = payload.video ? 'video' : 'call';
+            mobileProof('Incoming call navigation', { room, mode, role: 'participant', kind: 'call' });
+            router.push({ pathname: '/live-native' as never, params: { room, role: 'participant', mode, kind: 'call' } as never });
           },
         },
       ],
@@ -130,10 +138,11 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
     const sub = Notifications.addNotificationResponseReceivedListener((response) => {
       const data = response.notification.request.content.data as Record<string, any>;
       if (data?.type === 'call_invite' && typeof data.room === 'string') {
+        mobileProof('Push call notification payload', data);
         openIncomingCallPrompt({
           room: data.room,
           from: typeof data.from === 'string' ? data.from : undefined,
-          video: !!data.video,
+          video: normalizeCallVideoFlag(data.video),
         });
         return;
       }
@@ -148,10 +157,11 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
       try {
         const invite = await apiRequest<{ room?: string; caller?: { username?: string }; video?: boolean } | null>('/calls/incoming', { token });
         if (invite?.room) {
+          mobileProof('Incoming call poll response', invite);
           openIncomingCallPrompt({
             room: invite.room,
             from: invite.caller?.username,
-            video: !!invite.video,
+            video: normalizeCallVideoFlag(invite.video),
           });
         }
       } catch {

@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { mobileProof } from '@/lib/runtimeProof';
 
 const h = Dimensions.get('window').height;
 
@@ -17,6 +18,7 @@ function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
   });
 
   useEffect(() => {
+    mobileProof('Reel video component props', { component: 'VideoView', uri, focused, paused });
     if (errored) return;
     if (focused && !paused) {
       player.currentTime = 0;
@@ -29,6 +31,7 @@ function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
   useEffect(() => {
     const sub = player.addListener('statusChange', (status) => {
       if ((status as any)?.error || (status as any)?.status === 'error') {
+        mobileProof('Reel video status error', { uri, status });
         setErrored(true);
       }
     });
@@ -88,6 +91,11 @@ export default function ReelsScreen() {
     setError(null);
     try {
       const data = await apiRequest<{ data: PostItem[] }>(`/posts/reels?mode=${mode}`, { token });
+      mobileProof('Incoming reel JSON', {
+        endpoint: `/posts/reels?mode=${mode}`,
+        count: data.data?.length ?? 0,
+        firstReel: data.data?.[0] ?? null,
+      });
       setItems(data.data || []);
     } catch (e: any) {
       setError(e?.message ?? 'Could not load reels right now. Pull to refresh.');
@@ -381,6 +389,14 @@ export default function ReelsScreen() {
           const src = resolveMediaUrl(primaryAsset?.url || '');
           const fallbackImage = resolveMediaUrl(primaryAsset?.thumbnailUrl || primaryAsset?.url || '');
           const isPlayableVideo = !!src && isVideoAsset(primaryAsset);
+          mobileProof('Reel render media values', {
+            postId: item.id,
+            type: item.type,
+            primaryAsset,
+            src,
+            fallbackImage,
+            isPlayableVideo,
+          });
           const isOwnPost = item.author.id === user?.id;
           const deleting = deletingPostId === item.id;
           const focused = activePostId === item.id;

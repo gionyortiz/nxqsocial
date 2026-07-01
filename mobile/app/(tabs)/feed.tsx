@@ -4,7 +4,10 @@ import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
+import { LIVE_NATIVE_ENABLED } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
+import { PostMedia } from '@/components/PostMedia';
+import { mobileProof } from '@/lib/runtimeProof';
 
 interface StoryCandidate {
   id: string;
@@ -121,7 +124,6 @@ function PostCard({
   onOpenAuthor: (username: string) => void;
 }) {
   const first = post.media?.[0];
-  const mediaUrl = resolveMediaUrl(first?.thumbnailUrl || first?.url);
   const initials = (post.author.displayName || post.author.username || 'NX').slice(0, 2).toUpperCase();
   return (
     <View style={{ backgroundColor: '#0f172a', borderRadius: 16, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#263246' }}>
@@ -141,9 +143,7 @@ function PostCard({
           <MaterialCommunityIcons name={isOwnPost ? 'trash-can-outline' : 'dots-horizontal'} size={18} color={isOwnPost ? '#fca5a5' : '#cbd5e1'} />
         </Pressable>
       </View>
-      {mediaUrl ? (
-        <Image source={{ uri: mediaUrl }} style={{ width: '100%', height: 330, backgroundColor: '#0b1020' }} resizeMode="cover" />
-      ) : null}
+      <PostMedia asset={first} style={{ height: 330 }} />
       <View style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 18 }}>
           <Pressable onPress={() => onLike(post)} hitSlop={10}>
@@ -213,6 +213,11 @@ export default function FeedScreen() {
         apiRequest<{ data: PostItem[] }>(`/posts/feed?mode=${mode}`, { token }),
         apiRequest<StoriesResponse>('/feed/stories?take=15', { token }),
       ]);
+      mobileProof('Incoming feed JSON', {
+        endpoint: `/posts/feed?mode=${mode}`,
+        count: feedData.data?.length ?? 0,
+        firstPost: feedData.data?.[0] ?? null,
+      });
       setItems(feedData.data || []);
       setStories(storiesData.storyCandidates || []);
       setSuggestedCreators(storiesData.suggestedCreators || []);
@@ -406,10 +411,12 @@ export default function FeedScreen() {
     router.push({ pathname: '/user/[username]', params: { username } });
   };
   const openCreateAction = (mode: 'photo' | 'reel' | 'live') => {
+    if (mode === 'live' && !LIVE_NATIVE_ENABLED) return;
     router.push({ pathname: '/create', params: { mode } });
   };
 
   const openLiveRoom = (story: StoryCandidate) => {
+    if (!LIVE_NATIVE_ENABLED) return;
     if (story.liveRoom) {
       router.push({ pathname: '/live-room', params: { room: story.liveRoom } });
       return;
@@ -691,9 +698,11 @@ export default function FeedScreen() {
                   <View style={{ backgroundColor: '#111827', borderRadius: 16, borderWidth: 1, borderColor: '#1f2937', padding: 12, gap: 10 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                   <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Live now</Text>
-                  <Pressable onPress={() => openCreateAction('live')}>
-                    <Text style={{ color: '#a5b4fc', fontWeight: '800', fontSize: 12 }}>Start live</Text>
-                  </Pressable>
+                  {LIVE_NATIVE_ENABLED ? (
+                    <Pressable onPress={() => openCreateAction('live')}>
+                      <Text style={{ color: '#a5b4fc', fontWeight: '800', fontSize: 12 }}>Start live</Text>
+                    </Pressable>
+                  ) : null}
                 </View>
                 {liveNowCreators.length > 0 ? (
                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 8 }}>

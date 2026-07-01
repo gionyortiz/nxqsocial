@@ -28,6 +28,7 @@ import {
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
 import { API_BASE_URL } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
+import { mobileProof } from '@/lib/runtimeProof';
 
 type LiveTokenResponse = {
   token: string;
@@ -65,6 +66,7 @@ function LiveStage({
   roomMode,
   setRoomMode,
   onClose,
+  isDirectCall,
 }: {
   room: string;
   authToken: string | null;
@@ -74,6 +76,7 @@ function LiveStage({
   roomMode: 'call' | 'video';
   setRoomMode: (mode: 'call' | 'video') => void;
   onClose: () => void;
+  isDirectCall: boolean;
 }) {
   const participants = useParticipants();
   const { localParticipant } = useLocalParticipant();
@@ -128,7 +131,7 @@ function LiveStage({
   );
 
   useEffect(() => {
-    if (!isHost || !authToken) return;
+    if (!isHost || !authToken || isDirectCall) return;
     let stopped = false;
     const beat = async () => {
       if (stopped) return;
@@ -148,7 +151,7 @@ function LiveStage({
       stopped = true;
       clearInterval(id);
     };
-  }, [isHost, authToken, room, viewers]);
+  }, [isHost, authToken, room, viewers, isDirectCall]);
 
   const sendChat = () => {
     const text = draft.trim();
@@ -285,7 +288,7 @@ function LiveStage({
       ) : (
         <View style={[styles.video, styles.center]}>
           <ActivityIndicator color="#fff" />
-          <Text style={styles.dim}>{isHost ? (roomMode === 'video' ? 'Starting camera...' : 'Connecting to call...') : 'Waiting for broadcaster...'}</Text>
+          <Text style={styles.dim}>{isDirectCall ? 'Connecting to call...' : isHost ? (roomMode === 'video' ? 'Starting camera...' : 'Connecting to call...') : 'Waiting for broadcaster...'}</Text>
         </View>
       )}
 
@@ -293,7 +296,7 @@ function LiveStage({
         <View style={styles.topRow}>
           <View style={styles.liveBadge}>
             <View style={styles.liveDot} />
-            <Text style={styles.liveText}>LIVE</Text>
+            <Text style={styles.liveText}>{isDirectCall ? 'CALL' : 'LIVE'}</Text>
           </View>
           <View style={styles.viewerPill}>
             <Text style={styles.viewerText}>👁 {viewers}</Text>
@@ -393,9 +396,10 @@ function LiveStage({
 
 export default function NativeLiveScreen() {
   const { token: authToken, user } = useAuth();
-  const params = useLocalSearchParams<{ room?: string; role?: string; mode?: string }>();
+  const params = useLocalSearchParams<{ room?: string; role?: string; mode?: string; kind?: string }>();
   const room = typeof params.room === 'string' ? params.room : '';
-  const isHost = params.role !== 'viewer';
+  const isDirectCall = params.kind === 'call' || room.startsWith('dm_');
+  const isHost = isDirectCall || params.role !== 'viewer';
   const initialMode: 'call' | 'video' = params.mode === 'call' ? 'call' : 'video';
   const displayName = user?.displayName || user?.username || 'Guest';
 
@@ -405,23 +409,39 @@ export default function NativeLiveScreen() {
   const [roomMode, setRoomMode] = useState<'call' | 'video'>(initialMode);
 
   useEffect(() => {
+    mobileProof('Call screen params', {
+      room,
+      role: params.role,
+      mode: params.mode,
+      kind: params.kind,
+      isDirectCall,
+      isHost,
+      initialMode,
+      roomMode,
+    });
+  }, [room, params.role, params.mode, params.kind, isDirectCall, isHost, initialMode, roomMode]);
+
+  useEffect(() => {
     const init = async () => {
       if (!authToken || !room) return;
       setLoading(true);
       setError(null);
       try {
-        if (isHost) {
+        if (isHost && !isDirectCall) {
           await apiRequest('/live/start', {
             method: 'POST',
             token: authToken,
             body: { room, title: 'Live on NXQ Social' },
           });
         }
+        const tokenBody = { room, video: isHost && roomMode === 'video', host: isHost };
+        mobileProof('Call screen token request', tokenBody);
         const data = await apiRequest<LiveTokenResponse>('/calls/token', {
           method: 'POST',
           token: authToken,
-          body: { room, video: isHost && roomMode === 'video', host: isHost },
+          body: tokenBody,
         });
+        mobileProof('Call screen token response', { room: data?.room, url: data?.url, hasToken: !!data?.token });
         if (!data?.token || !data?.url) {
           throw new Error('Live video is not configured yet.');
         }
@@ -433,10 +453,16 @@ export default function NativeLiveScreen() {
       }
     };
     void init();
-  }, [authToken, room, isHost, roomMode]);
+  }, [authToken, room, isHost, roomMode, isDirectCall]);
 
   const closeLive = async () => {
-    if (isHost && authToken && room) {
+    if (isDirectCall && authToken) {
+      try {
+        await apiRequest('/calls/decline', { method: 'POST', token: authToken });
+      } catch {
+        // best effort
+      }
+    } else if (isHost && authToken && room) {
       try {
         await apiRequest(`/live/${encodeURIComponent(room)}/end`, { method: 'POST', token: authToken });
       } catch {
@@ -451,6 +477,18 @@ export default function NativeLiveScreen() {
     }
     router.back();
   };
+
+  useEffect(() => {
+    mobileProof('LiveKitRoom props', {
+      room,
+      isDirectCall,
+      isHost,
+      audio: isHost,
+      video: isHost && roomMode === 'video',
+      roomMode,
+      hasCreds: !!creds,
+    });
+  }, [room, isDirectCall, isHost, roomMode, creds]);
 
   if (!room) {
     return (
@@ -504,6 +542,7 @@ export default function NativeLiveScreen() {
           roomMode={roomMode}
           setRoomMode={setRoomMode}
           onClose={closeLive}
+          isDirectCall={isDirectCall}
         />
       </LiveKitRoom>
     </View>

@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { mobileProof } from '@/lib/runtimeProof';
 
 type Message = {
   id: string;
@@ -46,6 +47,10 @@ export default function ThreadScreen() {
   const avatar = params.avatar ? resolveMediaUrl(params.avatar) : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=256&q=80';
   const username = params.username || 'user';
 
+  useEffect(() => {
+    mobileProof('Chat screen params', { threadId, name, username, avatar });
+  }, [threadId, name, username, avatar]);
+
   const runReveal = () => {
     reveal.setValue(0);
     Animated.timing(reveal, {
@@ -60,6 +65,11 @@ export default function ThreadScreen() {
       if (!token || !threadId) return;
       try {
         const data = await apiRequest<{ data: ApiMessage[] }>(`/messages/conversations/${threadId}/messages`, { token });
+        mobileProof('Chat screen messages response', {
+          endpoint: `/messages/conversations/${threadId}/messages`,
+          count: data.data?.length ?? 0,
+          data,
+        });
         const mapped = (data.data || []).map((item) => ({
           id: item.id,
           mine: item.sender.id === user?.id,
@@ -68,7 +78,8 @@ export default function ThreadScreen() {
         }));
         setRemoteMessages(mapped);
         await apiRequest(`/messages/conversations/${threadId}/read`, { method: 'POST', token });
-      } catch {
+      } catch (e: any) {
+        mobileProof('Chat screen messages error', { threadId, message: e?.message });
         setRemoteMessages([]);
       } finally {
         runReveal();
@@ -85,17 +96,22 @@ export default function ThreadScreen() {
     const safePeer = username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const safeMe = (user?.username || 'guest').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const room = `dm_${safeMe}_${safePeer}_${Date.now().toString(36)}`;
+    const body = { room, targets: [username], video: mode === 'video', group: false };
+    mobileProof('Chat call ring request', body);
     try {
-      await apiRequest('/calls/ring', {
+      const response = await apiRequest('/calls/ring', {
         method: 'POST',
         token,
-        body: { room, targets: [username], video: mode === 'video', group: false },
+        body,
       });
+      mobileProof('Chat call ring response', response);
     } catch (e: any) {
+      mobileProof('Chat call ring error', { message: e?.message });
       Alert.alert('Call failed', e?.message ?? 'Could not reach this user right now.');
       return;
     }
-    router.push({ pathname: '/live-native' as never, params: { room, mode } as never });
+    mobileProof('Chat call navigation', { room, mode, kind: 'call' });
+    router.push({ pathname: '/live-native' as never, params: { room, mode, kind: 'call' } as never });
   };
 
   const sendMessage = async () => {
@@ -108,6 +124,7 @@ export default function ThreadScreen() {
         token,
         body: { content: next },
       });
+      mobileProof('Chat send response', { endpoint: `/messages/conversations/${threadId}/messages`, sent });
       setRemoteMessages((prev) => [
         ...prev,
         {

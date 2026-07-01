@@ -4,6 +4,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { PostMedia } from '@/components/PostMedia';
+import { mobileProof } from '@/lib/runtimeProof';
 
 type UserProfile = {
   id: string;
@@ -87,33 +89,39 @@ export default function UserProfileScreen() {
     if (!token) { Alert.alert('Not signed in', 'Please log in first.'); return; }
     if (!profile) { Alert.alert('Profile loading', 'Please wait and try again.'); return; }
     if (profile.username === user?.username) { Alert.alert('Cannot message yourself', 'Open a chat with another user.'); return; }
+    let created: { id: string };
     try {
-      const created = await apiRequest<{ id: string }>('/messages/conversations', {
+      mobileProof('Profile Message request', { participantUsername: profile.username });
+      created = await apiRequest<{ id: string }>('/messages/conversations', {
         method: 'POST',
         token,
         body: { participantUsername: profile.username },
       });
+      mobileProof('Profile Message response', created);
       if (!created?.id) throw new Error('Server did not return a conversation ID.');
-      router.push({
-        pathname: '/messages/[threadId]' as never,
-        params: {
-          threadId: created.id,
-          username: profile.username,
-          name: profile.displayName || profile.username,
-          avatar: profile.avatarUrl || '',
-        },
-      } as never);
     } catch (e: any) {
+      mobileProof('Profile Message error', { message: e?.message });
       Alert.alert('Chat unavailable', e?.message ?? 'Could not open chat right now.');
+      return;
     }
+
+    const query = new URLSearchParams({
+      username: profile.username,
+      name: profile.displayName || profile.username,
+      avatar: profile.avatarUrl || '',
+    });
+    const target = `/messages/${created.id}?${query.toString()}`;
+    mobileProof('Profile Message navigation', { target });
+    router.push(target as never);
   };
 
   const startDirectCall = async (mode: 'call' | 'video') => {
-    console.log('=== CALL BUTTON PRESSED ===');
-    console.log('Mode:', mode);
-    console.log('Token:', !!token);
-    console.log('Profile:', profile?.username);
-    console.log('User:', user?.username);
+    mobileProof('Profile call button pressed', {
+      mode,
+      hasToken: !!token,
+      profile: profile?.username,
+      user: user?.username,
+    });
     
     if (!token) {
       Alert.alert('Not signed in', 'Please log in to make calls.');
@@ -132,12 +140,9 @@ export default function UserProfileScreen() {
     const safeMe = (user?.username || 'guest').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const room = `dm_${safeMe}_${safePeer}_${Date.now().toString(36)}`;
     
-    console.log('Room:', room);
-    console.log('Targets:', [profile.username]);
-    console.log('Video:', mode === 'video');
+    mobileProof('Profile call ring request', { room, targets: [profile.username], video: mode === 'video' });
     
     try {
-      console.log('Sending /calls/ring request...');
       const response = await apiRequest('/calls/ring', {
         method: 'POST',
         token,
@@ -148,15 +153,15 @@ export default function UserProfileScreen() {
           group: false,
         },
       });
-      console.log('Ring response:', response);
+      mobileProof('Profile call ring response', response);
     } catch (e: any) {
-      console.error('Call ring error:', e);
+      mobileProof('Profile call ring error', { message: e?.message });
       Alert.alert('Call invite failed', e?.message ?? 'Could not notify this user right now.');
       return;
     }
     
-    console.log('Navigating to live-native with room:', room, 'mode:', mode);
-    router.push({ pathname: '/live-native' as never, params: { room, mode } as never });
+    mobileProof('Profile call navigation', { room, mode, kind: 'call' });
+    router.push({ pathname: '/live-native' as never, params: { room, mode, kind: 'call' } as never });
   };
 
   if (loading) {
@@ -313,10 +318,9 @@ export default function UserProfileScreen() {
         )}
         ListEmptyComponent={<Text style={{ color: '#93a1bd', paddingHorizontal: 16 }}>No posts yet.</Text>}
         renderItem={({ item }) => {
-          const mediaUrl = resolveMediaUrl(item.media?.[0]?.thumbnailUrl || item.media?.[0]?.url);
           return (
             <View style={{ backgroundColor: '#0f172a', borderRadius: 18, marginHorizontal: 16, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#233047' }}>
-              {mediaUrl ? <Image source={{ uri: mediaUrl }} style={{ width: '100%', height: 300, backgroundColor: '#0b1020' }} resizeMode="cover" /> : null}
+              <PostMedia asset={item.media?.[0]} style={{ height: 300 }} />
               <View style={{ padding: 12, gap: 8 }}>
                 {item.caption ? <Text style={{ color: '#e2e8f0', lineHeight: 20 }}>{item.caption}</Text> : null}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
