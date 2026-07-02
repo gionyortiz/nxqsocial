@@ -4,6 +4,7 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { pauseAllMedia } from '@/lib/mediaPlayback';
 import { mobileProof } from '@/lib/runtimeProof';
 
 type Message = {
@@ -111,6 +112,7 @@ export default function ThreadScreen() {
       return;
     }
     mobileProof('Chat call navigation', { room, mode, kind: 'call' });
+    pauseAllMedia();
     router.push({ pathname: '/live-native' as never, params: { room, mode, kind: 'call' } as never });
   };
 

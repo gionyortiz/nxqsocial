@@ -4,6 +4,7 @@ import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { pauseAllMedia } from '@/lib/mediaPlayback';
 import { PostMedia } from '@/components/PostMedia';
 import { mobileProof } from '@/lib/runtimeProof';
 
@@ -171,6 +172,7 @@ export default function UserProfileScreen() {
     }
     
     mobileProof('Profile call navigation', { room, mode, kind: 'call' });
+    pauseAllMedia();
     router.push({ pathname: '/live-native' as never, params: { room, mode, kind: 'call' } as never });
   };
 

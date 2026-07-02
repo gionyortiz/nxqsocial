@@ -5,6 +5,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
+import { registerMediaPauseHandler } from '@/lib/mediaPlayback';
 import { mobileProof } from '@/lib/runtimeProof';
 
 const h = Dimensions.get('window').height;
@@ -39,6 +40,8 @@ function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
     });
     return () => sub.remove();
   }, [player]);
+
+  useEffect(() => registerMediaPauseHandler(() => player.pause()), [player]);
 
   if (errored) {
     return (
@@ -81,7 +84,6 @@ export default function ReelsScreen() {
   const [followBusy, setFollowBusy] = useState<Record<string, boolean>>({});
   const [mode, setMode] = useState<'FOR_YOU' | 'FOLLOWING'>('FOR_YOU');
   const [activePostId, setActivePostId] = useState<string | null>(null);
-  const [screenFocused, setScreenFocused] = useState(false);
   const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item: PostItem }> }) => {
@@ -120,11 +122,7 @@ export default function ReelsScreen() {
 
   useFocusEffect(
     useCallback(() => {
-      setScreenFocused(true);
       load();
-      return () => {
-        setScreenFocused(false);
-      };
     }, [token, mode]),
   );
 
@@ -406,7 +404,7 @@ export default function ReelsScreen() {
           });
           const isOwnPost = item.author.id === user?.id;
           const deleting = deletingPostId === item.id;
-          const focused = screenFocused && activePostId === item.id;
+          const focused = activePostId === item.id;
           return (
             <View style={{ height: h, backgroundColor: '#000' }}>
               {isPlayableVideo ? (

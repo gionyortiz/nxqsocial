@@ -14,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { File, UploadType } from 'expo-file-system';
 import { Track } from 'livekit-client';
@@ -283,7 +284,13 @@ function LiveStage({
 
   return (
     <View style={styles.stage}>
-      {hostTrack ? (
+      {isDirectCall && roomMode === 'call' ? (
+        <View style={[styles.video, styles.center]}>
+          <MaterialCommunityIcons name="phone-in-talk-outline" size={42} color="#fff" />
+          <Text style={styles.title}>Audio call</Text>
+          <Text style={styles.dim}>{participants.length > 1 ? 'Connected' : 'Waiting for the other person...'}</Text>
+        </View>
+      ) : hostTrack ? (
         <VideoTrack trackRef={hostTrack as never} style={styles.video} />
       ) : (
         <View style={[styles.video, styles.center]}>

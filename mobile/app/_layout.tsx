@@ -9,6 +9,7 @@ import * as Notifications from 'expo-notifications';
 import { useColorScheme } from '@/components/useColorScheme';
 import { apiRequest } from '@/lib/api';
 import { AuthProvider, useAuth } from '@/lib/auth';
+import { pauseAllMedia } from '@/lib/mediaPlayback';
 import { ensurePushRegistration } from '@/lib/push';
 import { mobileProof } from '@/lib/runtimeProof';
 
@@ -119,6 +120,7 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
             });
             const mode = payload.video ? 'video' : 'call';
             mobileProof('Incoming call navigation', { room, mode, role: 'participant', kind: 'call' });
+            pauseAllMedia();
             router.push({ pathname: '/live-native' as never, params: { room, role: 'participant', mode, kind: 'call' } as never });
           },
         },

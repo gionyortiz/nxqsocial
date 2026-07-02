@@ -3,6 +3,7 @@ import { Image, ImageStyle, StyleProp, Text, View, ViewStyle } from 'react-nativ
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { MediaAsset, resolveMediaUrl } from '@/lib/api';
+import { registerMediaPauseHandler } from '@/lib/mediaPlayback';
 import { mobileProof } from '@/lib/runtimeProof';
 
 function isVideoAsset(asset?: Pick<MediaAsset, 'url' | 'mimeType'> | null): boolean {
@@ -41,6 +42,8 @@ function VideoMedia({ uri, style, shouldPlay }: { uri: string; style?: MediaStyl
       player.pause();
     };
   }, [errored, player, shouldPlay, uri]);
+
+  useEffect(() => registerMediaPauseHandler(() => player.pause()), [player]);
 
   useEffect(() => {
     const subscription = player.addListener('statusChange', (status) => {
