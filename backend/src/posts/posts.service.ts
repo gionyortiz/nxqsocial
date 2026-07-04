@@ -39,6 +39,39 @@ function resolveMediaUrl(url: string | null): string | null {
   return `${apiBase}${url}`;
 }
 
+function localUploadFilePath(url: string | null): string | null {
+  if (!url) return null;
+
+  let pathname = url;
+  if (url.startsWith('http://') || url.startsWith('https://')) {
+    try {
+      pathname = new URL(url).pathname;
+    } catch {
+      return null;
+    }
+  }
+
+  if (pathname.startsWith('/api/uploads/')) {
+    pathname = pathname.slice('/api'.length);
+  }
+  if (!pathname.startsWith('/uploads/')) return null;
+
+  const uploadRoot = path.join(process.cwd(), 'uploads');
+  const relativePath = pathname.slice('/uploads/'.length);
+  const filePath = path.normalize(path.join(uploadRoot, relativePath));
+  return filePath.startsWith(uploadRoot) ? filePath : null;
+}
+
+function mediaIsAvailable(media: any): boolean {
+  const filePath = localUploadFilePath(media?.url);
+  return filePath ? fs.existsSync(filePath) : true;
+}
+
+function postHasAvailableMedia(post: any): boolean {
+  if (!post.media?.length) return false;
+  return post.media.some(mediaIsAvailable);
+}
+
 function mapPost(p: any) {
   const { likes, author, media, ...rest } = p;
   const { profile, ...authorBase } = author;
@@ -46,7 +79,7 @@ function mapPost(p: any) {
     ...rest,
     isLiked: likes?.length > 0,
     author: { ...authorBase, ...(profile ?? {}) },
-    media: media?.map((m: any) => ({
+    media: media?.filter(mediaIsAvailable).map((m: any) => ({
       ...m,
       url: resolveMediaUrl(m.url),
       thumbnailUrl: resolveMediaUrl(m.thumbnailUrl),
@@ -207,12 +240,13 @@ export class PostsService {
       where,
       select: postSelect(userId),
       orderBy: { createdAt: 'desc' },
-      take: take + 1,
+      take: Math.max(take + 1, take * 3),
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    const hasMore = posts.length > take;
-    const data = posts.slice(0, take).map(mapPost);
+    const availablePosts = posts.filter(postHasAvailableMedia);
+    const hasMore = availablePosts.length > take;
+    const data = availablePosts.slice(0, take).map(mapPost);
     return { data, nextCursor: hasMore ? data[data.length - 1].id : null, mode };
   }
 
@@ -373,12 +407,13 @@ export class PostsService {
       where,
       select: postSelect(userId),
       orderBy: { createdAt: 'desc' },
-      take: take + 1,
+      take: Math.max(take + 1, take * 3),
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    const hasMore = posts.length > take;
-    const data = posts.slice(0, take).map(mapPost);
+    const availablePosts = posts.filter(postHasAvailableMedia);
+    const hasMore = availablePosts.length > take;
+    const data = availablePosts.slice(0, take).map(mapPost);
     return { data, nextCursor: hasMore ? data[data.length - 1].id : null, mode };
   }
 
@@ -394,8 +429,9 @@ export class PostsService {
       ...(cursor ? { cursor: { id: cursor }, skip: 1 } : {}),
     });
 
-    const hasMore = posts.length > 20;
-    const data = posts.slice(0, 20).map(mapPost);
+    const availablePosts = posts.filter(postHasAvailableMedia);
+    const hasMore = availablePosts.length > 20;
+    const data = availablePosts.slice(0, 20).map(mapPost);
     return { data, nextCursor: hasMore ? data[data.length - 1].id : null };
   }
 

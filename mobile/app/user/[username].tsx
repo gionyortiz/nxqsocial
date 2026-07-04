@@ -47,7 +47,8 @@ export default function UserProfileScreen() {
       setProfile(profileData);
       setPosts(postsData.data || []);
     } catch (e: any) {
-      setError(e?.message ?? 'Could not load profile.');
+      const message = e?.message ?? 'Could not load profile.';
+      setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -197,6 +198,11 @@ export default function UserProfileScreen() {
               {profile?.bannerUrl ? <Image source={{ uri: resolveMediaUrl(profile.bannerUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" /> : null}
               <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(12, 18, 39, 0.18)' }} />
             </View>
+            {error ? (
+              <Pressable onPress={() => { setError(null); void load(); }} style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: '#111827', borderWidth: 1, borderColor: '#334155', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 }}>
+                <Text style={{ color: '#f8fafc', fontWeight: '800' }}>Couldn’t load this section. Tap to retry.</Text>
+              </Pressable>
+            ) : null}
             <View style={{ paddingHorizontal: 16, marginTop: -42 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
                 <View style={{ width: 96, height: 96, borderRadius: 28, overflow: 'hidden', backgroundColor: '#1d4ed8', borderWidth: 4, borderColor: '#080f22', alignItems: 'center', justifyContent: 'center' }}>

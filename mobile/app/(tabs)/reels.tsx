@@ -103,7 +103,8 @@ export default function ReelsScreen() {
       });
       setItems(data.data || []);
     } catch (e: any) {
-      setError(e?.message ?? 'Could not load reels right now. Pull to refresh.');
+      const message = e?.message ?? 'Could not load reels right now.';
+      setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);

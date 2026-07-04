@@ -21,7 +21,7 @@ import {
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { API_BASE_URL } from '@/lib/config';
+import { API_BASE_URL, LIVE_NATIVE_ENABLED } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
 
 type UploadErrorView = {
@@ -303,6 +303,7 @@ export default function CreateScreen() {
     }
 
     if (mode === 'live') {
+      if (!LIVE_NATIVE_ENABLED) return;
       // Generate unique room ID for this broadcast
       const roomId = `live_${user?.id || 'guest'}_${Date.now().toString(36)}`;
       router.push({ pathname: '/live-native' as never, params: { room: roomId, mode: 'video' } as never });

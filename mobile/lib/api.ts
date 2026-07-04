@@ -1,5 +1,6 @@
 import { API_BASE_URL } from './config';
 import { Platform } from 'react-native';
+import { mobileProof } from './runtimeProof';
 
 export interface User {
   id: string;
@@ -48,15 +49,15 @@ function classifyNetworkError(error: unknown): string {
   if (!(error instanceof Error)) return `Could not connect to ${API_BASE_URL}`;
   const m = error.message.toLowerCase();
   if (m.includes('timed out') || m.includes('timeout') || error.name === 'AbortError') {
-    return `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s — server may be slow or unreachable (${API_BASE_URL})`;
+    return `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Please try again.`;
   }
   if (m.includes('hostname') || m.includes('host could not be found') || m.includes('dns') || m.includes('nodename nor servname')) {
-    return `DNS error — cannot resolve ${API_BASE_URL}. Check your network or disable Private Relay/VPN.`;
+    return `We could not reach ${API_BASE_URL} right now. Please try again.`;
   }
   if (m.includes('network request failed') || m.includes('fetch failed') || m.includes('load failed') || m.includes('network connection was lost')) {
-    return `Network error — cannot reach ${API_BASE_URL}. Check Wi-Fi/cellular and disable iCloud Private Relay.`;
+    return `We could not reach ${API_BASE_URL} right now. Please try again.`;
   }
-  return `Could not connect to ${API_BASE_URL}: ${error.message}`;
+  return `We could not reach ${API_BASE_URL} right now. Please try again.`;
 }
 
 function isTransientNativeNetworkError(error: unknown): boolean {
@@ -108,7 +109,9 @@ export async function apiRequest<T>(
   }
 
   if (!res) {
-    throw new Error(classifyNetworkError(lastError));
+    const message = classifyNetworkError(lastError);
+    mobileProof('apiRequest failed', { path, method, reason: message, error: lastError });
+    throw new Error(message);
   }
 
   if (!res.ok) {
@@ -119,6 +122,7 @@ export async function apiRequest<T>(
     } catch {
       // ignore
     }
+    mobileProof('apiRequest failed', { path, method, status: res.status, reason: message });
     throw new Error(message);
   }
 

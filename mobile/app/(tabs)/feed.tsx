@@ -225,7 +225,8 @@ export default function FeedScreen() {
       setStories(storiesData.storyCandidates || []);
       setSuggestedCreators(storiesData.suggestedCreators || []);
     } catch (e: any) {
-      setError(e?.message ?? 'Failed to load feed');
+      const message = e?.message ?? 'Failed to load feed';
+      setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);

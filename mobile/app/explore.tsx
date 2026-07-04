@@ -71,7 +71,8 @@ export default function ExploreScreen() {
       setUsers((Array.isArray(usersData) ? usersData : []).filter((u) => u.username !== user?.username).slice(0, 8));
       setPosts((postsData?.data || []).filter((p) => p.media?.length).slice(0, 10));
     } catch (e: any) {
-      setError(e?.message ?? 'Could not load explore content');
+      const message = e?.message ?? 'Could not load explore content';
+      setError(message);
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -215,7 +216,11 @@ export default function ExploreScreen() {
           />
 
           {searching ? <ActivityIndicator color="#8b5cf6" /> : null}
-          {error ? <Text style={{ color: '#fca5a5' }}>{error}</Text> : null}
+          {error ? (
+            <Pressable onPress={() => { setError(null); void load(); }} style={{ backgroundColor: '#111827', borderWidth: 1, borderColor: '#334155', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 }}>
+              <Text style={{ color: '#f8fafc', fontWeight: '800' }}>Couldn’t load this section. Tap to retry.</Text>
+            </Pressable>
+          ) : null}
 
           <View style={{ backgroundColor: '#111827', borderRadius: 14, padding: 12, gap: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
