@@ -93,7 +93,7 @@ export class VideoTranscodeService {
 
       await runProcess(ffmpegPath as string, [
         '-i', inputPath,
-        '-vf', "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease",
+        '-vf', "scale='min(1920,iw)':'min(1080,ih)':force_original_aspect_ratio=decrease,scale=trunc(iw/2)*2:trunc(ih/2)*2",
         '-c:v', 'libx264',
         '-preset', 'veryfast',
         '-crf', '23',
