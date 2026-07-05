@@ -419,7 +419,11 @@ export default function CreateScreen() {
         ? (assetName || 'mobile-upload.mp4')
         : 'mobile-upload.jpg';
 
-      const webBlob = Platform.OS === 'web' ? await (await fetch(finalUri)).blob() : null;
+      // This Expo SDK's fetch/FormData implementation only accepts real Blob
+      // parts (the classic RN `{ uri, name, type }` shorthand throws
+      // "Unsupported FormDataPart implementation"), so read the file into a
+      // real Blob on every platform, not just web.
+      const webBlob = await (await fetch(finalUri)).blob();
       const uploadFile = Platform.OS === 'web' ? null : new File(finalUri);
 
       // For local development APIs, skip presigned storage and post multipart directly.
@@ -434,12 +438,7 @@ export default function CreateScreen() {
         form.append('caption', caption);
         form.append('type', isVideo ? 'VIDEO' : 'PHOTO');
         form.append('visibility', visibility);
-        if (Platform.OS === 'web') {
-          if (!webBlob) throw new Error('Could not read selected media in browser.');
-          form.append('media', webBlob, filename);
-        } else {
-          form.append('media', { uri: finalUri, name: filename, type: finalMime } as any);
-        }
+        form.append('media', webBlob, filename);
 
         const fbRes = await fetch(`${API_BASE_URL}/posts`, {
           method: 'POST',
@@ -490,12 +489,7 @@ export default function CreateScreen() {
         form.append('caption', caption);
         form.append('type', isVideo ? 'VIDEO' : 'PHOTO');
         form.append('visibility', visibility);
-        if (Platform.OS === 'web') {
-          if (!webBlob) throw new Error('Could not read selected media in browser.');
-          form.append('media', webBlob, filename);
-        } else {
-          form.append('media', { uri: finalUri, name: filename, type: finalMime } as any);
-        }
+        form.append('media', webBlob, filename);
 
         const fbRes = await fetch(`${API_BASE_URL}/posts`, {
           method: 'POST',

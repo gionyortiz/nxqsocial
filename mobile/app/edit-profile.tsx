@@ -39,13 +39,13 @@ export default function EditProfileScreen() {
     const asset = result.assets[0];
     setUploadingAvatar(true);
     try {
+      // This Expo SDK's fetch/FormData implementation only accepts real Blob
+      // parts — the classic RN `{ uri, name, type }` shorthand throws
+      // "Unsupported FormDataPart implementation". Read the local file into
+      // an actual Blob on every platform instead.
       const form = new FormData();
-      if (Platform.OS === 'web') {
-        const blob = await (await fetch(asset.uri)).blob();
-        form.append('avatar', blob, asset.fileName || 'avatar.jpg');
-      } else {
-        form.append('avatar', { uri: asset.uri, name: asset.fileName || 'avatar.jpg', type: asset.mimeType || 'image/jpeg' } as any);
-      }
+      const blob = await (await fetch(asset.uri)).blob();
+      form.append('avatar', blob, asset.fileName || 'avatar.jpg');
 
       const res = await fetch(`${API_BASE_URL}/users/me/avatar`, {
         method: 'PATCH',
