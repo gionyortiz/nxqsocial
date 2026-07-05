@@ -13,6 +13,7 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { pauseAllMedia } from '@/lib/mediaPlayback';
 import { ensurePushRegistration } from '@/lib/push';
 import { mobileProof } from '@/lib/runtimeProof';
+import { saveOtaDebugInfo } from '@/lib/otaDebug';
 
 // Register LiveKit WebRTC globals once for native in-app Live.
 // Guarded so web/Expo Go (no native module) does not crash on startup.
@@ -132,19 +133,36 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
 
   useEffect(() => {
     // Explicit OTA check — don't rely solely on native auto-check-on-load,
-    // which gives no visibility if it silently fails to fire.
-    if (!Updates.isEnabled) return; // no-op in Expo Go / dev client
+    // which gives no visibility if it silently fails to fire. Also persist
+    // a diagnostic snapshot so it can be shown on-screen (Profile tab) even
+    // in a TestFlight build with no console attached.
+    const baseInfo = {
+      timestamp: new Date().toISOString(),
+      isEnabled: Updates.isEnabled,
+      isEmbeddedLaunch: Updates.isEmbeddedLaunch,
+      currentUpdateId: Updates.updateId,
+      currentUpdateCreatedAt: Updates.createdAt ? Updates.createdAt.toISOString() : null,
+      channel: Updates.channel,
+      runtimeVersion: Updates.runtimeVersion,
+    };
+    if (!Updates.isEnabled) {
+      saveOtaDebugInfo({ ...baseInfo, skipped: 'Updates.isEnabled is false' });
+      return;
+    }
     (async () => {
       try {
         const result = await Updates.checkForUpdateAsync();
         mobileProof('OTA update check', result);
+        await saveOtaDebugInfo({ ...baseInfo, checkResult: result });
         if (result.isAvailable) {
           await Updates.fetchUpdateAsync();
           mobileProof('OTA update fetched — reloading');
+          await saveOtaDebugInfo({ ...baseInfo, checkResult: result, fetched: true });
           await Updates.reloadAsync();
         }
       } catch (e: any) {
         mobileProof('OTA update check failed', { message: e?.message });
+        await saveOtaDebugInfo({ ...baseInfo, error: e?.message ?? String(e) });
       }
     })();
   }, []);
