@@ -317,7 +317,28 @@ export default function CreateScreen() {
     });
 
     if (result.canceled || !result.assets?.length) return;
-    storeSelectedAsset(result.assets[0]);
+    const captured = result.assets[0];
+
+    if (captured.type === 'video') {
+      // Some Android devices report a successful capture (canceled: false)
+      // even when the user pressed system "back" instead of an explicit
+      // confirm button after stopping the recording. Add our own explicit
+      // confirm step so "back" reliably discards the clip.
+      const useIt = await new Promise<boolean>((resolve) => {
+        Alert.alert(
+          'Use this video?',
+          'Keep the video you just recorded, or discard it.',
+          [
+            { text: 'Discard', style: 'destructive', onPress: () => resolve(false) },
+            { text: 'Use video', onPress: () => resolve(true) },
+          ],
+          { cancelable: false },
+        );
+      });
+      if (!useIt) return;
+    }
+
+    storeSelectedAsset(captured);
   };
 
   useEffect(() => {
