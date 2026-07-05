@@ -5,6 +5,7 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
+import * as Updates from 'expo-updates';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { apiRequest } from '@/lib/api';
@@ -128,6 +129,25 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
       { cancelable: true },
     );
   };
+
+  useEffect(() => {
+    // Explicit OTA check — don't rely solely on native auto-check-on-load,
+    // which gives no visibility if it silently fails to fire.
+    if (!Updates.isEnabled) return; // no-op in Expo Go / dev client
+    (async () => {
+      try {
+        const result = await Updates.checkForUpdateAsync();
+        mobileProof('OTA update check', result);
+        if (result.isAvailable) {
+          await Updates.fetchUpdateAsync();
+          mobileProof('OTA update fetched — reloading');
+          await Updates.reloadAsync();
+        }
+      } catch (e: any) {
+        mobileProof('OTA update check failed', { message: e?.message });
+      }
+    })();
+  }, []);
 
   useEffect(() => {
     if (!token) return;

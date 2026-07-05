@@ -46,7 +46,7 @@ export default function ThreadScreen() {
   const threadId = params.threadId || 'default';
   const name = params.name || 'Conversation';
   const avatar = params.avatar ? resolveMediaUrl(params.avatar) : 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=256&q=80';
-  const username = params.username || 'user';
+  const username = params.username;
 
   useEffect(() => {
     mobileProof('Chat screen params', { threadId, name, username, avatar });
@@ -93,14 +93,19 @@ export default function ThreadScreen() {
   const messages = useMemo(() => remoteMessages, [remoteMessages]);
 
   const startCall = async (mode: 'call' | 'video') => {
-    if (!token || !username) return;
+    if (!token) return;
+    if (!username) {
+      Alert.alert('Call failed', 'Could not identify who to call — try reopening this conversation from the messages list.');
+      return;
+    }
     const safePeer = username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const safeMe = (user?.username || 'guest').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
     const room = `dm_${safeMe}_${safePeer}_${Date.now().toString(36)}`;
     const body = { room, targets: [username], video: mode === 'video', group: false };
     mobileProof('Chat call ring request', body);
+    let response: { invited?: string[] } | undefined;
     try {
-      const response = await apiRequest('/calls/ring', {
+      response = await apiRequest('/calls/ring', {
         method: 'POST',
         token,
         body,
@@ -109,6 +114,11 @@ export default function ThreadScreen() {
     } catch (e: any) {
       mobileProof('Chat call ring error', { message: e?.message });
       Alert.alert('Call failed', e?.message ?? 'Could not reach this user right now.');
+      return;
+    }
+    if (!response?.invited?.length) {
+      mobileProof('Chat call ring no-op', { username, response });
+      Alert.alert('Call failed', `Couldn't reach @${username}. They may not exist or their account may have changed.`);
       return;
     }
     mobileProof('Chat call navigation', { room, mode, kind: 'call' });
@@ -174,7 +184,7 @@ export default function ThreadScreen() {
           <Image source={{ uri: avatar }} style={{ width: 40, height: 40, borderRadius: 14, backgroundColor: '#1f2937' }} />
           <View style={{ flex: 1 }}>
             <Text style={{ color: PALETTE.ink, fontWeight: '900', fontSize: 16 }}>{name}</Text>
-            <Text style={{ color: PALETTE.subInk, fontSize: 11, fontFamily: 'SpaceMono' }}>@{username}  ONLINE</Text>
+            <Text style={{ color: PALETTE.subInk, fontSize: 11, fontFamily: 'SpaceMono' }}>@{username ?? 'unknown'}  ONLINE</Text>
           </View>
           <Pressable onPress={() => startCall('call')} style={{ width: 38, height: 38, borderRadius: 12, backgroundColor: '#12203a', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: '#26466d' }}>
             <MaterialCommunityIcons name="phone-outline" size={20} color={PALETTE.ink} />

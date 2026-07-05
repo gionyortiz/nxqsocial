@@ -154,8 +154,9 @@ export default function UserProfileScreen() {
     
     mobileProof('Profile call ring request', { room, targets: [profile.username], video: mode === 'video' });
     
+    let response: { invited?: string[] } | undefined;
     try {
-      const response = await apiRequest('/calls/ring', {
+      response = await apiRequest('/calls/ring', {
         method: 'POST',
         token,
         body: {
@@ -171,7 +172,13 @@ export default function UserProfileScreen() {
       Alert.alert('Call invite failed', e?.message ?? 'Could not notify this user right now.');
       return;
     }
-    
+
+    if (!response?.invited?.length) {
+      mobileProof('Profile call ring no-op', { username: profile.username, response });
+      Alert.alert('Call failed', `Couldn't reach @${profile.username}. They may not exist or their account may have changed.`);
+      return;
+    }
+
     mobileProof('Profile call navigation', { room, mode, kind: 'call' });
     pauseAllMedia();
     router.push({ pathname: '/live-native' as never, params: { room, mode, kind: 'call' } as never });
