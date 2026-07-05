@@ -17,7 +17,8 @@
     "test:watch": "jest --watch",
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
-    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand --forceExit"
+    "test:e2e": "jest --config ./test/jest-e2e.json --runInBand --forceExit",
+    "backfill:transcode-videos": "ts-node -r tsconfig-paths/register scripts/backfill-transcode-videos.ts"
   },
   "dependencies": {
     "@aws-sdk/client-rekognition": "^3.1054.0",
@@ -39,6 +40,8 @@
     "class-transformer": "^0.5.1",
     "class-validator": "^0.15.1",
     "dotenv": "^17.4.2",
+    "ffmpeg-static": "^5.3.0",
+    "ffprobe-static": "^3.1.0",
     "helmet": "^8.2.0",
     "ioredis": "^5.11.0",
     "livekit-server-sdk": "^2.15.4",

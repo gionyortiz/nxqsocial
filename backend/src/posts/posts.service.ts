@@ -3,6 +3,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { SafetyService } from '../safety/safety.service';
 import { MediaSafetyService } from '../safety/media-safety.service';
 import { StorageService } from '../common/storage/storage.service';
+import { VideoTranscodeService } from '../media/video-transcode.service';
 import { CreatePostDto } from './posts.dto';
 import * as fs from 'fs';
 import * as path from 'path';
@@ -106,6 +107,7 @@ export class PostsService {
     private safety: SafetyService,
     private mediaSafety: MediaSafetyService,
     private storage: StorageService,
+    private videoTranscode: VideoTranscodeService,
   ) {}
 
   async createPost(authorId: string, dto: CreatePostDto, file?: Express.Multer.File) {
@@ -118,12 +120,36 @@ export class PostsService {
     const isVideo = file.mimetype.startsWith('video/');
     const type = dto.type ?? (isVideo ? 'VIDEO' : 'PHOTO');
 
+    // ── Normalize video to H.264/AAC faststart MP4 before storing ────────────
+    // Devices frequently produce containers/codecs some players can't decode
+    // (HEVC-in-QuickTime, non-faststart MP4). This path is synchronous since
+    // it's the dev/local-only upload flow; the production flow (media.service.ts
+    // completeUpload) does this asynchronously instead.
+    let thumbnailBuffer: Buffer | null = null;
+    let durationSec: number | null = null;
+    let width: number | null = null;
+    let height: number | null = null;
+    if (isVideo) {
+      const transcoded = await this.videoTranscode.transcodeBuffer(file.buffer, file.mimetype);
+      file.buffer = transcoded.buffer;
+      file.mimetype = transcoded.mimeType;
+      thumbnailBuffer = transcoded.thumbnailBuffer;
+      durationSec = transcoded.durationSec;
+      width = transcoded.width;
+      height = transcoded.height;
+    }
+    // ─────────────────────────────────────────────────────────────────────────
+
     // ── Upload media to R2/S3 (or fall back to local disk) ───────────────────
     let url: string;
+    let thumbnailUrl: string | null = null;
     if (this.storage.isEnabled) {
       const folder = isVideo ? 'videos' : 'images';
       url = await this.storage.upload(file.buffer, file.originalname, file.mimetype, folder);
       this.logger.log(`Media uploaded to R2: ${url}`);
+      if (thumbnailBuffer) {
+        thumbnailUrl = await this.storage.upload(thumbnailBuffer, 'thumb.jpg', 'image/jpeg', 'thumbnails');
+      }
     } else {
       // Local disk fallback — write buffer to uploads directory
       const isVid = file.mimetype.startsWith('video/');
@@ -134,6 +160,13 @@ export class PostsService {
       fs.mkdirSync(path.dirname(dest), { recursive: true });
       fs.writeFileSync(dest, file.buffer);
       url = `/uploads/${dir}/${filename}`;
+      if (thumbnailBuffer) {
+        const thumbFilename = `${randomUUID()}.jpg`;
+        const thumbDest = path.join(process.cwd(), 'uploads', 'thumbnails', thumbFilename);
+        fs.mkdirSync(path.dirname(thumbDest), { recursive: true });
+        fs.writeFileSync(thumbDest, thumbnailBuffer);
+        thumbnailUrl = `/uploads/thumbnails/${thumbFilename}`;
+      }
     }
     // ─────────────────────────────────────────────────────────────────────────
 
@@ -190,7 +223,11 @@ export class PostsService {
             bucket: process.env.S3_BUCKET_NAME ?? process.env.S3_BUCKET ?? 'local',
             size: file.size ?? 0,
             url,
+            thumbnailUrl,
             mimeType: file.mimetype,
+            durationSec: durationSec ?? undefined,
+            width: width ?? undefined,
+            height: height ?? undefined,
             uploadStatus: 'PUBLISHED',
             moderationStatus: mediaModerationStatus as any,
           },
@@ -467,6 +504,9 @@ export class PostsService {
     if (asset.postId) throw new BadRequestException('Media asset is already attached to a post');
     if (asset.uploadStatus === 'PENDING') {
       throw new BadRequestException('Upload not confirmed yet — call complete-upload first');
+    }
+    if (asset.uploadStatus === 'TRANSCODING') {
+      throw new BadRequestException('Video is still processing — check status and retry shortly');
     }
     if (asset.uploadStatus === 'REJECTED') {
       throw new BadRequestException('Media was rejected by the safety scanner');

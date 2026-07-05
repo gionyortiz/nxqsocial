@@ -4,10 +4,12 @@ import {
   PutObjectCommand,
   DeleteObjectCommand,
   HeadObjectCommand,
+  GetObjectCommand,
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { randomUUID } from 'crypto';
 import * as path from 'path';
+import type { Readable } from 'stream';
 
 @Injectable()
 export class StorageService {
@@ -111,12 +113,17 @@ export class StorageService {
   async delete(urlOrKey: string): Promise<void> {
     if (!this.enabled) return;
 
-    const key = urlOrKey.startsWith('http')
-      ? urlOrKey.replace(`${this.publicBase}/`, '')
-      : urlOrKey;
+    const key = this.keyFromUrl(urlOrKey);
 
     await this.client.send(new DeleteObjectCommand({ Bucket: this.bucket, Key: key }));
     this.logger.log(`Deleted ${key}`);
+  }
+
+  /**
+   * Resolve a full public URL down to its S3 key. Pass-through if already a key.
+   */
+  keyFromUrl(urlOrKey: string): string {
+    return urlOrKey.startsWith('http') ? urlOrKey.replace(`${this.publicBase}/`, '') : urlOrKey;
   }
 
   /**
@@ -135,6 +142,22 @@ export class StorageService {
       new PutObjectCommand({ Bucket: this.bucket, Key: key, ContentType: mimeType }),
       { expiresIn },
     );
+  }
+
+  /**
+   * Download an object's full contents as a Buffer (used by the video transcode
+   * pipeline to fetch the original upload back for re-encoding).
+   */
+  async download(key: string): Promise<Buffer> {
+    if (!this.enabled) throw new Error('StorageService: S3/R2 not configured');
+
+    const res = await this.client.send(new GetObjectCommand({ Bucket: this.bucket, Key: key }));
+    const stream = res.Body as unknown as Readable;
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream) {
+      chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
   }
 
   /**

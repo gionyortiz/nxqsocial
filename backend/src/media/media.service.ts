@@ -10,6 +10,7 @@ import * as path from 'path';
 import { PrismaService } from '../prisma/prisma.service';
 import { StorageService } from '../common/storage/storage.service';
 import { MediaSafetyService } from '../safety/media-safety.service';
+import { VideoTranscodeService } from './video-transcode.service';
 import {
   ALLOWED_MIME_TYPES,
   AUDIO_SIZE_LIMIT,
@@ -42,7 +43,7 @@ function isAudio(mime: string): boolean {
   return mime.startsWith('audio/');
 }
 
-function videoStartFailureData(reason?: string, userMessage?: string) {
+export function videoStartFailureData(reason?: string, userMessage?: string) {
   return {
     status: 'FAILED_TO_START',
     failureReason: reason ?? null,
@@ -58,6 +59,93 @@ function videoTimeoutData() {
   };
 }
 
+export function videoTranscodeFailureData(reason?: string) {
+  return {
+    status: 'TRANSCODE_FAILED',
+    failureReason: reason ?? null,
+    userMessage: 'Video could not be processed. Please try a different file.',
+    failedAt: new Date().toISOString(),
+  };
+}
+
+/**
+ * Transcode a video asset in place, then hand off to the existing Rekognition
+ * scan flow — shared between MediaService's fire-and-forget completeUpload
+ * hook and the standalone backfill script, so both go through identical logic.
+ */
+export async function runVideoTranscodeJob(
+  deps: {
+    prisma: PrismaService;
+    safety: MediaSafetyService;
+    videoTranscode: VideoTranscodeService;
+    logger: Logger;
+  },
+  mediaId: string,
+): Promise<void> {
+  const asset = await deps.prisma.mediaAsset.findUnique({ where: { id: mediaId } });
+  if (!asset) return;
+
+  try {
+    const result = await deps.videoTranscode.transcodeAndReplace({
+      s3Key: asset.s3Key,
+      bucket: asset.bucket,
+      mimeType: asset.mimeType,
+    });
+
+    await deps.prisma.mediaAsset.update({
+      where: { id: mediaId },
+      data: {
+        url: result.url,
+        thumbnailUrl: result.thumbnailUrl,
+        mimeType: result.mimeType,
+        durationSec: result.durationSec ?? undefined,
+        width: result.width ?? undefined,
+        height: result.height ?? undefined,
+        s3Key: result.s3Key,
+        bucket: result.bucket,
+      },
+    });
+
+    const scanStart = await deps.safety.startVideoScanJob(result.bucket, result.s3Key);
+    await deps.prisma.mediaAsset.update({
+      where: { id: mediaId },
+      data: {
+        uploadStatus:
+          scanStart.status === 'STARTED'
+            ? 'SCANNING'
+            : scanStart.status === 'BYPASSED'
+              ? 'PUBLISHED'
+              : 'REJECTED',
+        moderationStatus:
+          scanStart.status === 'FAILED'
+            ? 'FLAGGED'
+            : scanStart.status === 'BYPASSED'
+              ? 'APPROVED'
+              : 'PENDING',
+        safetyJobId: scanStart.jobId ?? undefined,
+        safetyResult:
+          scanStart.status === 'STARTED'
+            ? ({ status: 'SCANNING', scanStartedAt: new Date().toISOString() } as any)
+            : scanStart.status === 'FAILED'
+              ? (videoStartFailureData(scanStart.failureReason, scanStart.userMessage) as any)
+              : ({ status: 'BYPASSED' } as any),
+      },
+    });
+  } catch (err: any) {
+    deps.logger.error(`Transcode failed for asset ${mediaId}: ${err?.message}`);
+    await deps.prisma.mediaAsset
+      .update({
+        where: { id: mediaId },
+        data: {
+          uploadStatus: 'REJECTED',
+          moderationStatus: 'FLAGGED',
+          safetyResult: videoTranscodeFailureData(err?.message) as any,
+        },
+      })
+      .catch(() => {});
+  }
+}
+
 @Injectable()
 export class MediaService {
   private readonly logger = new Logger(MediaService.name);
@@ -66,6 +154,7 @@ export class MediaService {
     private readonly prisma: PrismaService,
     private readonly storage: StorageService,
     private readonly safety: MediaSafetyService,
+    private readonly videoTranscode: VideoTranscodeService,
   ) {}
 
   /**
@@ -140,38 +229,24 @@ export class MediaService {
     const publicUrl = this.storage.publicUrl(asset.s3Key);
 
     if (isVideo(asset.mimeType)) {
-      // Async video scan via Rekognition StartContentModeration
-      const scanStart = await this.safety.startVideoScanJob(asset.bucket, asset.s3Key);
+      // Normalize to H.264/AAC faststart MP4 before scanning/publishing —
+      // devices frequently produce containers/codecs AVPlayer/ExoPlayer can't
+      // both play (HEVC-in-QuickTime, non-faststart MP4). Runs async; the
+      // client polls getStatus() same as it already does for SCANNING.
       const updated = await this.prisma.mediaAsset.update({
         where: { id: mediaId },
-        data: {
-          url: publicUrl,
-          uploadStatus:
-            scanStart.status === 'STARTED'
-              ? 'SCANNING'
-              : scanStart.status === 'BYPASSED'
-                ? 'PUBLISHED'
-                : 'REJECTED',
-          moderationStatus:
-            scanStart.status === 'FAILED'
-              ? 'FLAGGED'
-              : scanStart.status === 'BYPASSED'
-                ? 'APPROVED'
-                : 'PENDING',
-          safetyJobId: scanStart.jobId ?? undefined,
-          safetyResult:
-            scanStart.status === 'STARTED'
-              ? ({ status: 'SCANNING', scanStartedAt: new Date().toISOString() } as any)
-              : scanStart.status === 'FAILED'
-                ? (videoStartFailureData(scanStart.failureReason, scanStart.userMessage) as any)
-                : ({ status: 'BYPASSED' } as any),
-        },
+        data: { url: publicUrl, uploadStatus: 'TRANSCODING' },
       });
+
+      runVideoTranscodeJob(
+        { prisma: this.prisma, safety: this.safety, videoTranscode: this.videoTranscode, logger: this.logger },
+        mediaId,
+      ).catch((err) => this.logger.error(`runVideoTranscodeJob crashed for ${mediaId}: ${err?.message}`));
+
       return {
         id: updated.id,
         uploadStatus: updated.uploadStatus,
         url: updated.url,
-        ...(scanStart.status === 'FAILED' ? { message: scanStart.userMessage } : {}),
       };
     }
 

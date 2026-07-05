@@ -382,6 +382,7 @@ enum ModerationStatus {
 
 enum UploadStatus {
   PENDING
+  TRANSCODING
   SCANNING
   PUBLISHED
   REJECTED

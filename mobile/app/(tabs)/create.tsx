@@ -38,6 +38,41 @@ const AUDIENCES: { value: Audience; label: string; desc: string; icon: keyof typ
   { value: 'PRIVATE', label: 'Only me', desc: 'Visible to you only', icon: 'lock' },
 ];
 
+const MEDIA_POLL_INTERVAL_MS = 1500;
+const MEDIA_POLL_MAX_ATTEMPTS = 40; // ~60s ceiling — local ffmpeg job, not Rekognition's 5min timeout
+
+/**
+ * Poll GET /media/:id/status while the video is still being processed
+ * server-side (TRANSCODING, then SCANNING). Resolves once it's safe to
+ * attach the asset to a post; throws if it's rejected or never finishes.
+ */
+async function pollMediaUntilProcessed(
+  apiBase: string,
+  token: string,
+  mediaId: string,
+  onStatus: (message: string) => void,
+): Promise<void> {
+  for (let attempt = 0; attempt < MEDIA_POLL_MAX_ATTEMPTS; attempt++) {
+    const res = await fetch(`${apiBase}/media/${mediaId}/status`, {
+      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+    });
+    const body = await res.json().catch(() => null);
+    const status = body?.uploadStatus;
+
+    if (status === 'REJECTED') {
+      throw new Error(body?.message || 'Video could not be processed.');
+    }
+    if (status === 'SCANNING' || status === 'PUBLISHED') {
+      return;
+    }
+
+    onStatus(body?.message || 'Processing video...');
+    await new Promise((resolve) => setTimeout(resolve, MEDIA_POLL_INTERVAL_MS));
+  }
+
+  throw new Error('Video is still processing. Please try posting again shortly.');
+}
+
 function mapUploadError(rawMessage: string, isVideo: boolean): UploadErrorView {
   const msg = rawMessage.toLowerCase();
 
@@ -510,9 +545,11 @@ export default function CreateScreen() {
 
       if (isVideo) {
         const status = completeJson?.uploadStatus;
-        if (status === 'SCANNING' || status === 'PENDING') {
+        if (status === 'TRANSCODING' || status === 'PENDING') {
           setUploadProgress(88);
-          setUploadStatusMessage(completeJson?.message || 'Processing video...');
+          await pollMediaUntilProcessed(API_BASE_URL, token, uploadTarget.mediaId, (message) => {
+            setUploadStatusMessage(message);
+          });
         }
       }
 
