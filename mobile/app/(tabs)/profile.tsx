@@ -106,13 +106,16 @@ export default function ProfileScreen() {
         <View style={{ paddingHorizontal: 16, marginTop: -48 }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
             <View style={{ position: 'relative' }}>
-              <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#312e81', borderWidth: 4, borderColor: '#0b1020', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+              <Pressable
+                onPress={() => router.push('/edit-profile' as never)}
+                style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#312e81', borderWidth: 4, borderColor: '#0b1020', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+              >
                 {user?.avatarUrl ? (
                   <Image source={{ uri: resolveMediaUrl(user.avatarUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                 ) : (
                   <Text style={{ color: '#ddd6fe', fontSize: 28, fontWeight: '900' }}>{initials}</Text>
                 )}
-              </View>
+              </Pressable>
               <Pressable
                 onPress={() => router.push({ pathname: '/create', params: { mode: 'story' } })}
                 style={{
