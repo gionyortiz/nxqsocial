@@ -35,16 +35,17 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
+        name="create"
+        options={{
+          title: 'Create',
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="plus-box" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
         name="messages"
         options={{
           title: 'Messages',
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="send-outline" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
-        name="create"
-        options={{
-          href: null,
         }}
       />
       <Tabs.Screen
