@@ -1,8 +1,8 @@
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { Alert, Platform, Pressable, SafeAreaView, ScrollView, Share, Text, View } from 'react-native';
+import { Alert, Image, Platform, Pressable, SafeAreaView, ScrollView, Share, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
-import { apiRequest } from '@/lib/api';
+import { apiRequest, resolveMediaUrl } from '@/lib/api';
 
 export default function ProfileScreen() {
   const { user, logout, token } = useAuth();
@@ -106,8 +106,12 @@ export default function ProfileScreen() {
         <View style={{ paddingHorizontal: 16, marginTop: -48 }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
             <View style={{ position: 'relative' }}>
-              <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#312e81', borderWidth: 4, borderColor: '#0b1020', alignItems: 'center', justifyContent: 'center' }}>
-                <Text style={{ color: '#ddd6fe', fontSize: 28, fontWeight: '900' }}>{initials}</Text>
+              <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#312e81', borderWidth: 4, borderColor: '#0b1020', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                {user?.avatarUrl ? (
+                  <Image source={{ uri: resolveMediaUrl(user.avatarUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                ) : (
+                  <Text style={{ color: '#ddd6fe', fontSize: 28, fontWeight: '900' }}>{initials}</Text>
+                )}
               </View>
               <Pressable
                 onPress={() => router.push({ pathname: '/create', params: { mode: 'story' } })}
@@ -152,7 +156,7 @@ export default function ProfileScreen() {
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
             <Pressable
-              onPress={() => Alert.alert('Edit profile', 'Profile editing will be available in the next update.')}
+              onPress={() => router.push('/edit-profile' as never)}
               style={{ flex: 1, backgroundColor: '#2563eb', borderRadius: 14, padding: 12 }}
             >
               <Text style={{ color: '#fff', fontWeight: '900', textAlign: 'center' }}>Edit profile</Text>

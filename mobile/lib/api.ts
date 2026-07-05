@@ -8,6 +8,10 @@ export interface User {
   username: string;
   displayName: string;
   avatarUrl?: string;
+  bannerUrl?: string;
+  bio?: string;
+  location?: string;
+  website?: string;
   verificationStatus?: string;
   trustScore?: number;
 }
