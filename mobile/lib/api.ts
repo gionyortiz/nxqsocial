@@ -30,6 +30,34 @@ export interface PostItem {
   _count?: { likes: number; comments: number };
 }
 
+export interface StoryMedia {
+  id: string;
+  url: string;
+  thumbnailUrl?: string | null;
+  mimeType: string;
+  width?: number | null;
+  height?: number | null;
+  durationSec?: number | null;
+}
+
+export interface StoryItem {
+  id: string;
+  caption?: string | null;
+  visibility: string;
+  status: string;
+  expiresAt: string;
+  createdAt: string;
+  viewed: boolean;
+  author: { id: string; username: string; displayName?: string; avatarUrl?: string | null };
+  media: StoryMedia | null;
+}
+
+export interface StoryFeedAuthorGroup {
+  author: { id: string; username: string; displayName?: string; avatarUrl?: string | null };
+  hasUnseen: boolean;
+  stories: StoryItem[];
+}
+
 interface ApiOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   token?: string | null;

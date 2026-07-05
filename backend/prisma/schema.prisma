@@ -53,6 +53,8 @@ model User {
   notificationsActed Notification[] @relation("notificationActor")
   conversationParticipants ConversationParticipant[]
   sentMessages             DirectMessage[] @relation("directMessageSender")
+  stories                  Story[]         @relation("storyAuthor")
+  storyViews               StoryView[]     @relation("storyViewer")
 }
 
 model Block {
@@ -139,8 +141,43 @@ model MediaAsset {
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
 
-  user User  @relation(fields: [userId], references: [id], onDelete: Cascade)
-  post Post? @relation(fields: [postId], references: [id], onDelete: SetNull)
+  storyId String? @unique
+
+  user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  post  Post?  @relation(fields: [postId], references: [id], onDelete: SetNull)
+  story Story? @relation(fields: [storyId], references: [id], onDelete: SetNull)
+}
+
+model Story {
+  id         String     @id @default(cuid())
+  authorId   String
+  caption    String?
+  visibility Visibility @default(PUBLIC)
+  status     PostStatus @default(PUBLISHED)
+  expiresAt  DateTime
+  createdAt  DateTime   @default(now())
+  updatedAt  DateTime   @updatedAt
+
+  author User        @relation("storyAuthor", fields: [authorId], references: [id], onDelete: Cascade)
+  media  MediaAsset?
+  views  StoryView[]
+
+  @@index([authorId, createdAt])
+  @@index([expiresAt])
+}
+
+model StoryView {
+  id        String   @id @default(cuid())
+  storyId   String
+  viewerId  String
+  createdAt DateTime @default(now())
+
+  story  Story @relation(fields: [storyId], references: [id], onDelete: Cascade)
+  viewer User  @relation("storyViewer", fields: [viewerId], references: [id], onDelete: Cascade)
+
+  @@unique([storyId, viewerId])
+  @@index([storyId])
+  @@index([viewerId])
 }
 
 // ─────────────────────────────────────────

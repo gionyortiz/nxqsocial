@@ -8,6 +8,7 @@ import { RedisModule } from './redis/redis.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PostsModule } from './posts/posts.module';
+import { StoriesModule } from './stories/stories.module';
 import { LikesModule } from './likes/likes.module';
 import { CommentsModule } from './comments/comments.module';
 import { FollowsModule } from './follows/follows.module';
@@ -62,6 +63,7 @@ import { getClientIpFromRequest } from './common/network/client-ip';
     AuthModule,
     UsersModule,
     PostsModule,
+    StoriesModule,
     LikesModule,
     CommentsModule,
     FollowsModule,

@@ -213,6 +213,7 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
         <Stack.Screen name="live" options={{ title: 'Live' }} />
         <Stack.Screen name="live-room" options={{ title: 'Live Room' }} />
         <Stack.Screen name="live-native" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
+        <Stack.Screen name="story-viewer" options={{ headerShown: false, presentation: 'fullScreenModal' }} />
       </Stack>
     </ThemeProvider>
   );

@@ -125,7 +125,7 @@ export class SafetyService {
   }
 
   /** Scan and persist a safety flag if content is unsafe */
-  async scanAndPersist(entityType: 'post' | 'comment', entityId: string, text: string): Promise<ScanResult> {
+  async scanAndPersist(entityType: 'post' | 'comment' | 'story', entityId: string, text: string): Promise<ScanResult> {
     const result = this.scan(text);
 
     if (!result.safe) {

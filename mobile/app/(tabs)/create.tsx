@@ -171,7 +171,8 @@ export default function CreateScreen() {
   const params = useLocalSearchParams<{ mode?: string }>();
   const initialModeHandled = useRef(false);
   const launchMode = typeof params.mode === 'string' ? params.mode : null;
-  const launchModeLabel = launchMode === 'photo' ? 'Photo' : launchMode === 'reel' ? 'Reel' : launchMode === 'live' ? 'Live' : null;
+  const launchModeLabel = launchMode === 'photo' ? 'Photo' : launchMode === 'reel' ? 'Reel' : launchMode === 'story' ? 'Story' : launchMode === 'live' ? 'Live' : null;
+  const isStory = launchMode === 'story';
   const [assetUri, setAssetUri] = useState<string | null>(null);
   const [assetType, setAssetType] = useState<'image' | 'video' | null>(null);
   const [assetName, setAssetName] = useState<string | null>(null);
@@ -358,6 +359,11 @@ export default function CreateScreen() {
       return;
     }
 
+    if (mode === 'story') {
+      void captureMedia('all');
+      return;
+    }
+
     if (mode === 'live') {
       if (!LIVE_NATIVE_ENABLED) return;
       // Generate unique room ID for this broadcast
@@ -418,6 +424,9 @@ export default function CreateScreen() {
 
       // For local development APIs, skip presigned storage and post multipart directly.
       const useDirectUpload = !API_BASE_URL.includes('localhost');
+      if (isStory && !useDirectUpload) {
+        throw new Error('Story creation requires cloud storage to be configured.');
+      }
       if (!useDirectUpload) {
         setUploadProgress(55);
         setUploadStatusMessage('Uploading media...');
@@ -471,6 +480,9 @@ export default function CreateScreen() {
       const createUploadBody = await createUploadRes.text();
 
       // If server doesn't have S3 configured, fall back to multipart upload via /posts
+      if (!createUploadRes.ok && isStory) {
+        throw new Error('Story creation requires cloud storage to be configured.');
+      }
       if (!createUploadRes.ok) {
         setUploadProgress(55);
         setUploadStatusMessage('Uploading media...');
@@ -575,20 +587,19 @@ export default function CreateScreen() {
       }
 
       setUploadProgress(95);
-      setUploadStatusMessage('Publishing post...');
-      const res = await fetch(`${API_BASE_URL}/posts`, {
+      setUploadStatusMessage(isStory ? 'Sharing to story...' : 'Publishing post...');
+      const res = await fetch(`${API_BASE_URL}/${isStory ? 'stories' : 'posts'}`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${token}`,
           Accept: 'application/json',
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          caption,
-          type: assetType === 'video' ? 'VIDEO' : 'PHOTO',
-          visibility,
-          mediaId: uploadTarget.mediaId,
-        }),
+        body: JSON.stringify(
+          isStory
+            ? { caption, visibility, mediaId: uploadTarget.mediaId }
+            : { caption, type: assetType === 'video' ? 'VIDEO' : 'PHOTO', visibility, mediaId: uploadTarget.mediaId },
+        ),
       });
       const status = res.status;
       const responseBody = await res.text();
@@ -601,7 +612,7 @@ export default function CreateScreen() {
             return {} as any;
           }
         })();
-        throw new Error(err?.message || `Failed to create post (${status})`);
+        throw new Error(err?.message || `Failed to ${isStory ? 'share story' : 'create post'} (${status})`);
       }
 
       setUploadProgress(100);
@@ -702,9 +713,9 @@ export default function CreateScreen() {
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <MaterialCommunityIcons name="check-circle" size={26} color="#4ade80" />
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#bbf7d0', fontWeight: '900', fontSize: 16 }}>Posted!</Text>
+                    <Text style={{ color: '#bbf7d0', fontWeight: '900', fontSize: 16 }}>{isStory ? 'Shared!' : 'Posted!'}</Text>
                     <Text style={{ color: '#86efac', marginTop: 2, fontSize: 13 }}>
-                      Your {publishedType === 'video' ? 'reel' : 'photo'} is now live on NXQ Social.
+                      {isStory ? 'Your story is now live on NXQ Social.' : `Your ${publishedType === 'video' ? 'reel' : 'photo'} is now live on NXQ Social.`}
                     </Text>
                   </View>
                 </View>
@@ -712,7 +723,7 @@ export default function CreateScreen() {
                   onPress={() => setPublishedType(null)}
                   style={{ backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '800' }}>Create another post</Text>
+                  <Text style={{ color: '#fff', fontWeight: '800' }}>{isStory ? 'Create another story' : 'Create another post'}</Text>
                 </Pressable>
               </View>
             ) : null}
@@ -839,7 +850,7 @@ export default function CreateScreen() {
               disabled={!assetUri || posting}
               style={{ backgroundColor: '#4f46e5', borderRadius: 16, paddingVertical: 15, alignItems: 'center', opacity: !assetUri || posting ? 0.6 : 1 }}
             >
-              {posting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800' }}>Publish</Text>}
+              {posting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800' }}>{isStory ? 'Share to story' : 'Publish'}</Text>}
             </Pressable>
           </ScrollView>
         </TouchableWithoutFeedback>

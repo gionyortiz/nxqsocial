@@ -105,8 +105,21 @@ export default function ProfileScreen() {
         <View style={{ height: 132, backgroundColor: '#1e1b4b', borderBottomLeftRadius: 26, borderBottomRightRadius: 26 }} />
         <View style={{ paddingHorizontal: 16, marginTop: -48 }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
-            <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#312e81', borderWidth: 4, borderColor: '#0b1020', alignItems: 'center', justifyContent: 'center' }}>
-              <Text style={{ color: '#ddd6fe', fontSize: 28, fontWeight: '900' }}>{initials}</Text>
+            <View style={{ position: 'relative' }}>
+              <View style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#312e81', borderWidth: 4, borderColor: '#0b1020', alignItems: 'center', justifyContent: 'center' }}>
+                <Text style={{ color: '#ddd6fe', fontSize: 28, fontWeight: '900' }}>{initials}</Text>
+              </View>
+              <Pressable
+                onPress={() => router.push({ pathname: '/create', params: { mode: 'story' } })}
+                style={{
+                  position: 'absolute', bottom: -2, right: -2,
+                  width: 30, height: 30, borderRadius: 15,
+                  backgroundColor: '#4f46e5', borderWidth: 2, borderColor: '#0b1020',
+                  alignItems: 'center', justifyContent: 'center',
+                }}
+              >
+                <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+              </Pressable>
             </View>
             <View style={{ flex: 1, paddingBottom: 8 }}>
               <Text style={{ color: '#fff', fontSize: 24, fontWeight: '900' }}>{user?.displayName || 'NXQ User'}</Text>

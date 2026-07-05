@@ -3,11 +3,12 @@ import { ActivityIndicator, Alert, FlatList, Image, Platform, Pressable, Refresh
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
+import { apiRequest, PostItem, resolveMediaUrl, StoryFeedAuthorGroup } from '@/lib/api';
 import { LIVE_NATIVE_ENABLED } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
 import { PostMedia } from '@/components/PostMedia';
 import { mobileProof } from '@/lib/runtimeProof';
+import { CreateActionSheet, CreateActionMode } from '@/components/CreateActionSheet';
 
 interface StoryCandidate {
   id: string;
@@ -194,6 +195,8 @@ export default function FeedScreen() {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [showInsights, setShowInsights] = useState(false);
   const [screenFocused, setScreenFocused] = useState(false);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const [storyFeed, setStoryFeed] = useState<StoryFeedAuthorGroup[]>([]);
 
   const trendingTopics = useMemo(() => buildTrendingTopics(items), [items]);
   const activeCreators = useMemo(() => new Set(items.map((item) => item.author.id)).size, [items]);
@@ -212,9 +215,10 @@ export default function FeedScreen() {
     if (!token) return;
     setError(null);
     try {
-      const [feedData, storiesData] = await Promise.all([
+      const [feedData, storiesData, storyFeedData] = await Promise.all([
         apiRequest<{ data: PostItem[] }>(`/posts/feed?mode=${mode}`, { token }),
         apiRequest<StoriesResponse>('/feed/stories?take=15', { token }),
+        apiRequest<{ authors: StoryFeedAuthorGroup[] }>('/stories/feed', { token }).catch(() => ({ authors: [] })),
       ]);
       mobileProof('Incoming feed JSON', {
         endpoint: `/posts/feed?mode=${mode}`,
@@ -224,6 +228,7 @@ export default function FeedScreen() {
       setItems(feedData.data || []);
       setStories(storiesData.storyCandidates || []);
       setSuggestedCreators(storiesData.suggestedCreators || []);
+      setStoryFeed(storyFeedData.authors || []);
     } catch (e: any) {
       const message = e?.message ?? 'Failed to load feed';
       setError(message);
@@ -418,9 +423,14 @@ export default function FeedScreen() {
   const openUserProfile = (username: string) => {
     router.push({ pathname: '/user/[username]', params: { username } });
   };
-  const openCreateAction = (mode: 'photo' | 'reel' | 'live') => {
+  const openCreateAction = (mode: 'photo' | 'reel' | 'live' | 'story') => {
     if (mode === 'live' && !LIVE_NATIVE_ENABLED) return;
     router.push({ pathname: '/create', params: { mode } });
+  };
+
+  const onSelectCreateMode = (mode: CreateActionMode) => {
+    setShowCreateMenu(false);
+    openCreateAction(mode === 'post' ? 'photo' : mode);
   };
 
   const openLiveRoom = (story: StoryCandidate) => {
@@ -509,6 +519,12 @@ export default function FeedScreen() {
                 </View>
                 <View style={{ flexDirection: 'row', gap: 10 }}>
                   <Pressable
+                    onPress={() => setShowCreateMenu(true)}
+                    style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#263246', alignItems: 'center', justifyContent: 'center' }}
+                  >
+                    <MaterialCommunityIcons name="plus" size={22} color="#e5e7eb" />
+                  </Pressable>
+                  <Pressable
                     onPress={() => router.push('/explore')}
                     style={{ width: 38, height: 38, borderRadius: 19, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#263246', alignItems: 'center', justifyContent: 'center' }}
                   >
@@ -522,6 +538,58 @@ export default function FeedScreen() {
                   </Pressable>
                 </View>
               </View>
+
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 12, paddingRight: 8 }}>
+                <Pressable
+                  onPress={() => {
+                    const mine = storyFeed.find((g) => g.author.id === user?.id);
+                    if (mine) {
+                      router.push({ pathname: '/story-viewer' as never, params: { authorId: mine.author.id } as never });
+                    } else {
+                      openCreateAction('story');
+                    }
+                  }}
+                  style={{ alignItems: 'center', gap: 4, width: 68 }}
+                >
+                  <View
+                    style={{
+                      width: 64, height: 64, borderRadius: 32,
+                      borderWidth: 2, borderColor: storyFeed.some((g) => g.author.id === user?.id) ? '#f43f5e' : '#334155',
+                      alignItems: 'center', justifyContent: 'center', backgroundColor: '#111827', overflow: 'hidden',
+                    }}
+                  >
+                    {user?.avatarUrl ? (
+                      <Image source={{ uri: resolveMediaUrl(user.avatarUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                    ) : (
+                      <MaterialCommunityIcons name="plus" size={26} color="#93c5fd" />
+                    )}
+                  </View>
+                  <Text numberOfLines={1} style={{ color: '#cbd5e1', fontSize: 11, fontWeight: '700' }}>Your story</Text>
+                </Pressable>
+
+                {storyFeed.filter((g) => g.author.id !== user?.id).map((group) => (
+                  <Pressable
+                    key={group.author.id}
+                    onPress={() => router.push({ pathname: '/story-viewer' as never, params: { authorId: group.author.id } as never })}
+                    style={{ alignItems: 'center', gap: 4, width: 68 }}
+                  >
+                    <View
+                      style={{
+                        width: 64, height: 64, borderRadius: 32,
+                        borderWidth: 2, borderColor: group.hasUnseen ? '#f43f5e' : '#334155',
+                        alignItems: 'center', justifyContent: 'center', backgroundColor: '#111827', overflow: 'hidden',
+                      }}
+                    >
+                      {group.author.avatarUrl ? (
+                        <Image source={{ uri: resolveMediaUrl(group.author.avatarUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
+                      ) : (
+                        <Text style={{ color: '#d1d5db', fontWeight: '800' }}>{group.author.username.slice(0, 2).toUpperCase()}</Text>
+                      )}
+                    </View>
+                    <Text numberOfLines={1} style={{ color: '#cbd5e1', fontSize: 11, fontWeight: '700' }}>{group.author.username}</Text>
+                  </Pressable>
+                ))}
+              </ScrollView>
 
               <View style={{ gap: 8 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
@@ -900,6 +968,7 @@ export default function FeedScreen() {
           )}
         />
       )}
+      <CreateActionSheet visible={showCreateMenu} onClose={() => setShowCreateMenu(false)} onSelect={onSelectCreateMode} />
     </SafeAreaView>
   );
 }
