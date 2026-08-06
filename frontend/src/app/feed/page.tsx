@@ -87,24 +87,24 @@ export default function FeedPage() {
     <AppShell aside={<RightSidebar />}>
       <div className="px-3 sm:px-4 py-4 flex flex-col gap-3.5">
         {/* Create post */}
-        <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-3">
+        <div className="bg-white dark:bg-[#111827] rounded-3xl border border-[var(--border)] shadow-[var(--shadow-card)] p-3">
           <div className="flex items-center gap-2.5">
             <Avatar src={user?.avatarUrl} alt={user?.username ?? 'You'} size="md" />
             <Link
               href="/upload"
-              className="flex-1 h-11 rounded-full border border-gray-200 bg-gray-50 hover:bg-gray-100 transition-colors px-4 flex items-center text-sm text-gray-500"
+              className="flex-1 h-11 rounded-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors px-4 flex items-center text-sm text-gray-500 dark:text-gray-400"
             >
               What&apos;s on your mind?
             </Link>
           </div>
-          <div className="mt-3 pt-3 border-t border-gray-100 grid grid-cols-3 gap-2">
-            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700">
+          <div className="mt-3 pt-3 border-t border-[var(--border)] grid grid-cols-3 gap-2">
+            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300">
               <PenSquare size={16} className="text-purple-600" /> Post
             </Link>
-            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700">
+            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300">
               <Camera size={16} className="text-purple-600" /> Photo
             </Link>
-            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700">
+            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300">
               <Clapperboard size={16} className="text-purple-600" /> Reel
             </Link>
           </div>
@@ -124,8 +124,8 @@ export default function FeedPage() {
               onClick={() => setMode(m.key)}
               className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
                 mode === m.key
-                  ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-sm'
-                  : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-100'
+                  ? 'btn-gradient'
+                  : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
               }`}
             >
               {m.label}
@@ -136,27 +136,27 @@ export default function FeedPage() {
         {posts.length === 0 && loading && (
           <div className="flex flex-col gap-3">
             {Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-4 animate-pulse">
+              <div key={idx} className="bg-white dark:bg-[#111827] rounded-3xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4">
                 <div className="flex items-center gap-3 mb-3">
-                  <div className="w-10 h-10 rounded-full bg-gray-200" />
+                  <div className="w-10 h-10 skeleton" style={{ borderRadius: '9999px' }} />
                   <div className="flex-1">
-                    <div className="h-3.5 bg-gray-200 rounded w-32 mb-1.5" />
-                    <div className="h-3 bg-gray-100 rounded w-24" />
+                    <div className="h-3.5 skeleton w-32 mb-1.5" />
+                    <div className="h-3 skeleton w-24" />
                   </div>
                 </div>
-                <div className="rounded-2xl bg-gray-100 h-72" />
-                <div className="mt-3 h-3.5 bg-gray-100 rounded w-5/6" />
+                <div className="skeleton h-72" />
+                <div className="mt-3 h-3.5 skeleton w-5/6" />
               </div>
             ))}
           </div>
         )}
 
         {posts.length === 0 && !loading && (
-          <div className="text-center py-14 text-gray-400 bg-white rounded-2xl border border-dashed border-gray-300">
-            <p className="text-lg font-semibold text-gray-700">Your feed is warming up</p>
+          <div className="text-center py-14 text-gray-400 dark:text-gray-500 bg-white dark:bg-[#111827] rounded-3xl border border-dashed border-gray-300 dark:border-white/10">
+            <p className="text-lg font-semibold text-gray-700 dark:text-gray-200">Your feed is warming up</p>
             <p className="text-sm mt-1">Follow more people or share your first post to increase feed density.</p>
             <div className="mt-4">
-              <Link href="/upload" className="inline-flex items-center px-4 h-10 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white text-sm font-semibold">
+              <Link href="/upload" className="inline-flex items-center px-4 h-10 btn-gradient text-sm">
                 Create a post
               </Link>
             </div>

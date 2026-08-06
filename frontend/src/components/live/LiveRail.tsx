@@ -32,12 +32,12 @@ export function LiveRail() {
   if (lives.length === 0) return null;
 
   return (
-    <div className="rounded-2xl bg-gradient-to-br from-rose-50 to-white ring-1 ring-rose-100 p-3">
+    <div className="rounded-3xl bg-gradient-to-br from-rose-50 to-white dark:from-rose-950/40 dark:to-[#111827] ring-1 ring-rose-100 dark:ring-rose-900/40 p-3">
       <div className="flex items-center gap-1.5 mb-2">
         <span className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-rose-600 text-white text-[10px] font-bold uppercase tracking-wide">
           <span className="w-1.5 h-1.5 rounded-full bg-white animate-pulse" /> Live
         </span>
-        <span className="text-xs font-semibold text-gray-700">Live now</span>
+        <span className="text-xs font-semibold text-gray-700 dark:text-gray-300">Live now</span>
       </div>
       <div className="flex gap-3 overflow-x-auto scrollbar-hide">
         {lives.map((l) => (
@@ -48,7 +48,7 @@ export function LiveRail() {
           >
             <span className="relative">
               <span className="block rounded-full p-[2px] bg-gradient-to-tr from-rose-500 to-red-600">
-                <span className="block rounded-full p-[2px] bg-white">
+                <span className="block rounded-full p-[2px] bg-white dark:bg-[#111827]">
                   <Avatar src={l.host.avatarUrl ?? undefined} alt={l.host.displayName} size="lg" />
                 </span>
               </span>
@@ -56,7 +56,7 @@ export function LiveRail() {
                 Live
               </span>
             </span>
-            <span className="text-[11px] text-gray-700 font-medium truncate max-w-[64px]">
+            <span className="text-[11px] text-gray-700 dark:text-gray-300 font-medium truncate max-w-[64px]">
               {l.host.displayName}
             </span>
           </button>

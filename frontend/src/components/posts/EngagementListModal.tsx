@@ -84,29 +84,29 @@ export function EngagementListModal({
         className="absolute inset-0 w-full h-full cursor-default"
         aria-label="Close engagement list"
       />
-      <div className="relative z-10 w-full max-w-2xl rounded-3xl bg-white shadow-2xl overflow-hidden ring-1 ring-black/5">
-        <div className="flex items-center justify-between border-b border-gray-100 px-5 py-4">
+      <div className="relative z-10 w-full max-w-2xl rounded-3xl bg-white dark:bg-[#111827] shadow-2xl overflow-hidden ring-1 ring-black/5 dark:ring-white/10">
+        <div className="flex items-center justify-between border-b border-gray-100 dark:border-white/10 px-5 py-4">
           <div>
-            <p className="text-xs font-bold uppercase tracking-[0.2em] text-purple-600">Post activity</p>
-            <h3 className="text-xl font-black text-gray-900">Who reacted</h3>
+            <p className="text-xs font-bold uppercase tracking-[0.2em] text-purple-600 dark:text-purple-400">Post activity</p>
+            <h3 className="text-xl font-black text-gray-900 dark:text-gray-100">Who reacted</h3>
           </div>
           <button
             type="button"
             onClick={onClose}
-            className="p-2 rounded-full text-gray-500 hover:text-gray-700 hover:bg-gray-100 transition-colors"
+            className="p-2 rounded-full text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors"
             aria-label="Close"
           >
             <X size={20} />
           </button>
         </div>
 
-        <div className="flex border-b border-gray-100 bg-gray-50/70">
+        <div className="flex border-b border-gray-100 dark:border-white/10 bg-gray-50/70 dark:bg-white/[0.03]">
           <button
             type="button"
             onClick={() => setTab('likes')}
             className={cn(
               'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors',
-              tab === 'likes' ? 'text-purple-700 bg-white' : 'text-gray-500 hover:text-gray-700',
+              tab === 'likes' ? 'text-purple-700 dark:text-purple-400 bg-white dark:bg-white/5' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
             )}
           >
             <Heart size={16} fill={tab === 'likes' ? 'currentColor' : 'none'} />
@@ -117,7 +117,7 @@ export function EngagementListModal({
             onClick={() => setTab('comments')}
             className={cn(
               'flex-1 flex items-center justify-center gap-2 py-3 text-sm font-semibold transition-colors',
-              tab === 'comments' ? 'text-purple-700 bg-white' : 'text-gray-500 hover:text-gray-700',
+              tab === 'comments' ? 'text-purple-700 dark:text-purple-400 bg-white dark:bg-white/5' : 'text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200',
             )}
           >
             <MessageCircle size={16} />
@@ -127,37 +127,37 @@ export function EngagementListModal({
 
         <div className="max-h-[70vh] overflow-y-auto">
           {loading ? (
-            <div className="flex items-center justify-center py-14 text-gray-500">
+            <div className="flex items-center justify-center py-14 text-gray-500 dark:text-gray-400">
               <Loader2 size={18} className="animate-spin mr-2" /> Loading activity...
             </div>
           ) : error ? (
             <div className="px-5 py-10 text-center text-sm text-red-500">{error}</div>
           ) : activeList.length === 0 ? (
-            <div className="px-5 py-12 text-center text-sm text-gray-500">
+            <div className="px-5 py-12 text-center text-sm text-gray-500 dark:text-gray-400">
               {tab === 'likes' ? 'No likes yet.' : 'No comments yet.'}
             </div>
           ) : tab === 'likes' ? (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-white/10">
               {likes.map((like) => (
                 <Link
                   key={like.id}
                   href={`/profile/${like.user.username}`}
-                  className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50 transition-colors"
+                  className="flex items-center gap-3 px-5 py-4 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors"
                 >
                   <Avatar src={like.user.profile?.avatarUrl ?? null} alt={like.user.username} size="md" />
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-semibold text-gray-900 truncate">{like.user.profile?.displayName ?? like.user.username}</span>
+                      <span className="font-semibold text-gray-900 dark:text-gray-100 truncate">{like.user.profile?.displayName ?? like.user.username}</span>
                       <TrustBadge status={like.user.verificationStatus ?? 'BASIC'} size="sm" />
                     </div>
-                    <p className="text-sm text-gray-500 truncate">@{like.user.username}</p>
+                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">@{like.user.username}</p>
                   </div>
-                  <span className="text-xs text-gray-400">{timeAgo(like.createdAt)}</span>
+                  <span className="text-xs text-gray-400 dark:text-gray-500">{timeAgo(like.createdAt)}</span>
                 </Link>
               ))}
             </div>
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-gray-100 dark:divide-white/10">
               {comments.map((comment) => (
                 <div key={comment.id} className="flex items-start gap-3 px-5 py-4">
                   <Link href={`/profile/${comment.user.username}`} className="shrink-0">
@@ -165,13 +165,13 @@ export function EngagementListModal({
                   </Link>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2 flex-wrap">
-                      <Link href={`/profile/${comment.user.username}`} className="font-semibold text-gray-900 hover:underline">
+                      <Link href={`/profile/${comment.user.username}`} className="font-semibold text-gray-900 dark:text-gray-100 hover:underline">
                         {comment.user.profile?.displayName ?? comment.user.username}
                       </Link>
                       <TrustBadge status={comment.user.verificationStatus ?? 'BASIC'} size="sm" />
-                      <span className="text-xs text-gray-400">{timeAgo(comment.createdAt)}</span>
+                      <span className="text-xs text-gray-400 dark:text-gray-500">{timeAgo(comment.createdAt)}</span>
                     </div>
-                    <p className="mt-1 text-sm text-gray-700 whitespace-pre-wrap break-words">{comment.content}</p>
+                    <p className="mt-1 text-sm text-gray-700 dark:text-gray-300 whitespace-pre-wrap break-words">{comment.content}</p>
                   </div>
                 </div>
               ))}
