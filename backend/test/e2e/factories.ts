@@ -7,6 +7,15 @@ export function uid(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
+/**
+ * Registration is invite-gated in this env (REQUIRE_INVITE_CODE=true, see .env) —
+ * spread this into any /api/auth/register payload so the request isn't rejected
+ * with 403 for reasons unrelated to what the test actually exercises.
+ */
+export function inviteCodeField(): { inviteCode?: string } {
+  return { inviteCode: process.env.INVITE_CODE ?? process.env.BETA_INVITE_CODE };
+}
+
 export interface TestUser {
   id: string;
   email: string;
@@ -28,7 +37,13 @@ export async function registerUser(
 
   const { body } = await request(app.getHttpServer())
     .post('/api/auth/register')
-    .send({ email, username, password, displayName: overrides.displayName ?? 'Test User' })
+    .send({
+      email,
+      username,
+      password,
+      displayName: overrides.displayName ?? 'Test User',
+      ...inviteCodeField(),
+    })
     .expect(201);
 
   return {

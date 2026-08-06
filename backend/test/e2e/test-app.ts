@@ -1,5 +1,7 @@
 import { Test, TestingModule } from '@nestjs/testing';
 import { INestApplication, ValidationPipe } from '@nestjs/common';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { AppModule } from '../../src/app.module';
 import { NotificationsService } from '../../src/notifications/notifications.service';
 import { MediaSafetyService } from '../../src/safety/media-safety.service';
@@ -11,8 +13,13 @@ export interface TestAppContext {
   module: TestingModule;
   notificationsMock: jest.Mocked<Pick<NotificationsService, 'sendEmailOtp' | 'sendPhoneOtp'>>;
   mediaSafetyMock: jest.Mocked<Pick<MediaSafetyService, 'scanImage' | 'scanImageFromS3' | 'startVideoScan' | 'startVideoScanJob' | 'pollVideoScan' | 'statusFromScan' | 'isEnabled'>>;
-  storageMock: jest.Mocked<Pick<StorageService, 'upload' | 'delete' | 'isEnabled'>>;
+  storageMock: jest.Mocked<Pick<StorageService, 'upload' | 'delete' | 'download' | 'isEnabled'>>;
 }
+
+// Same real, ffmpeg-decodable fixture used by media-safety.e2e-spec.ts — returned
+// by the storage mock's `download` so the real video-transcode pipeline (which
+// fetches the "uploaded" original back out of storage) has valid bytes to work with.
+const TINY_MP4 = readFileSync(join(__dirname, 'fixtures', 'tiny.mp4'));
 
 export async function createTestApp(
   mediaSafetyEnabled = false,
@@ -38,9 +45,11 @@ export async function createTestApp(
     isEnabled: storageEnabled,
     upload: jest.fn().mockResolvedValue('https://r2.example.com/test/image.jpg'),
     delete: jest.fn().mockResolvedValue(undefined),
+    download: jest.fn().mockResolvedValue(TINY_MP4),
     exists: jest.fn().mockResolvedValue(true),
     presignUpload: jest.fn().mockResolvedValue('https://r2.example.com/presign'),
     publicUrl: jest.fn().mockReturnValue('https://r2.example.com/test/key'),
+    keyFromUrl: jest.fn().mockReturnValue('videos/test-transcoded.mp4'),
   };
 
   const moduleFixture = await Test.createTestingModule({

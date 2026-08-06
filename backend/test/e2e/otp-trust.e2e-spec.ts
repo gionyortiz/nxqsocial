@@ -1,6 +1,6 @@
 import { INestApplication } from '@nestjs/common';
 import { createTestApp } from './test-app';
-import { registerUser, getOtpCode, cleanupTestUsers } from './factories';
+import { registerUser, getOtpCode, cleanupTestUsers, inviteCodeField } from './factories';
 import { PrismaService } from '../../src/prisma/prisma.service';
 import request from 'supertest';
 
@@ -97,6 +97,7 @@ describe('OTP Verification + Trust Score E2E', () => {
         username: `otpphone_${id}`,
         password: 'P@ssw0rd_Test!',
         displayName: 'Phone OTP User',
+        ...inviteCodeField(),
       })
       .expect(201);
 

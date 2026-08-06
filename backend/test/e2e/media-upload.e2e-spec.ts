@@ -208,7 +208,7 @@ describe('Media Upload Pipeline E2E', () => {
       expect(body.s3Key).toMatch(/uploads\/.+\.mp4$/);
     });
 
-    it('complete-upload sets video status to SCANNING or PUBLISHED', async () => {
+    it('complete-upload sets video status to TRANSCODING, then SCANNING or PUBLISHED once the async job finishes', async () => {
       const { body: urlBody } = await request(app.getHttpServer())
         .post('/api/media/create-upload-url')
         .set('Authorization', `Bearer ${token}`)
@@ -221,8 +221,18 @@ describe('Media Upload Pipeline E2E', () => {
         .send({ mediaId: urlBody.mediaId })
         .expect(201);
 
-      // startVideoScan mock returns null → falls back to PUBLISHED
-      expect(['SCANNING', 'PUBLISHED']).toContain(body.uploadStatus);
+      // complete-upload synchronously marks videos TRANSCODING and kicks off
+      // an async transcode job (see media.service.ts) — the client is expected
+      // to poll getStatus() afterward, same as it already does for SCANNING.
+      expect(body.uploadStatus).toBe('TRANSCODING');
+
+      // startVideoScan mock returns null → falls back to PUBLISHED once transcoding finishes
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      const { body: finalStatus } = await request(app.getHttpServer())
+        .get(`/api/media/${urlBody.mediaId}/status`)
+        .set('Authorization', `Bearer ${token}`)
+        .expect(200);
+      expect(['SCANNING', 'PUBLISHED']).toContain(finalStatus.uploadStatus);
     });
   });
 

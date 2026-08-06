@@ -1,4 +1,6 @@
 import request from 'supertest';
+import { readFileSync } from 'fs';
+import { join } from 'path';
 import { INestApplication } from '@nestjs/common';
 import { createTestApp, TestAppContext } from './test-app';
 import { registerUser, cleanupTestUsers } from './factories';
@@ -11,8 +13,10 @@ const TINY_JPEG = Buffer.from(
   'base64',
 );
 
-// 1-second silence MP4 stub (minimal valid structure for multer mime check)
-const TINY_MP4 = Buffer.from('AAAAIGZ0eXBpc29tAAACAGlzb21pc28yYXZjMW1wNDEAAAAIZnJlZQAAAAhtZGF0AAAA', 'base64');
+// A genuinely valid, ffprobe/ffmpeg-decodable 1-second H.264 MP4 (64x64, black) —
+// needed because the upload pipeline now runs real video transcoding, which a
+// fake/minimal byte stub (no real moov/track data) fails with "moov atom not found".
+const TINY_MP4 = readFileSync(join(__dirname, 'fixtures', 'tiny.mp4'));
 
 describe('Media Safety Scanning E2E', () => {
   let ctx: TestAppContext;

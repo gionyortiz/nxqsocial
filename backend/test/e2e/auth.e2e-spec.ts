@@ -1,7 +1,7 @@
 import request from 'supertest';
 import { INestApplication } from '@nestjs/common';
 import { createTestApp } from './test-app';
-import { uid, cleanupTestUsers } from './factories';
+import { uid, cleanupTestUsers, inviteCodeField } from './factories';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 describe('Auth E2E', () => {
@@ -29,6 +29,7 @@ describe('Auth E2E', () => {
           username: `authuser_${id}`,
           password: 'P@ssw0rd_Test!',
           displayName: 'Auth Test User',
+          ...inviteCodeField(),
         });
 
       expect(status).toBe(201);
@@ -48,6 +49,7 @@ describe('Auth E2E', () => {
         username: `dupuser_${id}`,
         password: 'P@ssw0rd_Test!',
         displayName: 'Dup User',
+        ...inviteCodeField(),
       };
 
       await request(app.getHttpServer()).post('/api/auth/register').send(payload).expect(201);
@@ -64,6 +66,7 @@ describe('Auth E2E', () => {
         username: `dupuname_${id}`,
         password: 'P@ssw0rd_Test!',
         displayName: 'Dup User',
+        ...inviteCodeField(),
       };
 
       await request(app.getHttpServer()).post('/api/auth/register').send(payload).expect(201);
@@ -83,6 +86,7 @@ describe('Auth E2E', () => {
 
   describe('POST /api/auth/register — beta invite code gating', () => {
     const ORIGINAL = process.env.BETA_INVITE_CODE;
+    const ORIGINAL_INVITE_CODE = process.env.INVITE_CODE;
     const ORIGINAL_REQUIRE = process.env.REQUIRE_INVITE_CODE;
 
     afterEach(() => {
@@ -90,12 +94,19 @@ describe('Auth E2E', () => {
       if (ORIGINAL === undefined) delete process.env.BETA_INVITE_CODE;
       else process.env.BETA_INVITE_CODE = ORIGINAL;
 
+      // INVITE_CODE takes precedence over the BETA_INVITE_CODE alias (see
+      // auth.service.ts), so it must be cleared/restored alongside it for
+      // these tests to actually exercise the BETA_INVITE_CODE path they claim to.
+      if (ORIGINAL_INVITE_CODE === undefined) delete process.env.INVITE_CODE;
+      else process.env.INVITE_CODE = ORIGINAL_INVITE_CODE;
+
       if (ORIGINAL_REQUIRE === undefined) delete process.env.REQUIRE_INVITE_CODE;
       else process.env.REQUIRE_INVITE_CODE = ORIGINAL_REQUIRE;
     });
 
     it('allows registration when no invite code is configured', async () => {
       delete process.env.BETA_INVITE_CODE;
+      delete process.env.INVITE_CODE;
       delete process.env.REQUIRE_INVITE_CODE;
       const id = uid();
       await request(app.getHttpServer())
@@ -111,6 +122,7 @@ describe('Auth E2E', () => {
 
     it('blocks registration with 403 when wrong invite code is sent', async () => {
       process.env.BETA_INVITE_CODE = 'correct-code';
+      delete process.env.INVITE_CODE;
       process.env.REQUIRE_INVITE_CODE = 'true';
       const id = uid();
       await request(app.getHttpServer())
@@ -127,6 +139,7 @@ describe('Auth E2E', () => {
 
     it('blocks registration with 403 when invite code is required but omitted', async () => {
       process.env.BETA_INVITE_CODE = 'correct-code';
+      delete process.env.INVITE_CODE;
       process.env.REQUIRE_INVITE_CODE = 'true';
       const id = uid();
       await request(app.getHttpServer())
@@ -142,6 +155,7 @@ describe('Auth E2E', () => {
 
     it('allows registration with the correct invite code', async () => {
       process.env.BETA_INVITE_CODE = 'correct-code';
+      delete process.env.INVITE_CODE;
       process.env.REQUIRE_INVITE_CODE = 'true';
       const id = uid();
       const { status } = await request(app.getHttpServer())
@@ -158,6 +172,7 @@ describe('Auth E2E', () => {
 
     it('allows open registration when REQUIRE_INVITE_CODE=false', async () => {
       process.env.BETA_INVITE_CODE = 'correct-code';
+      delete process.env.INVITE_CODE;
       process.env.REQUIRE_INVITE_CODE = 'false';
       const id = uid();
       await request(app.getHttpServer())
@@ -173,6 +188,7 @@ describe('Auth E2E', () => {
 
     it('blocks registration when REQUIRE_INVITE_CODE=true but invite secret missing', async () => {
       delete process.env.BETA_INVITE_CODE;
+      delete process.env.INVITE_CODE;
       process.env.REQUIRE_INVITE_CODE = 'true';
       const id = uid();
       await request(app.getHttpServer())
@@ -195,7 +211,7 @@ describe('Auth E2E', () => {
 
       await request(app.getHttpServer())
         .post('/api/auth/register')
-        .send({ email, username: `loginuser_${id}`, password, displayName: 'Login User' })
+        .send({ email, username: `loginuser_${id}`, password, displayName: 'Login User', ...inviteCodeField() })
         .expect(201);
 
       const { body } = await request(app.getHttpServer())
@@ -213,7 +229,7 @@ describe('Auth E2E', () => {
 
       await request(app.getHttpServer())
         .post('/api/auth/register')
-        .send({ email, username: `badpwuser_${id}`, password: 'Correct_Pass1!', displayName: 'Bad PW' })
+        .send({ email, username: `badpwuser_${id}`, password: 'Correct_Pass1!', displayName: 'Bad PW', ...inviteCodeField() })
         .expect(201);
 
       await request(app.getHttpServer())

@@ -2,7 +2,7 @@ import request from 'supertest';
 import bcrypt from 'bcryptjs';
 import { INestApplication } from '@nestjs/common';
 import { createTestApp } from './test-app';
-import { registerUser, cleanupTestUsers, uid } from './factories';
+import { registerUser, cleanupTestUsers, uid, inviteCodeField } from './factories';
 import { PrismaService } from '../../src/prisma/prisma.service';
 
 describe('Auth Security E2E', () => {
@@ -27,6 +27,7 @@ describe('Auth Security E2E', () => {
       username: `sec_${id}`,
       displayName: 'Security Test',
       password: 'P@ssw0rd_Test!',
+      ...inviteCodeField(),
     };
   };
 
