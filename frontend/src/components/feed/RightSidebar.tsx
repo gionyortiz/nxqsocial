@@ -16,6 +16,7 @@ interface SuggestedUser {
   avatarUrl?: string;
   verificationStatus: string;
   trustScore: number;
+  isFollowing: boolean;
 }
 
 const TRENDING = [
@@ -56,7 +57,7 @@ export function RightSidebar() {
       .get('/users/search', { params: { q: '' } })
       .then(({ data }) => {
         const list: SuggestedUser[] = Array.isArray(data) ? data : [];
-        setSuggested(list.filter((u) => u.username !== user?.username).slice(0, 5));
+        setSuggested(list.filter((u) => u.username !== user?.username && !u.isFollowing).slice(0, 5));
       })
       .catch(() => {});
   }, [user?.username]);
@@ -64,7 +65,8 @@ export function RightSidebar() {
   const follow = async (username: string) => {
     setFollowed((f) => ({ ...f, [username]: true }));
     try {
-      await api.post(`/users/${username}/follow`);
+      const { data } = await api.post(`/users/${username}/follow`);
+      setFollowed((f) => ({ ...f, [username]: !!data?.following }));
     } catch {
       setFollowed((f) => ({ ...f, [username]: false }));
     }

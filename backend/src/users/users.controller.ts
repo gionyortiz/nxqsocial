@@ -1,12 +1,16 @@
 import {
-  Controller, Get, Put, Patch, Post, Delete, Param, Body, Query,
+  Controller, Get, Put, Patch, Post, Delete, Param, Body, Query, Req,
   UseGuards, UseInterceptors, UploadedFile, BadRequestException,
+  UnsupportedMediaTypeException,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { diskStorage } from 'multer';
-import { extname } from 'path';
+import { extname, join } from 'path';
+import { promises as fs } from 'fs';
+import type { Request } from 'express';
 import { randomUUID } from 'crypto';
 import { JwtAuthGuard } from '../auth/jwt-auth.guard';
+import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
@@ -122,8 +126,9 @@ export class UsersController {
   // ── Public / self endpoints ────────────────────────────────────────────────
 
   @Get('search')
-  search(@Query('q') query: string) {
-    return this.usersService.searchUsers(query ?? '');
+  @UseGuards(OptionalJwtAuthGuard)
+  search(@Query('q') query: string, @CurrentUser() user: any) {
+    return this.usersService.searchUsers(query ?? '', user?.id);
   }
 
   @Get('me/settings')
@@ -171,8 +176,54 @@ export class UsersController {
   )
   uploadAvatar(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
     this.validateImageUpload(file, 'avatar');
-    const avatarUrl = `/uploads/avatars/${file.filename}`;
+    const avatarUrl = `/api/uploads/avatars/${file.filename}`;
     return this.usersService.updateAvatar(user.id, avatarUrl);
+  }
+
+  /** Native mobile upload path that avoids React Native multipart/FormData. */
+  @Patch('me/avatar/raw')
+  @UseGuards(JwtAuthGuard)
+  async uploadAvatarRaw(@CurrentUser() user: any, @Req() req: Request) {
+    const mimeType = String(req.headers['content-type'] || '').split(';', 1)[0].toLowerCase();
+    const extensions: Record<string, string> = {
+      'image/jpeg': '.jpg',
+      'image/png': '.png',
+      'image/webp': '.webp',
+      'image/gif': '.gif',
+      'image/heic': '.heic',
+      'image/heif': '.heif',
+    };
+    const extension = extensions[mimeType];
+    if (!extension) {
+      throw new UnsupportedMediaTypeException('Select a JPEG, PNG, WebP, GIF, or HEIC image');
+    }
+
+    const maxBytes = 10 * 1024 * 1024;
+    const declaredBytes = Number(req.headers['content-length'] || 0);
+    if (declaredBytes > maxBytes) {
+      throw new BadRequestException('Profile photo must be smaller than 10 MB');
+    }
+
+    const chunks: Buffer[] = [];
+    let totalBytes = 0;
+    for await (const chunk of req) {
+      const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
+      totalBytes += buffer.length;
+      if (totalBytes > maxBytes) {
+        throw new BadRequestException('Profile photo must be smaller than 10 MB');
+      }
+      chunks.push(buffer);
+    }
+    if (!totalBytes) {
+      throw new BadRequestException('Select a profile photo before saving');
+    }
+
+    const filename = `${randomUUID()}${extension}`;
+    const uploadDirectory = join(process.cwd(), 'uploads', 'avatars');
+    await fs.mkdir(uploadDirectory, { recursive: true });
+    await fs.writeFile(join(uploadDirectory, filename), Buffer.concat(chunks));
+
+    return this.usersService.updateAvatar(user.id, `/api/uploads/avatars/${filename}`);
   }
 
   @Delete('me/avatar')
@@ -202,7 +253,7 @@ export class UsersController {
   )
   uploadBanner(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
     this.validateImageUpload(file, 'banner');
-    const bannerUrl = `/uploads/avatars/${file.filename}`;
+    const bannerUrl = `/api/uploads/avatars/${file.filename}`;
     return this.usersService.updateBanner(user.id, bannerUrl);
   }
 

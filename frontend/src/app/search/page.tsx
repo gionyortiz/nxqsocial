@@ -18,6 +18,7 @@ interface UserResult {
   avatarUrl?: string;
   verificationStatus: string;
   trustScore: number;
+  isFollowing: boolean;
 }
 
 interface MediaAsset { url: string; mimeType: string; }
@@ -62,7 +63,7 @@ export default function ExplorePage() {
         const list: UserResult[] = Array.isArray(users) ? users : [];
         setCreators(
           list
-            .filter((u) => u.username !== me?.username)
+            .filter((u) => u.username !== me?.username && !u.isFollowing)
             .sort((a, b) => b.trustScore - a.trustScore)
             .slice(0, 8),
         );
@@ -81,7 +82,9 @@ export default function ExplorePage() {
     debounceRef.current = setTimeout(async () => {
       try {
         const { data } = await api.get('/users/search', { params: { q } });
-        setResults(Array.isArray(data) ? data : []);
+        const list: UserResult[] = Array.isArray(data) ? data : [];
+        setResults(list);
+        setFollowed((f) => ({ ...f, ...Object.fromEntries(list.map((u) => [u.username, !!u.isFollowing])) }));
       } catch {
         setResults([]);
       } finally {
@@ -93,7 +96,8 @@ export default function ExplorePage() {
   const follow = async (username: string) => {
     setFollowed((f) => ({ ...f, [username]: true }));
     try {
-      await api.post(`/users/${username}/follow`);
+      const { data } = await api.post(`/users/${username}/follow`);
+      setFollowed((f) => ({ ...f, [username]: !!data?.following }));
     } catch {
       setFollowed((f) => ({ ...f, [username]: false }));
     }

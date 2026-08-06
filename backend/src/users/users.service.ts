@@ -194,7 +194,7 @@ export class UsersService {
     return blocks.map((b) => ({ ...flattenUser(b.blocked), blockedAt: b.createdAt }));
   }
 
-  async searchUsers(query: string) {
+  async searchUsers(query: string, currentUserId?: string) {
     const users = await this.prisma.user.findMany({
       where: {
         OR: [
@@ -208,7 +208,17 @@ export class UsersService {
       },
       take: 20,
     });
-    return users.map(flattenUser);
+
+    let followingIds = new Set<string>();
+    if (currentUserId && users.length > 0) {
+      const follows = await this.prisma.follow.findMany({
+        where: { followerId: currentUserId, followingId: { in: users.map((u) => u.id) } },
+        select: { followingId: true },
+      });
+      followingIds = new Set(follows.map((f) => f.followingId));
+    }
+
+    return users.map((u) => ({ ...flattenUser(u), isFollowing: followingIds.has(u.id) }));
   }
 
   // ── Admin: user management ─────────────────────────────────────────────────
