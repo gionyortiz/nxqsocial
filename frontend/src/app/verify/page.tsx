@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { AppShell } from '@/components/layout/AppShell';
 import { Button } from '@/components/ui/Button';
 import { api } from '@/lib/api';
@@ -12,6 +12,7 @@ interface VerificationStatus {
   verificationStatus: string;
   trustScore: number;
   verifications: Array<{ id: string; level: string; status: string; createdAt: string }>;
+  idVerificationPriceCents: number;
 }
 
 const TIERS = [
@@ -30,7 +31,8 @@ const TIERS = [
     icon: '🪪',
     color: 'text-yellow-600',
     border: 'border-yellow-200 bg-yellow-50',
-    description: 'Verify your government-issued ID. Trust score 70. Unlocks gold badge.',
+    description: (priceCents: number | null) =>
+      `Verify your government-issued ID.${priceCents != null ? ` One-time $${(priceCents / 100).toFixed(2)} fee.` : ''} Trust score 70. Unlocks gold badge.`,
     how: 'Powered by Stripe Identity — securely verify your passport, driving licence, or national ID card. Takes 2 minutes.',
   },
   {
@@ -46,13 +48,15 @@ const TIERS = [
 
 const TIER_ORDER = ['UNVERIFIED', 'BASIC', 'HUMAN_VERIFIED', 'ID_VERIFIED', 'BUSINESS_VERIFIED'];
 
-export default function VerifyPage() {
+function VerifyPageContent() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user } = useAuthStore();
   const [status, setStatus] = useState<VerificationStatus | null>(null);
   const [requesting, setRequesting] = useState('');
   const [done, setDone] = useState('');
   const [error, setError] = useState('');
+  const checkoutResult = searchParams.get('checkout');
 
   useEffect(() => {
     if (!user) { router.push('/login'); return; }
@@ -114,6 +118,17 @@ export default function VerifyPage() {
           </div>
         )}
 
+        {checkoutResult === 'success' && (
+          <p className="text-sm text-green-700 bg-green-50 border border-green-200 rounded-xl px-4 py-3 mb-4">
+            Payment received — click Apply again below to continue your ID verification.
+          </p>
+        )}
+        {checkoutResult === 'canceled' && (
+          <p className="text-sm text-gray-600 bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 mb-4">
+            Checkout canceled — no charge was made.
+          </p>
+        )}
+
         {error && <p className="text-sm text-red-500 mb-4">{error}</p>}
 
         <div className="flex flex-col gap-4">
@@ -121,6 +136,9 @@ export default function VerifyPage() {
             const tierIdx = TIER_ORDER.indexOf(tier.key);
             const isCurrentOrBelow = tierIdx <= currentTierIdx;
             const hasPending = status?.verifications.some((v) => v.level === tier.key && v.status === 'PENDING');
+            const description = typeof tier.description === 'function'
+              ? tier.description(status?.idVerificationPriceCents ?? null)
+              : tier.description;
 
             return (
               <div key={tier.key} className={`rounded-2xl border p-5 ${tier.border}`}>
@@ -129,7 +147,7 @@ export default function VerifyPage() {
                     <p className={`font-bold text-base ${tier.color} flex items-center gap-2`}>
                       <span className="text-xl">{tier.icon}</span> {tier.label}
                     </p>
-                    <p className="text-sm text-gray-600 mt-1">{tier.description}</p>
+                    <p className="text-sm text-gray-600 mt-1">{description}</p>
                     <p className="text-xs text-gray-400 mt-2">{tier.how}</p>
                   </div>
                   <div className="flex-shrink-0 mt-1">
@@ -173,5 +191,13 @@ export default function VerifyPage() {
         )}
       </div>
     </AppShell>
+  );
+}
+
+export default function VerifyPage() {
+  return (
+    <Suspense fallback={null}>
+      <VerifyPageContent />
+    </Suspense>
   );
 }

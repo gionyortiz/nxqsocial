@@ -44,7 +44,7 @@ export class VerificationService {
   }
 
   async getStatus(userId: string) {
-    return this.prisma.user.findUnique({
+    const user = await this.prisma.user.findUnique({
       where: { id: userId },
       select: {
         verificationStatus: true,
@@ -52,6 +52,11 @@ export class VerificationService {
         verifications: { orderBy: { createdAt: 'desc' } },
       },
     });
+    return user && { ...user, idVerificationPriceCents: this.getIdVerificationPriceCents() };
+  }
+
+  private getIdVerificationPriceCents(): number {
+    return parseInt(this.config.get<string>('ID_VERIFICATION_PRICE_CENTS', '499'), 10);
   }
 
   /**
@@ -91,11 +96,91 @@ export class VerificationService {
   }
 
   /**
-   * Starts a Stripe Identity verification session.
-   * Returns the Stripe-hosted verification URL for the client to redirect to.
+   * Starts a Stripe Identity verification session — gated behind a paid
+   * Stripe Checkout session (ID_VERIFICATION). Same return shape
+   * (`{url}` at minimum) whether the caller ends up redirected to
+   * Checkout or straight to Identity, so the frontend trigger doesn't
+   * need to know which stage it's in.
    * Used for ID_VERIFIED tier.
    */
   async startStripeIdentityCheck(userId: string) {
+    let payment = await this.prisma.payment.findFirst({
+      where: { userId, purpose: 'ID_VERIFICATION', status: 'PAID' },
+      orderBy: { paidAt: 'desc' },
+    });
+
+    if (!payment) {
+      const pending = await this.prisma.payment.findFirst({
+        where: { userId, purpose: 'ID_VERIFICATION', status: 'PENDING' },
+        orderBy: { createdAt: 'desc' },
+      });
+
+      if (pending) {
+        const stripe = this.requireStripeClient();
+        const checkoutSession = await stripe.checkout.sessions.retrieve(pending.stripeSessionId);
+
+        if (checkoutSession.payment_status === 'paid') {
+          // Reconcile on read: the webhook may not have landed yet (or was lost).
+          await this.prisma.payment.updateMany({
+            where: { id: pending.id, status: 'PENDING' },
+            data: { status: 'PAID', paidAt: new Date() },
+          });
+          payment = await this.prisma.payment.findUnique({ where: { id: pending.id } });
+        } else if (checkoutSession.status === 'open') {
+          return { url: checkoutSession.url };
+        }
+        // else: expired / closed-unpaid — fall through to a fresh checkout session below.
+      }
+    }
+
+    if (!payment || payment.status !== 'PAID') {
+      return this.createIdVerificationCheckout(userId);
+    }
+
+    return this.startIdentitySessionForPayment(userId, payment.id);
+  }
+
+  /** Creates the paid Stripe Checkout session in front of Identity verification. */
+  private async createIdVerificationCheckout(userId: string) {
+    const stripe = this.requireStripeClient();
+    const appUrl = this.config.get<string>('APP_BASE_URL', 'http://localhost:3001');
+    const amountCents = this.getIdVerificationPriceCents();
+    const user = await this.prisma.user.findUniqueOrThrow({ where: { id: userId }, select: { email: true } });
+
+    const session = await stripe.checkout.sessions.create({
+      mode: 'payment',
+      customer_email: user.email,
+      line_items: [
+        {
+          price_data: {
+            currency: 'usd',
+            product_data: { name: 'NXQ Social ID Verification' },
+            unit_amount: amountCents,
+          },
+          quantity: 1,
+        },
+      ],
+      metadata: { nxqsocial_user_id: userId },
+      success_url: `${appUrl}/verify?checkout=success`,
+      cancel_url: `${appUrl}/verify?checkout=canceled`,
+    });
+
+    await this.prisma.payment.create({
+      data: {
+        userId,
+        purpose: 'ID_VERIFICATION',
+        stripeSessionId: session.id,
+        status: 'PENDING',
+        amountCents,
+        currency: 'usd',
+      },
+    });
+
+    return { url: session.url };
+  }
+
+  /** Starts the actual Stripe Identity session, funded by an already-paid Payment. */
+  private async startIdentitySessionForPayment(userId: string, paymentId: string) {
     const stripe = this.requireStripeClient();
     const appUrl = this.config.get<string>('APP_BASE_URL', 'http://localhost:3001');
 
@@ -106,7 +191,7 @@ export class VerificationService {
       return_url: `${appUrl}/verify/complete?session_id={VERIFICATION_SESSION_ID}`,
     });
 
-    // Store the session ref so the webhook can look it up
+    // Store the session ref (and funding payment) so the webhook can look it up
     await this.prisma.verification.create({
       data: {
         userId,
@@ -114,6 +199,7 @@ export class VerificationService {
         provider: 'stripe',
         providerRef: session.id,
         status: 'PENDING',
+        paymentId,
       },
     });
 
@@ -143,9 +229,21 @@ export class VerificationService {
       await this.onStripeVerified(event.data.object as any);
     } else if (event.type === 'identity.verification_session.requires_input') {
       await this.onStripeRequiresInput(event.data.object as any);
+    } else if (event.type === 'checkout.session.completed') {
+      await this.onCheckoutSessionCompleted(event.data.object as any);
     }
 
     return { received: true };
+  }
+
+  /** Marks the matching Payment PAID. Idempotent against Stripe's at-least-once webhook redelivery. */
+  private async onCheckoutSessionCompleted(session: any) {
+    const { count } = await this.prisma.payment.updateMany({
+      where: { stripeSessionId: session.id, status: 'PENDING' },
+      data: { status: 'PAID', paidAt: new Date() },
+    });
+    if (count === 0) return; // already processed, or not one of ours — safe no-op
+    this.logger.log(`Payment for checkout session ${session.id} marked PAID`);
   }
 
   private async onStripeVerified(session: any) {
@@ -175,6 +273,15 @@ export class VerificationService {
       where: { id: userId },
       data: { verificationStatus: tier as any },
     });
+
+    // Consume the payment that funded this attempt only now that it actually
+    // succeeded — a failed/requires-input attempt leaves it PAID and reusable.
+    if (verification.paymentId) {
+      await this.prisma.payment.updateMany({
+        where: { id: verification.paymentId, status: 'PAID' },
+        data: { status: 'CONSUMED' },
+      });
+    }
 
     // Recompute trust score with the new verification
     await this.trustEngine.recalculate(userId);

@@ -39,6 +39,7 @@ model User {
   reportsGiven    Report[]       @relation("reporter")
   reportsReceived Report[]       @relation("reported")
   verifications   Verification[]
+  payments        Payment[]
   feedPref        FeedPreference?
   otpCodes        OtpCode[]
   auditLogs       AuditLog[]     @relation("auditAdmin")
@@ -285,8 +286,28 @@ model Verification {
   verifiedAt  DateTime?
   expiresAt   DateTime?
   createdAt   DateTime           @default(now())
+  paymentId   String?
 
-  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  payment Payment? @relation(fields: [paymentId], references: [id])
+}
+
+// Paid gate in front of Stripe Identity checks (see Payment.purpose).
+model Payment {
+  id              String         @id @default(cuid())
+  userId          String
+  purpose         PaymentPurpose
+  stripeSessionId String         @unique
+  status          PaymentStatus  @default(PENDING)
+  amountCents     Int
+  currency        String         @default("usd")
+  createdAt       DateTime       @default(now())
+  paidAt          DateTime?
+
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  verifications Verification[]
+
+  @@index([userId, purpose, status])
 }
 
 // ─────────────────────────────────────────
@@ -379,6 +400,16 @@ enum VerificationStatus {
   HUMAN_VERIFIED
   ID_VERIFIED
   BUSINESS_VERIFIED
+}
+
+enum PaymentPurpose {
+  ID_VERIFICATION
+}
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  CONSUMED
 }
 
 enum PostType {
