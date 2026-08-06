@@ -9,6 +9,14 @@ This is the single source of truth for the current release state across Apple an
 
 ## Status Changelog
 
+### 2026-08-05 App Store Live Confirmation
+- Checked public App Store lookup (`itunes.apple.com/lookup?bundleId=com.gionyortiz.nxqsocial`).
+- App is **live** on the App Store: https://apps.apple.com/us/app/nxq-social/id6775623679
+- Original release date: `2026-06-22`.
+- Current live version: `1.0.6`, released `2026-07-19`.
+- This supersedes the `1.0 Waiting for Review` status below — the app was approved and published, and has since shipped at least one update (1.0.6) beyond the initial `1.0` submission tracked in this doc. The intermediate approval/version history (1.0 → 1.0.6) was not captured here and should be backfilled from App Store Connect if needed.
+- Not verified in this check: Google Play production status (still shown below as internal-testing-only as of 2026-06-21).
+
 ### 2026-06-21 Release Gate Check
 - Mobile typecheck: PASS (`npx tsc --noEmit` in mobile).
 - Backend build: PASS (`npm run build` in backend).
@@ -49,7 +57,10 @@ Top known lint categories (frontend):
 ## Apple Status
 
 ### Current Apple State
-- App Store Connect inflight status: `1.0 Waiting for Review`
+- **Live on the App Store** (confirmed 2026-08-05 via public iTunes lookup API): https://apps.apple.com/us/app/nxq-social/id6775623679
+- Current live version: `1.0.6`, released `2026-07-19`
+- Original release date: `2026-06-22`
+- Prior tracked status (now superseded): App Store Connect inflight status `1.0 Waiting for Review`
 - Expo submission status: `Success`
 - Submission ID: `7fada23c-0895-4c98-bd20-b53e3deead85`
 
@@ -62,7 +73,7 @@ File: mobile/app/register.tsx
 
 ### Why Apple Is In Good Shape
 - iOS submission pipeline executed successfully.
-- Live App Store Connect status shows the app waiting for review.
+- App is live on the App Store, currently at version 1.0.6.
 - No current Apple blocker is known from the latest captured status.
 
 ## Google Play Status
