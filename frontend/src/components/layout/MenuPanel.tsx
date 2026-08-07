@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import { useRouter } from 'next/navigation';
 import {
@@ -10,7 +10,7 @@ import {
 import { Avatar } from '@/components/ui/Avatar';
 import { TrustBadge } from '@/components/ui/TrustBadge';
 import { useAuthStore } from '@/store/auth';
-import { callsVisible } from '@/lib/calls';
+import { callsVisible, fetchCallServerConfig } from '@/lib/calls';
 import { liveVisible } from '@/lib/live';
 
 interface Props {
@@ -47,6 +47,7 @@ export function MenuPanel({ onClose }: Props) {
   const pathname = usePathname();
   const router = useRouter();
   const { user, logout } = useAuthStore();
+  const [callConfigured, setCallConfigured] = useState(false);
 
   // Close on Escape
   useEffect(() => {
@@ -54,6 +55,16 @@ export function MenuPanel({ onClose }: Props) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
+
+  useEffect(() => {
+    let active = true;
+    fetchCallServerConfig().then((cfg) => {
+      if (active) setCallConfigured(cfg.enabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const go = (href: string) => { onClose(); router.push(href); };
 
@@ -121,7 +132,7 @@ export function MenuPanel({ onClose }: Props) {
               ))}
 
               {/* Call entry, gated by flag/role */}
-              {callsVisible(user?.role) && (
+              {callsVisible(user?.role) && callConfigured && (
                 <button
                   onClick={() => go('/call/new')}
                   className="group flex items-start gap-3 p-3 rounded-2xl bg-white ring-1 ring-gray-100 hover:ring-purple-200 hover:shadow-md transition-all text-left"

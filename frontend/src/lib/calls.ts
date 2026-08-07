@@ -1,6 +1,11 @@
 import { api } from '@/lib/api';
 import type { CallType } from '@/store/call';
 
+export interface CallServerConfig {
+  enabled: boolean;
+  url: string;
+}
+
 /** Build a deterministic-ish unique room id for a call. */
 export function newRoomId(prefix = 'call'): string {
   const rand = Math.random().toString(36).slice(2, 8);
@@ -17,6 +22,11 @@ export async function startCall(opts: {
   callType?: CallType;
   group?: boolean;
 }): Promise<string> {
+  const config = await fetchCallServerConfig();
+  if (!config.enabled) {
+    throw new Error('Calling is not configured on this server yet.');
+  }
+
   const video = opts.callType ? opts.callType === 'video' : (opts.video ?? true);
   const group = opts.group ?? opts.targets.length > 1;
   const room = newRoomId(group ? 'group' : 'call');
@@ -50,4 +60,16 @@ export function callHref(room: string, video: boolean): string {
  */
 export function callsVisible(role?: string): boolean {
   return process.env.NEXT_PUBLIC_CALLS_ENABLED === 'true' || role === 'ADMIN';
+}
+
+export async function fetchCallServerConfig(): Promise<CallServerConfig> {
+  try {
+    const { data } = await api.get('/calls/config');
+    return {
+      enabled: !!data?.enabled,
+      url: typeof data?.url === 'string' ? data.url : '',
+    };
+  } catch {
+    return { enabled: false, url: '' };
+  }
 }
