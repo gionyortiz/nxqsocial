@@ -41,6 +41,10 @@ export class CallsService {
     return this.config.get<string>('LIVEKIT_URL') ?? '';
   }
 
+  get isConfigured() {
+    return !!(this.wsUrl && this.apiKey && this.apiSecret);
+  }
+
   /** Generate a LiveKit access token for the given user to join a room. */
   async createToken(
     userId: string,

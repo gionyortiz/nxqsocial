@@ -12,7 +12,7 @@ export class CallsController {
   /** Returns whether calling is configured + the LiveKit ws URL for the client. */
   @Get('config')
   config() {
-    return { enabled: !!this.calls.wsUrl, url: this.calls.wsUrl };
+    return { enabled: this.calls.isConfigured, url: this.calls.wsUrl };
   }
 
   /** Mint a LiveKit access token to join a room. */

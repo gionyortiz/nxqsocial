@@ -26,6 +26,7 @@ export default function NewCallPage() {
   const [results, setResults] = useState<UserLite[]>([]);
   const [selected, setSelected] = useState<UserLite[]>([]);
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
   const preferredType = useState<'voice' | 'video'>(() => {
     if (typeof window === 'undefined') return 'video';
     const param = new URLSearchParams(window.location.search).get('type');
@@ -58,6 +59,7 @@ export default function NewCallPage() {
   const start = async (video: boolean) => {
     if (selected.length === 0 || starting) return;
     setStarting(true);
+    setStartError(null);
     const group = selected.length > 1;
     const callType = video ? 'video' as const : 'voice' as const;
     void trackEvent('call_started', { video, group, targetCount: selected.length });
@@ -66,21 +68,31 @@ export default function NewCallPage() {
       group,
       targetCount: selected.length,
     });
-    const room = await startCall({
-      targets: selected.map((s) => s.username),
-      callType,
-      group,
-    });
-    beginCall(room, {
-      video,
-      callType,
-      peer: group ? { username: 'group', displayName: `${selected.length} people` } : {
-        username: selected[0].username,
-        displayName: selected[0].displayName,
-        avatarUrl: selected[0].avatarUrl,
-      },
-    });
-    router.push('/feed');
+    try {
+      const room = await startCall({
+        targets: selected.map((s) => s.username),
+        callType,
+        group,
+      });
+      beginCall(room, {
+        video,
+        callType,
+        peer: group ? { username: 'group', displayName: `${selected.length} people` } : {
+          username: selected[0].username,
+          displayName: selected[0].displayName,
+          avatarUrl: selected[0].avatarUrl,
+        },
+      });
+      router.push('/feed');
+    } catch (err: any) {
+      setStartError(
+        err?.response?.data?.message
+        || err?.message
+        || 'Calling is not available right now.',
+      );
+    } finally {
+      setStarting(false);
+    }
   };
 
   return (
@@ -118,6 +130,12 @@ export default function NewCallPage() {
             className="w-full pl-10 pr-4 py-3 rounded-2xl border border-gray-200 focus:border-purple-400 focus:ring-2 focus:ring-purple-100 outline-none text-sm"
           />
         </div>
+
+        {startError && (
+          <div className="mb-4 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
+            {startError}
+          </div>
+        )}
 
         {/* Results */}
         <div className="flex flex-col divide-y divide-gray-100 rounded-2xl border border-gray-100 bg-white overflow-hidden mb-24">
