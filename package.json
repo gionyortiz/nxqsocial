@@ -4,11 +4,19 @@
   "scripts": {
     "dev:backend": "cd backend && npm run start:dev",
     "dev:frontend": "cd frontend && npm run dev -- --port 3001",
+    "build:backend": "npm --prefix backend run build",
+    "build:frontend": "npm --prefix frontend run build",
+    "test:backend": "npm --prefix backend test -- --runInBand",
+    "test:backend:e2e": "npm --prefix backend run test:e2e",
+    "test:frontend": "npm --prefix frontend test",
+    "test:scripts": "node --test scripts/*.test.js",
     "db:up": "docker-compose up -d",
     "db:down": "docker-compose down",
     "db:migrate": "cd backend && npx prisma migrate dev",
     "db:studio": "cd backend && npx prisma studio",
     "install:all": "cd backend && npm install && cd ../frontend && npm install",
-    "ops:verify": "node scripts/prod-verify.js"
+    "ops:verify": "node scripts/prod-verify.js",
+    "ops:ready": "node scripts/readiness-check.js",
+    "smoke:staging": "node scripts/smoke-test.js"
   }
 }

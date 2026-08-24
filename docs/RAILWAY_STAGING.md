@@ -87,6 +87,31 @@ Create four services in one Railway staging environment:
 Use Railway private networking for PostgreSQL and Redis. Do not define a fixed
 Railway `PORT`; Railway injects it. The web containers bind to `0.0.0.0`.
 
+## Repository deployment configuration
+
+Railway's legacy per-service `railway.json` / `railway.toml` Config as Code is
+deprecated and new services cannot opt into it. NXQ Social therefore uses the
+project-level Infrastructure-as-Code definition at `.railway/railway.ts`.
+
+Before any apply:
+
+1. Commit and push the IaC definition, provider preflight, CI workflow, tests,
+   and deletion of both legacy `railway.json` files atomically on the reviewed
+   release branch.
+2. Run `npm ci --prefix .railway` and `npm --prefix .railway run plan:verbose`
+   with the pinned external Railway CLI described in `.railway/README.md`.
+3. Require the wrapper to confirm the exact `nxq-social-staging` project and
+   `staging` environment. Stop if it cannot prove both identities.
+4. Require the plan to be exactly `2 to add, 0 to change, 0 to destroy`, with
+   only the `backend` and `frontend` services added. Any database, Redis,
+   volume, domain, image, production resource, change, or deletion stops the
+   rollout.
+5. Keep GitHub check-suite waiting enabled. A pushed revision is not eligible
+   for Railway deployment until CI passes on that exact commit.
+
+Planning is read-only. `railway config apply`, service creation, variable
+injection, domains, and deployment remain separate operational actions.
+
 ## Backend deployment settings
 
 - Root directory: `/backend`
@@ -95,31 +120,41 @@ Railway `PORT`; Railway injects it. The web containers bind to `0.0.0.0`.
   graph requires Node 22; keep the build and runtime major aligned and do not
   downgrade to Node 20 without a clean install, migration, and startup smoke
   test.
-- Pre-deploy command: `npm run db:migrate:deploy`
+- Pre-deploy sequence: `node dist/scripts/release-provider-preflight.js`
+  **first**, then `npm run db:migrate:deploy` only if preflight succeeds
 - Start command: leave unset (`npm run start:prod` is the image command)
 - Healthcheck path: `/api/health/ready`
 - Healthcheck timeout: 300 seconds
-- Config-as-code path: `/backend/railway.json`
+- Project IaC source: `/.railway/railway.ts`
 - Restart policy: on failure, at most 5 retries (prevents an unbounded staging
   crash loop from consuming the authorized budget)
 - Draining time: at least 20 seconds
 
-The pre-deploy command has no persistent volume and must only run Prisma
-migrations. Never run the local-media migration or video backfill as a
-pre-deploy command. The Windows Compose deployment deliberately uses
+The pre-deploy container has no persistent volume. Its only permitted sequence
+is the offline, read-only provider/application-target preflight followed by
+Prisma migrations; a preflight failure must prevent the migration command from
+starting. Never run the local-media migration or video backfill as a pre-deploy
+command. The Windows Compose deployment deliberately uses
 `npm run start:with-migrations` for its existing single backend instance.
 
-Set backend variables in Railway without committing their values:
+The project IaC pins the non-secret staging target and application origins and
+uses Railway references for private database/Redis URLs:
 
 ```text
 NODE_ENV=production
+NXQ_RELEASE_TARGET=staging
 DATABASE_URL=${{Postgres.DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
+FRONTEND_URL=https://staging.nxqsocial.com
+APP_BASE_URL=https://staging.nxqsocial.com
+API_BASE_URL=https://api-staging.nxqsocial.com/api
+```
+
+Set the remaining backend values in Railway without committing their values:
+
+```text
 JWT_SECRET
 JWT_EXPIRES_IN
-FRONTEND_URL
-APP_BASE_URL
-API_BASE_URL
 SIGNUP_HARDENING_ENABLED=true
 TURNSTILE_SECRET_KEY
 TURNSTILE_ALLOWED_HOSTNAMES
@@ -152,6 +187,21 @@ TRUSTED_PROXY_IPS
 TRUSTED_PROXY_CIDRS
 CLOUDFLARE_PROXY_CIDRS
 ```
+
+The application origins are not free-form staging inputs. They must remain this
+single approved set; the release preflight rejects missing, alternate,
+generated Railway, preview, or production values before any migration runs:
+
+```text
+FRONTEND_URL=https://staging.nxqsocial.com
+APP_BASE_URL=https://staging.nxqsocial.com
+API_BASE_URL=https://api-staging.nxqsocial.com/api
+```
+
+`FRONTEND_URL` must contain only that one origin in staging. Keep the `/api`
+suffix on `API_BASE_URL`. These values pin application-generated links, CORS,
+and media URLs to the same reviewed staging boundary; they do not create or
+attach either hostname.
 
 `S3_PUBLIC_BASE_URL` must be the staging public-media hostname. It must never be
 the R2 API endpoint or production `media.nxqsocial.com`. The backend refuses to
@@ -188,7 +238,7 @@ exact staging frontend origin and only the required method/header, for example:
 ```json
 [
   {
-    "AllowedOrigins": ["https://staging.example.invalid"],
+    "AllowedOrigins": ["https://staging.nxqsocial.com"],
     "AllowedMethods": ["PUT"],
     "AllowedHeaders": ["Content-Type"],
     "MaxAgeSeconds": 3600
@@ -196,8 +246,9 @@ exact staging frontend origin and only the required method/header, for example:
 ]
 ```
 
-Replace the example hostname before applying the rule. Use two exact-prefix
-lifecycle rules on the quarantine bucket:
+Do not apply this rule until the approved staging hostname is actually attached
+and Access/synthetic-data exposure is ready. Use two exact-prefix lifecycle
+rules on the quarantine bucket:
 
 - expire client-writable `incoming/` objects after 1 day; the application first
   reclaims PENDING rows after the 10-minute presign plus a 60-minute slow-upload
@@ -243,24 +294,29 @@ signature enforcement; never bypass Access for the whole API.
 - Start command: leave unset (standalone Next.js image command)
 - Healthcheck path: `/health`
 - Healthcheck timeout: 300 seconds
-- Config-as-code path: `/frontend/railway.json`
+- Project IaC source: `/.railway/railway.ts`
 - Restart policy: on failure, at most 5 retries
 - Draining time: at least 20 seconds
 
-Set these build variables before the first build:
+The project IaC pins the first three non-secret build variables. Supply the
+remaining staging-only values before the first build:
 
 ```text
-NEXT_PUBLIC_API_URL=https://<backend-staging-host>/api
+NXQ_RELEASE_TARGET=staging
+NEXT_PUBLIC_APP_URL=https://staging.nxqsocial.com
+NEXT_PUBLIC_API_URL=https://api-staging.nxqsocial.com/api
 NEXT_PUBLIC_TURNSTILE_SITE_KEY
 NEXT_PUBLIC_CALLS_ENABLED=true
 NEXT_PUBLIC_LIVE_ENABLED=true
 ```
 
-The Docker build rejects an empty, local, non-HTTPS, malformed, or non-`/api`
-API target and a placeholder Turnstile site key. `NEXT_PUBLIC_*` values are
-compiled into the browser bundle; rebuild after every change. If calls or live
-are intentionally disabled, record the verification result as partial rather
-than claiming the full release gate passed.
+The Docker build requires the explicit release target and rejects any app/API
+pair other than the exact approved pair for that target, including a staging
+build aimed at production. It also rejects a placeholder Turnstile site key.
+`NEXT_PUBLIC_*` values are compiled into the browser bundle; rebuild after every
+change. These values do not create domains. If calls or live are intentionally
+disabled, record the verification result as partial rather than claiming the
+full release gate passed.
 
 ## Restore and local-media migration
 

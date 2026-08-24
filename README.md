@@ -2,8 +2,10 @@
 
 A trust-first social platform for verified humans — safer feeds, creator-first media, and anti-bot protection.
 
-> **Status: Release candidate** — open-registration hardening is implemented;
-> Railway staging verification and production rollout are still pending.
+> **Status: Release candidate** — open-registration hardening, Railway
+> Infrastructure as Code, CI, and fail-closed staging checks are implemented.
+> Isolated provider credentials, the bounded Railway staging deployment, full
+> end-to-end verification, and production rollout are still pending.
 
 ## Release Status
 

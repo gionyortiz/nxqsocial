@@ -6,6 +6,7 @@ export class MailService {
   private readonly logger = new Logger(MailService.name);
   private readonly resend: Resend | null;
   private readonly from: string;
+  private readonly verificationUrl: string;
 
   constructor() {
     const apiKey = process.env.RESEND_API_KEY;
@@ -13,9 +14,12 @@ export class MailService {
       process.env.EMAIL_FROM ??
       process.env.MAIL_FROM ??
       'NXQ Social <onboarding@resend.dev>';
+    this.verificationUrl = verificationUrlFromEnvironment(process.env);
     this.resend = apiKey ? new Resend(apiKey) : null;
     if (!this.resend) {
-      this.logger.warn('RESEND_API_KEY not set — emails will be logged, not sent.');
+      this.logger.warn(
+        'RESEND_API_KEY not set — emails will be logged, not sent.',
+      );
     }
   }
 
@@ -59,22 +63,24 @@ export class MailService {
       }
       return true;
     } catch (err) {
-      this.logger.error(`Failed to send reset email to ${to}`, err as any);
+      this.logger.error(`Failed to send reset email to ${to}`, err);
       return false;
     }
   }
 
   async sendVerificationEmail(to: string, username: string) {
     const subject = 'Verify your NXQ Social email';
+    const safeUsername = escapeHtml(username);
+    const safeVerificationUrl = escapeHtml(this.verificationUrl);
     const html = `
       <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">
-        <h2 style="color:#7c3aed;margin:0 0 12px;">Verify your email, @${username}</h2>
+        <h2 style="color:#7c3aed;margin:0 0 12px;">Verify your email, @${safeUsername}</h2>
         <p style="color:#374151;font-size:15px;line-height:1.6;">
           An admin has requested that you verify your email address on NXQ Social.
           Please log in and go to Settings → Verify to complete the process.
         </p>
         <p style="margin:24px 0;">
-          <a href="https://nxqsocial.com/verify" style="background:#7c3aed;color:#fff;text-decoration:none;
+          <a href="${safeVerificationUrl}" style="background:#7c3aed;color:#fff;text-decoration:none;
              padding:12px 24px;border-radius:9999px;font-weight:600;display:inline-block;">
             Go to Verify
           </a>
@@ -103,8 +109,77 @@ export class MailService {
       }
       return true;
     } catch (err) {
-      this.logger.error(`Failed to send verification email to ${to}`, err as any);
+      this.logger.error(`Failed to send verification email to ${to}`, err);
       return false;
     }
   }
+}
+
+type MailEnvironment = Record<string, string | undefined>;
+
+/**
+ * Resolve the public verification route without ever falling back to the
+ * production hostname. Production accepts only an exact canonical HTTPS
+ * origin. Development and tests may use an exact localhost HTTP origin and
+ * otherwise default to the local frontend.
+ */
+export function verificationUrlFromEnvironment(
+  environment: MailEnvironment,
+): string {
+  const production = environment.NODE_ENV?.trim() === 'production';
+  const configured = environment.APP_BASE_URL?.trim();
+  const baseUrl = configured || (production ? '' : 'http://localhost:3001');
+
+  if (!baseUrl) {
+    throw new Error(
+      'APP_BASE_URL is required to build verification email links in production',
+    );
+  }
+
+  let parsed: URL;
+  try {
+    parsed = new URL(baseUrl);
+  } catch {
+    throw new Error(
+      'APP_BASE_URL must be an exact canonical HTTPS origin for verification email links',
+    );
+  }
+
+  const canonicalOrigin = parsed.origin;
+  const isExactOrigin =
+    baseUrl === canonicalOrigin &&
+    parsed.pathname === '/' &&
+    !parsed.username &&
+    !parsed.password &&
+    !parsed.search &&
+    !parsed.hash;
+  const isHttps = parsed.protocol === 'https:';
+  const isLocalDevelopmentHttp =
+    !production &&
+    parsed.protocol === 'http:' &&
+    ['localhost', '127.0.0.1', '[::1]'].includes(parsed.hostname);
+
+  if (!isExactOrigin || (!isHttps && !isLocalDevelopmentHttp)) {
+    throw new Error(
+      production
+        ? 'APP_BASE_URL must be an exact canonical HTTPS origin for verification email links'
+        : 'APP_BASE_URL must be an exact HTTPS origin or localhost HTTP origin for verification email links',
+    );
+  }
+
+  return `${canonicalOrigin}/verify`;
+}
+
+function escapeHtml(value: string): string {
+  return value.replace(
+    /[&<>"']/g,
+    (character) =>
+      ({
+        '&': '&amp;',
+        '<': '&lt;',
+        '>': '&gt;',
+        '"': '&quot;',
+        "'": '&#39;',
+      })[character]!,
+  );
 }

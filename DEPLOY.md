@@ -4,8 +4,16 @@
 
 Cross-platform Apple + Google Play release tracking is maintained in [docs/NXQ_SOCIAL_RELEASE_STATUS.md](docs/NXQ_SOCIAL_RELEASE_STATUS.md).
 
-> **Target environment:** Docker Compose on a single VPS (e.g., Hetzner CX21, DigitalOcean Droplet, AWS EC2).  
-> Adapting to Kubernetes or managed PaaS is straightforward � the Docker images are self-contained.
+> **Permanent production target:** Railway frontend/backend with Railway
+> PostgreSQL and Redis, Cloudflare DNS and R2 media, LiveKit Cloud, Resend,
+> Stripe, and Turnstile. See
+> [docs/RAILWAY_STAGING.md](docs/RAILWAY_STAGING.md) for the authoritative,
+> gated rollout procedure.
+>
+> The Docker Compose procedure below is retained for local development and the
+> temporary Windows rollback deployment. It is not the zero-PC production
+> architecture and must not be used as evidence that Railway staging or a
+> production cutover passed.
 
 ---
 
@@ -274,9 +282,12 @@ Migrations run automatically on backend restart.
 
 ---
 
-## Monitoring (optional)
+## Monitoring (required before production cutover)
 
-For production observability consider:
+External uptime monitoring is a release gate because Railway deployment health
+checks are not continuous monitoring. Error, metric, and log aggregation may be
+introduced incrementally, but the public web and API readiness endpoints must
+be monitored before DNS cutover.
 
 - **Uptime monitoring:** Better Uptime, UptimeRobot (ping `/api/health/ready`)
 - **Error tracking:** Sentry (add `@sentry/nestjs` + `@sentry/nextjs`)

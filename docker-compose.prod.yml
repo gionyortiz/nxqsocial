@@ -68,6 +68,8 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
+        NXQ_RELEASE_TARGET: production
+        NEXT_PUBLIC_APP_URL: https://nxqsocial.com
         NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required and must be the public HTTPS API URL ending in /api}
         NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?NEXT_PUBLIC_TURNSTILE_SITE_KEY is required}
         NEXT_PUBLIC_CALLS_ENABLED: ${NEXT_PUBLIC_CALLS_ENABLED:-false}

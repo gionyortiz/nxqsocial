@@ -1,0 +1,16 @@
+{
+  "name": "nxq-social-railway-iac",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "plan": "node plan.mjs",
+    "plan:verbose": "node plan.mjs --verbose",
+    "validate": "node --import tsx validate.mjs"
+  },
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "railway": "3.11.0"
+  }
+}

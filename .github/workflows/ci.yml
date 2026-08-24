@@ -1,0 +1,192 @@
+name: CI
+
+on:
+  push:
+    branches:
+      - main
+      - "release/**"
+    paths:
+      - ".github/workflows/ci.yml"
+      - "backend/**"
+      - "frontend/**"
+      - ".railway/**"
+      - "scripts/**"
+      - "package.json"
+  pull_request:
+    paths:
+      - ".github/workflows/ci.yml"
+      - "backend/**"
+      - "frontend/**"
+      - ".railway/**"
+      - "scripts/**"
+      - "package.json"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  backend:
+    name: Backend build, unit, and E2E
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: nxqsocial_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres -d nxqsocial_test"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      redis:
+        image: redis:8.2-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+    env:
+      CI: "true"
+      NODE_ENV: test
+      DATABASE_URL: postgresql://postgres:postgres@127.0.0.1:5432/nxqsocial_test
+      DATABASE_URL_TEST: postgresql://postgres:postgres@127.0.0.1:5432/nxqsocial_test
+      REDIS_URL: redis://127.0.0.1:6379
+      JWT_SECRET: ci-only-synthetic-jwt-secret-with-at-least-32-characters
+      OTP_PEPPER: ci-only-synthetic-otp-pepper-with-at-least-32-characters
+      STRIPE_SECRET_KEY: sk_test_ci_synthetic_not_a_provider_credential
+      # Matches the local E2E fixtures; it is not a provider credential.
+      STRIPE_WEBHOOK_SECRET: whsec_e2e_test_secret_nexasocial
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: backend/package-lock.json
+
+      - name: Install backend dependencies
+        working-directory: backend
+        run: npm ci
+
+      - name: Generate Prisma client
+        working-directory: backend
+        run: npm run prisma:generate
+
+      - name: Apply test database migrations
+        working-directory: backend
+        run: npm run db:migrate:deploy
+
+      - name: Build backend
+        working-directory: backend
+        run: npm run build
+
+      - name: Run backend unit tests
+        working-directory: backend
+        run: npm test -- --runInBand
+
+      - name: Run backend E2E tests
+        working-directory: backend
+        run: npm run test:e2e
+
+  frontend:
+    name: Frontend test and build
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    env:
+      CI: "true"
+      NEXT_TELEMETRY_DISABLED: "1"
+      NEXT_PUBLIC_API_URL: http://127.0.0.1:3000/api
+      NEXT_PUBLIC_CALLS_ENABLED: "false"
+      NEXT_PUBLIC_LIVE_ENABLED: "false"
+      NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Install frontend dependencies
+        working-directory: frontend
+        run: npm ci
+
+      - name: Run frontend tests
+        working-directory: frontend
+        run: npm test
+
+      - name: Build frontend
+        working-directory: frontend
+        run: npm run build
+
+  operational-scripts:
+    name: Operational script safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+
+      - name: Run script safety tests
+        run: npm run test:scripts
+
+      - name: Check operational script syntax
+        run: |
+          node --check scripts/smoke-test.js
+          node --check scripts/readiness-check.js
+          node --check scripts/prod-verify.js
+
+  railway-iac-safety:
+    name: Railway IaC offline safety
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v6
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: .railway/package-lock.json
+
+      - name: Verify IaC source and lock files exist
+        shell: bash
+        run: |
+          test -s .railway/package.json
+          test -s .railway/package-lock.json
+          test -s .railway/plan.mjs
+          test -s .railway/railway.ts
+
+      - name: Install lockfile-pinned IaC dependencies
+        run: npm ci --prefix .railway
+
+      - name: Syntax-check offline plan entrypoint
+        run: node --check .railway/plan.mjs
+
+      - name: Parse and evaluate the IaC definition offline
+        run: npm --prefix .railway run validate
