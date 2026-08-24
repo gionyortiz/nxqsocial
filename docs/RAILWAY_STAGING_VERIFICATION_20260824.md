@@ -6,7 +6,9 @@
 - Not authorized or performed: production DNS cutover, Railway Pro upgrade,
   App Store/Expo publication, Windows deployment deletion, or production data
   mutation.
-- Railway project/services created so far: **none**.
+- Railway project created: `nxq-social-staging`. Its default `production`
+  environment is empty; all NXQ resources are scoped to the separate `staging`
+  environment.
 - Source branch: `release/railway-staging-20260823`.
 - Verified application-code commit: `c0f8626816583ce5e4d38738d405543253363ca8`,
   pushed to `origin/release/railway-staging-20260823`. Any following commit in
@@ -18,7 +20,9 @@
 
 - Authenticated Railway workspace contained three unrelated projects before
   NXQ staging.
-- Current billing-period usage at the preflight snapshot was $3.86.
+- Current billing-period usage was rechecked in the signed-in Railway dashboard
+  immediately before provisioning: $3.87 for Jul 23 through Aug 23, with $5.00
+  included usage.
 - No workspace compute usage limit was configured.
 - A workspace-wide hard limit was deliberately not changed because reaching it
   can stop unrelated projects. NXQ staging will use bounded service resources,
@@ -31,6 +35,35 @@
   to seven days, with the NXQ project stopped at $12 estimated usage to retain
   a $3 safety margin. This is a manual project-level gate; no workspace-wide
   limit will be changed.
+
+## Railway provisioning evidence
+
+- Project: `nxq-social-staging` in the existing shared Hobby workspace.
+- Environment: `staging`; the automatically created `production` environment
+  remains empty.
+- PostgreSQL service: `Postgres`, pinned to
+  `ghcr.io/railwayapp-templates/postgres-ssl:16` to match the verified
+  PostgreSQL 16 backup baseline. Its Railway private-network endpoint reached
+  the ready state; no application data was restored.
+- Redis service: `Redis`, Railway template image `redis:8.2`. Its Railway
+  private-network endpoint reached the ready state; production Redis keys were
+  not copied.
+- Neither service has an application web domain. No frontend or backend service
+  was created, linked, or deployed.
+- After provisioning verification, both database deployments were removed so
+  they consume no ongoing compute while external staging providers are
+  unavailable. Their service definitions, generated staging-only credentials,
+  and empty persistent volumes remain in the `staging` environment for a later
+  controlled restart.
+- No workspace-wide budget or usage limit was changed, and no unrelated Railway
+  project or service was modified.
+
+The repository has no audited production-data sanitizer and no demonstrably
+sanitized dump. The retained archive is a raw production backup. It was not
+uploaded to Railway and must not be attached to a running backend. Until a
+versioned sanitizer and zero-leak assertion suite are implemented and reviewed,
+application staging must use a fresh migrated database with synthetic accounts
+and content.
 
 ## Production backup and independent restore proof
 
@@ -140,11 +173,14 @@ build or update was started during this staging work.
 1.0.1 value to the already identified 1.0.6 binaries. It does not introduce a
 1.0.7 version and did not trigger a build, OTA update, or store publication.
 
-## Remaining gates before creating Railway services
+## Remaining gates before deploying Railway application services
 
 - Prepare staging-only R2 public/quarantine storage, AWS moderation,
   Turnstile, mail sink, Stripe test, and LiveKit credentials. Production
   credentials and recipient data must not be reused.
+- Restart the stopped PostgreSQL and Redis deployments only for a bounded test
+  window, apply all 17 migrations to the fresh staging database, and populate
+  synthetic fixtures. Do not upload the raw production dump.
 - Reconfirm that the deployed Railway source contains the verified application
   commit above and repeat the diff/secret gate on the exact deploy revision.
 - Keep mobile publication blocked until the Hermes regression is removed and a
