@@ -10,6 +10,8 @@ Base HEAD: `b2553be0d9dc7f96293b1779b462d54c1e1ce001`
 
 Initial migration commit: `945321e212a50d3c3ce1815bc12963ca87ec9466`
 
+SDK 57 patch-alignment commit: `96c7ecd9848f121c75060b234f4cc16837cfb7d0`
+
 ## Scope boundary
 
 This record began with an uncommitted code-only migration candidate. The two

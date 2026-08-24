@@ -189,3 +189,18 @@ build or update was started during this staging work.
 No production cutover can be considered until the full end-to-end checklist in
 `RAILWAY_STAGING.md` passes against staging and the separately required second
 restore rehearsal also matches.
+
+## Post-record local infrastructure rehearsal
+
+After the mobile-only SDK 57 commits, branch tip
+`f0493289e08d26d7ce9f80a429a45301d30f5d38` was checked with disposable local
+infrastructure. A fresh PostgreSQL 16 database applied all 17 Prisma migrations;
+an immediate second `prisma migrate deploy` reported no pending migrations and
+the completed migration ledger remained at 17. The resulting `public` schema
+contained 28 tables. A fresh Redis 8.2 container passed set/get/delete and the
+deleted key no longer existed. The disposable containers and network were then
+removed, with zero labeled rehearsal resources remaining.
+
+This local synthetic/empty-data check did not restart Railway, upload a
+production backup, exercise provider credentials, or satisfy the required
+bounded Railway deployment and second backup-restore gates above.
