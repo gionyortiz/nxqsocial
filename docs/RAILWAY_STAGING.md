@@ -14,6 +14,13 @@ not proof that Cloudflare can reach the host: after using it, verify
 `https://nxqsocial.com` and the public API from an independent network before
 declaring a 1033/523 incident recovered.
 
+Do not leave a remotely managed Cloudflare tunnel token in the scheduled-task
+command line. Configure `cloudflared` with `--token-file` and restrict that
+file's ACL to the task principal plus the minimum recovery principals. This is
+local containment only: if a token was exposed, rotate it in Cloudflare and
+force-disconnect the old connectors as documented in Cloudflare's
+[compromised-token procedure](https://developers.cloudflare.com/tunnel/advanced/tunnel-tokens/#rotate-a-compromised-token).
+
 ## Stop conditions
 
 Do not create or expose staging until all of the following are true:
