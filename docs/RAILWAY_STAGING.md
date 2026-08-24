@@ -345,11 +345,14 @@ rejected previously published asset stops the release.
 After storage/config smoke tests pass, expose only the sanitized/access-gated
 staging services and verify all of the following on web. Mobile registration is
 an explicit blocked lane under the current authorization: the store binary does
-not contain the new native WebView dependency, and every existing EAS profile
-targets production hosts. Do not point an existing profile at staging or call
-mobile E2E passed. A separately authorized internal native build with a
-staging-only API and Turnstile host must pass the same checks before mobile can
-be promoted.
+not contain the new native WebView dependency. The isolated `staging-native`
+profile now exists, but it is deliberately locked behind required staging URLs,
+a separate Expo project ID, and an explicit readiness gate; the default internal
+build scripts target that locked profile. Do not substitute the legacy
+production-routed `preview` profile, unlock or build `staging-native` before its
+resources and build authorization exist, or call mobile E2E passed. An
+authorized internal native build must pass the same checks before mobile can be
+promoted.
 
 - registration with password confirmation, Turnstile, email verification,
   resend/rate limits, login, logout, password reset, and bot-abuse controls;
