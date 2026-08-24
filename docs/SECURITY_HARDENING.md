@@ -1,19 +1,23 @@
 # NXQ Social — Security Hardening Record
 
-This document records the security controls implemented for NXQ Social and the
-follow-up tasks required before a wider public launch. It reflects the verified
-state of the codebase as of the latest deployment.
+This document records the security controls implemented in the NXQ Social
+staging-candidate code and the follow-up tasks required before a wider public
+launch. These uncommitted changes are not the latest production deployment.
+The verified live runtime remains Windows Docker behind a Cloudflare tunnel;
+Railway is an unprovisioned staging target.
 
 > Scope: backend (NestJS 11 + Prisma + PostgreSQL + Redis), frontend
-> (Next.js 16), and production infrastructure (Hetzner VPS, Docker Compose).
+> (Next.js 16), the current Windows Docker rollback deployment, and the planned
+> Railway staging environment.
 
 ---
 
 ## 1. Transport security (HTTPS / SSL)
 
-- Nginx reverse proxy in front of the application containers.
-- Let's Encrypt SSL certificates.
-- HTTPS enabled for `nxqsocial.com` and `api.nxqsocial.com`.
+- Cloudflare currently terminates public HTTPS in front of the Windows-hosted
+  tunnel. Railway proxy and custom-domain behavior must be reverified in
+  staging before any DNS change.
+- HTTPS is currently enabled for `nxqsocial.com` and `api.nxqsocial.com`.
 - API served behind the `/api` global prefix.
 
 ---
@@ -28,7 +32,7 @@ state of the codebase as of the latest deployment.
 - **Graceful shutdown** hooks enabled.
 - **Health endpoints**:
   - `GET /api/health`
-  - `GET /api/health/ready` → `{ "status": "ready", "checks": { "database": "ok", "redis": "ok" } }`
+  - `GET /api/health/ready` → `{ "status": "ready", "checks": { "database": "ok", "redis": "ok", "storage": "ok" } }`
 
 ---
 
@@ -64,13 +68,18 @@ mirror these rules to give users clear inline guidance.
 ## 5. Rate limiting
 
 Implemented with `@nestjs/throttler`, scoped **per-route** (not a global guard)
-so normal polling traffic is unaffected. Throttling is skipped under
-`NODE_ENV=test` so the E2E suite can register/login freely.
+so normal polling traffic is unaffected. Counters and block windows use shared
+Redis storage so restarts and multiple backend replicas cannot reset or split
+the limits. Storage failures return a bounded `503` instead of silently
+disabling the gate. Throttling is skipped under `NODE_ENV=test` so the E2E
+suite can register/login freely.
 
 | Endpoint | Limit |
 | --- | --- |
-| `POST /api/auth/login` | 5 / minute |
-| `POST /api/auth/register` | 5 / 5 minutes |
+| `POST /api/auth/login` | 20 / minute |
+| `POST /api/auth/register` | 20 / 10 minutes; valid Turnstile is also required |
+| `POST /api/auth/verify-email` | 10 / 10 minutes; a code is invalidated after 5 wrong attempts |
+| `POST /api/auth/resend-verification` | 3 / 10 minutes plus a 60-second resend cooldown |
 | `POST /api/auth/forgot-password` | 3 / 10 minutes |
 | `POST /api/auth/reset-password` | 5 / 10 minutes |
 | `POST /api/media/create-upload-url` | 30 / hour |
@@ -159,7 +168,7 @@ Verified ownership checks and covered by `authorization.e2e-spec.ts`:
   (verified via `git log --all -- password.txt`).
 - No secret files are currently staged or tracked.
 - **Recommended:** rotate any credentials that may have been shared outside the
-  repo (including the beta invite code) before inviting beta users.
+  repo before opening registration to beta users.
 
 ---
 
@@ -182,12 +191,14 @@ Verified ownership checks and covered by `authorization.e2e-spec.ts`:
 
 ## 13. Known follow-up security tasks
 
-- Rotate all potentially-exposed secrets (DB, Redis, admin, beta invite code).
+- Rotate all potentially-exposed secrets (DB, Redis, admin, object storage).
 - Scrub any leaked history if a real secret is ever found committed.
-- Add a dependency audit report (`npm audit --omit=dev` for backend & frontend);
-  current backend finding is 3 **moderate** advisories transitively via
-  `@prisma/dev → @hono/node-server`, a dev-only tool not used in the production
-  runtime (`prisma migrate deploy`). No critical/high.
+- Keep dependency audit reports (`npm audit --omit=dev`) with each release.
+  The current backend toolchain finding is 3 **high** advisories transitively via
+  Prisma CLI's `@prisma/config` / `deepmerge-ts` chain; npm currently offers
+  only a breaking Prisma downgrade. The frontend reports zero vulnerabilities.
+  The mobile toolchain reports 11 **moderate** advisories in Expo/Xcode/UUID
+  dependencies for which npm's suggested force-fix is a breaking downgrade.
 - Enable **GitHub secret scanning** and **Dependabot**.
 - Add magic-byte content sniffing for uploads.
 - Finish avatar/banner profile-media security tests
@@ -201,10 +212,10 @@ Verified ownership checks and covered by `authorization.e2e-spec.ts`:
 
 ## Private Beta Security Status
 
-**Status: Ready for limited private beta after secret rotation and smoke testing.**
+**Status: Not yet approved for a limited private beta.**
 
 The application has strong authentication, authorization, upload, and input
 validation controls in place, with automated tests guarding the highest-risk
 OWASP categories (Broken Access Control, BOLA, mass assignment, and auth safety).
-Complete the secret rotation in §13 and a smoke test before inviting the first
-10–25 beta users.
+Complete the Railway staging durability gates, secret rotation, full E2E/device
+matrix, and the go/no-go checklist before inviting the first 10–25 beta users.

@@ -17,10 +17,24 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     });
   }
 
-  async validate(payload: { sub: string; email: string }) {
-    const user = await this.prisma.user.findUnique({ where: { id: payload.sub } });
+  async validate(payload: { sub: string; email: string; purpose?: string }) {
+    const user = await this.prisma.user.findUnique({
+      where: { id: payload.sub },
+    });
     if (!user) throw new UnauthorizedException();
+    if (
+      payload.purpose === 'email_verification' ||
+      user.emailVerificationRequired
+    ) {
+      throw new UnauthorizedException({
+        statusCode: 401,
+        error: 'Unauthorized',
+        code: 'EMAIL_VERIFICATION_REQUIRED',
+        message: 'Verify your email before using this account.',
+      });
+    }
     const { passwordHash, ...result } = user;
+    void passwordHash;
     return result;
   }
 }

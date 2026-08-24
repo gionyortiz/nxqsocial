@@ -3,13 +3,17 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import helmet from 'helmet';
 import { AppModule } from './app.module';
 import { existsSync, mkdirSync } from 'fs';
+import { isTrustedProxy } from './common/network/client-ip';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
 
   // rawBody: true enables req.rawBody for Stripe webhook signature verification
   const app = await NestFactory.create(AppModule, { rawBody: true });
-  app.getHttpAdapter().getInstance().set('trust proxy', true);
+  app
+    .getHttpAdapter()
+    .getInstance()
+    .set('trust proxy', (address: string) => isTrustedProxy(address));
 
   // ── Security headers ──────────────────────────────────────────────────────
   // crossOriginResourcePolicy must allow cross-origin so /uploads/* avatars

@@ -110,9 +110,12 @@ export class NotificationsService {
       throw new Error('Email OTP delivery is not configured');
     }
 
-    const from = this.config.get<string>('EMAIL_FROM', 'noreply@nxqsocial.com');
+    const from = this.config.get<string>(
+      'EMAIL_FROM',
+      'noreply@mail.nxqsocial.com',
+    );
     try {
-      await this.resend.emails.send({
+      const result = await this.resend.emails.send({
         from,
         to,
         subject: `Your NXQ Social verification code: ${code}`,
@@ -127,6 +130,12 @@ export class NotificationsService {
           </div>
         `,
       });
+      // Resend returns provider/network failures in the result object instead
+      // of always rejecting the promise. Treat either form as a failed send so
+      // signup cannot leave a user waiting for a code that was never delivered.
+      if (result.error) {
+        throw new Error('Email OTP delivery failed');
+      }
       this.logger.log(`Email OTP sent to ${to}`);
     } catch (err: any) {
       this.logger.error(`Failed to send email OTP to ${to}: ${err.message}`);

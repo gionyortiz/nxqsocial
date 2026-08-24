@@ -9,6 +9,25 @@ This is the single source of truth for the current release state across Apple an
 
 ## Status Changelog
 
+### 2026-08-23 Railway-staging worktree superseding gate
+
+- The public App Store state below remains historical evidence for live version
+  `1.0.6`; no newer store state was asserted in this check.
+- The current registration worktree adds native `react-native-webview` for the
+  Turnstile flow. The identified 1.0.6 iOS binary does not contain that module,
+  so this change is **not eligible for an OTA-only update**.
+- Expo Doctor passes 21/22 checks but blocks this worktree on the Expo SDK 56 /
+  Hermes V1 memory regression. A separately reviewed upgrade to Expo 57.0.9+
+  and React Native 0.86.2+ is required before a mobile release candidate.
+- Mobile TypeScript passes. No EAS build, OTA update, App Store submission, or
+  Google Play publication was authorized or started.
+
+Release interpretation for the current worktree: **MOBILE NO-GO** until an
+authorized native staging build includes the WebView dependency, removes the
+Hermes blocker, and passes staging registration/device E2E. This supersedes the
+2026-06-21 “Mobile store readiness: GO” statement for new source changes; it
+does not change the already-live historical 1.0.6 status.
+
 ### 2026-08-05 App Store Live Confirmation
 - Checked public App Store lookup (`itunes.apple.com/lookup?bundleId=com.gionyortiz.nxqsocial`).
 - App is **live** on the App Store: https://apps.apple.com/us/app/nxq-social/id6775623679
@@ -74,7 +93,9 @@ File: mobile/app/register.tsx
 ### Why Apple Is In Good Shape
 - iOS submission pipeline executed successfully.
 - App is live on the App Store, currently at version 1.0.6.
-- No current Apple blocker is known from the latest captured status.
+- No blocker is recorded for the already-live 1.0.6 binary. The current source
+  worktree has the separate native-module/Hermes release blockers documented
+  in the superseding 2026-08-23 gate above.
 
 ## Google Play Status
 
@@ -122,13 +143,18 @@ Result:
 - Pass (exit code 0)
 
 ## Current Blockers
-- Apple: none currently known.
-- Google Play internal testing: none currently known.
+- Current iOS/Android source: native WebView is absent from identified 1.0.6
+  binaries, so the registration change cannot ship OTA-only.
+- Current iOS/Android source: Expo SDK 56 Hermes regression; upgrade and device
+  verification are required before a native release.
+- Google Play portal status has not been reverified since the historical entry
+  above; do not infer production readiness from the old internal-testing note.
 
 ## Current Focus
-1. Keep this master release file up to date.
-2. Capture screenshots/evidence for review and QA.
-3. Update review notes only if Apple asks for follow-up.
+1. Keep Railway work staging-only; do not publish an Expo/App Store update.
+2. Separately authorize and review the Expo SDK/native dependency upgrade.
+3. Create a staging-only internal native profile, then run registration and
+   device E2E before revisiting store readiness.
 
 ## Evidence and Supporting Docs
 - docs/QA_ANDROID_PARITY_VERIFICATION.md

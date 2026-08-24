@@ -1,18 +1,11 @@
-import { useEffect, useState } from 'react';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Alert, Image, Platform, Pressable, SafeAreaView, ScrollView, Share, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
-import { getOtaDebugInfo } from '@/lib/otaDebug';
 
 export default function ProfileScreen() {
   const { user, logout, token } = useAuth();
-  const [otaDebug, setOtaDebug] = useState<string | null>(null);
-
-  useEffect(() => {
-    getOtaDebugInfo().then(setOtaDebug);
-  }, []);
 
   const handleDeleteAccount = () => {
     Alert.alert(
@@ -204,12 +197,6 @@ export default function ProfileScreen() {
             </Pressable>
           </View>
 
-          <View style={{ backgroundColor: '#0b1020', borderRadius: 18, borderWidth: 1, borderColor: '#1f2937', marginTop: 16, padding: 14 }}>
-            <Text style={{ color: '#93a1bd', fontWeight: '900', fontSize: 12, marginBottom: 8 }}>App update diagnostics</Text>
-            <Text selectable style={{ color: '#64748b', fontSize: 11, fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace' }}>
-              {otaDebug ?? 'No update-check has run yet in this session.'}
-            </Text>
-          </View>
         </View>
       </ScrollView>
     </SafeAreaView>

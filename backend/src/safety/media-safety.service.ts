@@ -6,6 +6,15 @@ import {
   GetContentModerationCommand,
   ModerationLabel,
 } from '@aws-sdk/client-rekognition';
+import {
+  S3Client,
+  PutObjectCommand,
+  DeleteObjectCommand,
+} from '@aws-sdk/client-s3';
+import { randomUUID } from 'crypto';
+import { createReadStream } from 'fs';
+import { stat } from 'fs/promises';
+import type { Readable } from 'stream';
 
 export interface MediaScanResult {
   safe: boolean;
@@ -20,6 +29,7 @@ export interface VideoScanStartResult {
   jobId: string | null;
   failureReason?: string;
   userMessage?: string;
+  moderationObjectKey?: string;
 }
 
 export interface VideoScanPollResult {
@@ -54,21 +64,25 @@ export class MediaSafetyService {
   private readonly logger = new Logger(MediaSafetyService.name);
   private readonly client: RekognitionClient | null;
   private readonly enabled: boolean;
+  private readonly moderationStorage: S3Client | null;
+  private readonly moderationBucket: string;
 
   constructor() {
-    const accessKeyId = process.env.AWS_ACCESS_KEY_ID;
-    const secretAccessKey = process.env.AWS_SECRET_ACCESS_KEY;
-    const region = process.env.AWS_REGION ?? 'us-east-1';
-
-    // Rekognition requires AWS (not R2) credentials and a real AWS region
-    const rekognitionRegion = process.env.REKOGNITION_REGION ?? region;
-    const rekognitionKeyId = process.env.REKOGNITION_ACCESS_KEY_ID ?? accessKeyId;
-    const rekognitionSecret = process.env.REKOGNITION_SECRET_ACCESS_KEY ?? secretAccessKey;
+    // These credentials are intentionally independent from R2 media storage.
+    // Rekognition video moderation can read only from an AWS S3 bucket.
+    const rekognitionRegion = process.env.REKOGNITION_REGION?.trim();
+    const rekognitionKeyId = process.env.REKOGNITION_ACCESS_KEY_ID?.trim();
+    const rekognitionSecret =
+      process.env.REKOGNITION_SECRET_ACCESS_KEY?.trim();
+    this.moderationBucket =
+      process.env.REKOGNITION_S3_BUCKET?.trim() ?? '';
 
     this.enabled = !!(
       rekognitionKeyId &&
       rekognitionSecret &&
+      this.moderationBucket &&
       !rekognitionKeyId.startsWith('REPLACE') &&
+      rekognitionRegion &&
       rekognitionRegion !== 'auto'
     );
 
@@ -77,10 +91,30 @@ export class MediaSafetyService {
         region: rekognitionRegion,
         credentials: { accessKeyId: rekognitionKeyId!, secretAccessKey: rekognitionSecret! },
       });
+      this.moderationStorage = new S3Client({
+        region: rekognitionRegion,
+        credentials: {
+          accessKeyId: rekognitionKeyId!,
+          secretAccessKey: rekognitionSecret!,
+        },
+      });
       this.logger.log(`MediaSafetyService: Rekognition enabled (region=${rekognitionRegion})`);
     } else {
       this.client = null;
-      this.logger.warn('MediaSafetyService: Rekognition not configured — media scanning disabled');
+      this.moderationStorage = null;
+      const production =
+        process.env.NODE_ENV === 'production' ||
+        Boolean(
+          process.env.RAILWAY_ENVIRONMENT_ID || process.env.RAILWAY_PROJECT_ID,
+        );
+      if (production) {
+        throw new Error(
+          'Media moderation is required in production. Configure REKOGNITION_REGION, REKOGNITION_ACCESS_KEY_ID, REKOGNITION_SECRET_ACCESS_KEY, and REKOGNITION_S3_BUCKET.',
+        );
+      }
+      this.logger.warn(
+        'MediaSafetyService: Rekognition not configured - development scanning bypassed',
+      );
     }
   }
 
@@ -108,8 +142,7 @@ export class MediaSafetyService {
       return this.processLabels(response.ModerationLabels ?? [], 'rekognition');
     } catch (err: any) {
       this.logger.error(`Rekognition image scan failed: ${err?.message}`);
-      // Fail-open: don't block uploads if scanner is down
-      return { safe: true, labels: [], maxConfidence: 0, provider: 'rekognition' };
+      throw new Error('Image safety review is temporarily unavailable');
     }
   }
 
@@ -132,7 +165,7 @@ export class MediaSafetyService {
       return this.processLabels(response.ModerationLabels ?? [], 'rekognition');
     } catch (err: any) {
       this.logger.error(`Rekognition S3 image scan failed: ${err?.message}`);
-      return { safe: true, labels: [], maxConfidence: 0, provider: 'rekognition' };
+      throw new Error('Image safety review is temporarily unavailable');
     }
   }
 
@@ -142,7 +175,122 @@ export class MediaSafetyService {
    *
    * The video must already be in the S3 bucket (bucketName / objectKey).
    */
-  async startVideoScan(bucketName: string, objectKey: string): Promise<string | null> {
+  async startVideoScanBuffer(buffer: Buffer): Promise<VideoScanStartResult> {
+    if (!this.enabled || !this.client || !this.moderationStorage) {
+      return { status: 'BYPASSED', jobId: null };
+    }
+
+    const requestToken = randomUUID();
+    const moderationObjectKey = `nxq-social/${requestToken}.mp4`;
+    return this.stageAndStartVideoScan(
+      buffer,
+      buffer.length,
+      moderationObjectKey,
+      requestToken,
+    );
+  }
+
+  /**
+   * Stream a transcoded video into the private AWS moderation bucket and start
+   * Rekognition against it. The caller supplies a previously persisted key so
+   * an interruption between upload and database commit remains recoverable.
+   */
+  async startVideoScanFile(
+    filePath: string,
+    moderationObjectKey: string,
+  ): Promise<VideoScanStartResult> {
+    if (!this.enabled || !this.client || !this.moderationStorage) {
+      return { status: 'BYPASSED', jobId: null };
+    }
+    if (!this.isManagedModerationKey(moderationObjectKey)) {
+      throw new Error('Refusing to stage video outside the managed moderation prefix');
+    }
+
+    const metadata = await stat(filePath);
+    if (!metadata.isFile() || !Number.isSafeInteger(metadata.size) || metadata.size <= 0) {
+      throw new Error('Video moderation source must be a non-empty regular file');
+    }
+
+    const body = createReadStream(filePath);
+    try {
+      return await this.stageAndStartVideoScan(
+        body,
+        metadata.size,
+        moderationObjectKey,
+        moderationObjectKey.split('/').at(-1)!.slice(0, -4),
+      );
+    } finally {
+      body.destroy();
+    }
+  }
+
+  private async stageAndStartVideoScan(
+    body: Buffer | Readable,
+    contentLength: number,
+    moderationObjectKey: string,
+    requestToken: string,
+  ): Promise<VideoScanStartResult> {
+    try {
+      await this.moderationStorage!.send(
+        new PutObjectCommand({
+          Bucket: this.moderationBucket,
+          Key: moderationObjectKey,
+          Body: body,
+          ContentLength: contentLength,
+          ContentType: 'video/mp4',
+        }),
+      );
+      const jobId = await this.startVideoScan(
+        this.moderationBucket,
+        moderationObjectKey,
+        requestToken,
+      );
+      if (!jobId) throw new Error('Video moderation did not return a job ID');
+      return {
+        status: 'STARTED',
+        jobId,
+        moderationObjectKey,
+      };
+    } catch (err: any) {
+      await this.cleanupVideoScanObject(moderationObjectKey).catch(() => {});
+      return {
+        status: 'FAILED',
+        jobId: null,
+        failureReason: err?.message ?? 'Video moderation job failed to start',
+        userMessage: this.toUserFacingVideoError(err?.message),
+        moderationObjectKey,
+      };
+    }
+  }
+
+  async cleanupVideoScanObject(objectKey: string | undefined): Promise<void> {
+    if (!objectKey || !this.moderationStorage || !this.moderationBucket) return;
+    if (!this.isManagedModerationKey(objectKey)) {
+      throw new Error('Refusing to delete outside the managed moderation prefix');
+    }
+    await this.moderationStorage.send(
+      new DeleteObjectCommand({
+        Bucket: this.moderationBucket,
+        Key: objectKey,
+      }),
+    );
+  }
+
+  private isManagedModerationKey(objectKey: string): boolean {
+    return (
+      objectKey.startsWith('nxq-social/') &&
+      objectKey.endsWith('.mp4') &&
+      !objectKey.includes('\\') &&
+      !objectKey.includes('//') &&
+      !objectKey.split('/').some((segment) => !segment || segment === '.' || segment === '..')
+    );
+  }
+
+  async startVideoScan(
+    bucketName: string,
+    objectKey: string,
+    clientRequestToken?: string,
+  ): Promise<string | null> {
     if (!this.enabled || !this.client) {
       return null;
     }
@@ -152,6 +300,7 @@ export class MediaSafetyService {
         new StartContentModerationCommand({
           Video: { S3Object: { Bucket: bucketName, Name: objectKey } },
           MinConfidence: BLOCK_THRESHOLD,
+          ClientRequestToken: clientRequestToken,
         }),
       );
       this.logger.log(`Started video scan job: ${response.JobId}`);

@@ -9,14 +9,13 @@ item as you verify it on the live site (`nxqsocial.com` / `api.nxqsocial.com`).
 
 ## Pre-flight (do these first)
 
-- [ ] Rotate the beta invite code (old `NXQ-BETA-R7K9M2` is considered public)
-- [ ] Confirm whether beta gating is on (`NEXT_PUBLIC_BETA_MODE`) and the backend
-      `BETA_INVITE_CODE` matches the new code
-- [ ] Rotate any other potentially-exposed secrets (DB / Redis / admin)
+- [ ] Confirm open registration shows no invitation-code field
+- [ ] Confirm Cloudflare Turnstile is required and email verification completes
+- [ ] Rotate any potentially-exposed secrets (DB / Redis / admin / storage)
 - [ ] Enable GitHub **Dependabot alerts**, **Dependabot updates**, **secret
       scanning**, and **push protection** (repo → Settings → Security)
 - [ ] Health check green: `GET /api/health/ready` →
-      `{"status":"ready","checks":{"database":"ok","redis":"ok"}}`
+      `{"status":"ready","checks":{"database":"ok","redis":"ok","storage":"ok"}}`
 
 ---
 
@@ -24,6 +23,8 @@ item as you verify it on the live site (`nxqsocial.com` / `api.nxqsocial.com`).
 
 - [ ] Register a new account (strong password rules enforced: 12+ chars, upper,
       lower, number, symbol)
+- [ ] Registration requires matching password and confirm-password fields
+- [ ] Registration completes Turnstile and then verifies the email address
 - [ ] Register rejects a weak password with a clear message
 - [ ] Login with correct credentials succeeds
 - [ ] Login with wrong password shows a generic error

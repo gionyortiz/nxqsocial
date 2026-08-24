@@ -5,7 +5,6 @@ import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import * as Updates from 'expo-updates';
 
 import { useColorScheme } from '@/components/useColorScheme';
 import { apiRequest } from '@/lib/api';
@@ -13,7 +12,6 @@ import { AuthProvider, useAuth } from '@/lib/auth';
 import { pauseAllMedia } from '@/lib/mediaPlayback';
 import { ensurePushRegistration } from '@/lib/push';
 import { mobileProof } from '@/lib/runtimeProof';
-import { saveOtaDebugInfo } from '@/lib/otaDebug';
 
 // Register LiveKit WebRTC globals once for native in-app Live.
 // Guarded so web/Expo Go (no native module) does not crash on startup.
@@ -132,42 +130,6 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
   };
 
   useEffect(() => {
-    // Explicit OTA check — don't rely solely on native auto-check-on-load,
-    // which gives no visibility if it silently fails to fire. Also persist
-    // a diagnostic snapshot so it can be shown on-screen (Profile tab) even
-    // in a TestFlight build with no console attached.
-    const baseInfo = {
-      timestamp: new Date().toISOString(),
-      isEnabled: Updates.isEnabled,
-      isEmbeddedLaunch: Updates.isEmbeddedLaunch,
-      currentUpdateId: Updates.updateId,
-      currentUpdateCreatedAt: Updates.createdAt ? Updates.createdAt.toISOString() : null,
-      channel: Updates.channel,
-      runtimeVersion: Updates.runtimeVersion,
-    };
-    if (!Updates.isEnabled) {
-      saveOtaDebugInfo({ ...baseInfo, skipped: 'Updates.isEnabled is false' });
-      return;
-    }
-    (async () => {
-      try {
-        const result = await Updates.checkForUpdateAsync();
-        mobileProof('OTA update check', result);
-        await saveOtaDebugInfo({ ...baseInfo, checkResult: result });
-        if (result.isAvailable) {
-          await Updates.fetchUpdateAsync();
-          mobileProof('OTA update fetched — reloading');
-          await saveOtaDebugInfo({ ...baseInfo, checkResult: result, fetched: true });
-          await Updates.reloadAsync();
-        }
-      } catch (e: any) {
-        mobileProof('OTA update check failed', { message: e?.message });
-        await saveOtaDebugInfo({ ...baseInfo, error: e?.message ?? String(e) });
-      }
-    })();
-  }, []);
-
-  useEffect(() => {
     if (!token) return;
     ensurePushRegistration(token).catch(() => {
       // keep auth flow resilient even if push registration fails
@@ -223,6 +185,7 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="register" options={{ headerShown: false }} />
+        <Stack.Screen name="verify-email" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
         <Stack.Screen name="messages/[threadId]" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />

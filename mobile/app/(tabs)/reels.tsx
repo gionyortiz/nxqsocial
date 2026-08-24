@@ -1,45 +1,64 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Dimensions, FlatList, Image, Platform, Pressable, RefreshControl, SafeAreaView, Share, Text, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, FlatList, Image, Platform, Pressable, RefreshControl, SafeAreaView, Share, Text, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useVideoPlayer, VideoView } from 'expo-video';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { registerMediaPauseHandler } from '@/lib/mediaPlayback';
+import { pauseAllMedia, registerMediaPauseHandler } from '@/lib/mediaPlayback';
 import { mobileProof } from '@/lib/runtimeProof';
-
-const h = Dimensions.get('window').height;
 
 function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
   const [paused, setPaused] = useState(false);
   const [errored, setErrored] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const focusedRef = useRef(focused);
+  const pausedRef = useRef(paused);
+  const wasFocusedRef = useRef(false);
+  focusedRef.current = focused;
+  pausedRef.current = paused;
 
-  const player = useVideoPlayer(uri, (p) => {
+  const source = useMemo(() => ({
+    uri,
+    contentType: 'progressive' as const,
+    useCaching: true,
+  }), [uri]);
+
+  const player = useVideoPlayer(source, (p) => {
     p.loop = true;
   });
 
   useEffect(() => {
     mobileProof('Reel video component props', { component: 'VideoView', uri, focused, paused });
-    if (errored) return;
-    if (focused && !paused) {
-      player.currentTime = 0;
-      player.play();
-      return () => {
-        player.pause();
-      };
+    const justFocused = focused && !wasFocusedRef.current;
+    wasFocusedRef.current = focused;
+
+    if (errored || !focused || paused) {
+      player.pause();
+      return;
     }
-    player.pause();
+
+    if (justFocused) player.currentTime = 0;
+    if (player.status === 'readyToPlay') {
+      player.play();
+    }
+    return () => player.pause();
   }, [focused, paused, errored, player]);
 
   useEffect(() => {
-    const sub = player.addListener('statusChange', (status) => {
-      if ((status as any)?.error || (status as any)?.status === 'error') {
-        mobileProof('Reel video status error', { uri, status });
+    const sub = player.addListener('statusChange', ({ status, error }) => {
+      setLoading(status === 'idle' || status === 'loading');
+      if (error || status === 'error') {
+        mobileProof('Reel video status error', { uri, status, error });
         setErrored(true);
+        return;
+      }
+      if (status === 'readyToPlay' && focusedRef.current && !pausedRef.current) {
+        player.play();
       }
     });
     return () => sub.remove();
-  }, [player]);
+  }, [player, uri]);
 
   useEffect(() => registerMediaPauseHandler(() => player.pause()), [player]);
 
@@ -53,13 +72,28 @@ function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
   }
 
   return (
-    <Pressable onPress={() => setPaused((p) => !p)} style={{ width: '100%', height: '100%' }}>
+    <Pressable
+      onPress={() => setPaused((current) => {
+        const next = !current;
+        if (next) player.pause();
+        else if (focused) player.play();
+        return next;
+      })}
+      style={{ width: '100%', height: '100%' }}
+    >
       <VideoView
         player={player}
         style={{ width: '100%', height: '100%' }}
         contentFit="cover"
         nativeControls={false}
+        surfaceType="textureView"
+        onFirstFrameRender={() => setLoading(false)}
       />
+      {loading && focused && !paused && (
+        <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
+          <ActivityIndicator color="#fff" size="large" />
+        </View>
+      )}
       {paused && (
         <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
           <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
@@ -74,6 +108,7 @@ function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
 export default function ReelsScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
+  const { height: windowHeight } = useWindowDimensions();
   const [items, setItems] = useState<PostItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -84,10 +119,18 @@ export default function ReelsScreen() {
   const [followBusy, setFollowBusy] = useState<Record<string, boolean>>({});
   const [mode, setMode] = useState<'FOR_YOU' | 'FOLLOWING'>('FOR_YOU');
   const [activePostId, setActivePostId] = useState<string | null>(null);
-  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 80 }).current;
+  const [screenFocused, setScreenFocused] = useState(false);
+  const [scrolling, setScrolling] = useState(false);
+  const [reelHeight, setReelHeight] = useState(windowHeight);
+  const activePostIdRef = useRef<string | null>(null);
+  const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 55 }).current;
 
   const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item: PostItem }> }) => {
     const nextActive = viewableItems[0]?.item?.id ?? null;
+    if (nextActive === activePostIdRef.current) return;
+    pauseAllMedia();
+    activePostIdRef.current = nextActive;
     setActivePostId(nextActive);
   }).current;
 
@@ -101,7 +144,14 @@ export default function ReelsScreen() {
         count: data.data?.length ?? 0,
         firstReel: data.data?.[0] ?? null,
       });
-      setItems(data.data || []);
+      const nextItems = data.data || [];
+      setItems(nextItems);
+      const currentActive = activePostIdRef.current;
+      const nextActive = currentActive && nextItems.some((item) => item.id === currentActive)
+        ? currentActive
+        : nextItems[0]?.id ?? null;
+      activePostIdRef.current = nextActive;
+      setActivePostId(nextActive);
     } catch (e: any) {
       const message = e?.message ?? 'Could not load reels right now.';
       setError(message);
@@ -115,15 +165,16 @@ export default function ReelsScreen() {
     load();
   }, [token, mode]);
 
-  useEffect(() => {
-    if (items.length > 0 && !activePostId) {
-      setActivePostId(items[0].id);
-    }
-  }, [items, activePostId]);
-
   useFocusEffect(
     useCallback(() => {
+      setScreenFocused(true);
       load();
+      return () => {
+        setScreenFocused(false);
+        setScrolling(false);
+        if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+        pauseAllMedia();
+      };
     }, [token, mode]),
   );
 
@@ -378,9 +429,34 @@ export default function ReelsScreen() {
       <FlatList
         data={items}
         pagingEnabled
+        onLayout={(event) => {
+          const nextHeight = Math.max(1, Math.round(event.nativeEvent.layout.height));
+          setReelHeight((current) => current === nextHeight ? current : nextHeight);
+        }}
         keyExtractor={(item) => item.id}
         viewabilityConfig={viewabilityConfig}
         onViewableItemsChanged={onViewableItemsChanged}
+        onScrollBeginDrag={() => {
+          if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+          setScrolling(true);
+          pauseAllMedia();
+        }}
+        onMomentumScrollBegin={() => {
+          if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+          setScrolling(true);
+        }}
+        onScrollEndDrag={() => {
+          if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+          scrollEndTimerRef.current = setTimeout(() => setScrolling(false), 180);
+        }}
+        onMomentumScrollEnd={() => {
+          if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+          setScrolling(false);
+        }}
+        initialNumToRender={2}
+        maxToRenderPerBatch={2}
+        windowSize={3}
+        getItemLayout={(_data, index) => ({ length: reelHeight, offset: reelHeight * index, index })}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
         renderItem={({ item }) => {
           const isVideoAsset = (asset: any) => {
@@ -405,9 +481,9 @@ export default function ReelsScreen() {
           });
           const isOwnPost = item.author.id === user?.id;
           const deleting = deletingPostId === item.id;
-          const focused = activePostId === item.id;
+          const focused = screenFocused && !scrolling && activePostId === item.id;
           return (
-            <View style={{ height: h, backgroundColor: '#000' }}>
+            <View style={{ height: reelHeight, backgroundColor: '#000' }}>
               {isPlayableVideo ? (
                 <ReelVideo uri={src} focused={focused} />
               ) : fallbackImage ? (

@@ -12,7 +12,13 @@ const bcrypt = require('bcryptjs');
 const EMAIL = process.env.APP_REVIEW_EMAIL || 'appreview@nxqsocial.com';
 const USERNAME = process.env.APP_REVIEW_USERNAME || 'appreview';
 const DISPLAY_NAME = process.env.APP_REVIEW_DISPLAY_NAME || 'App Review';
-const PASSWORD = process.env.APP_REVIEW_PASSWORD || 'NxqAppReview!2026';
+const PASSWORD = process.env.APP_REVIEW_PASSWORD;
+
+if (!PASSWORD) {
+  throw new Error(
+    'APP_REVIEW_PASSWORD is required. Refusing to create or reset the review account with a public default password.',
+  );
+}
 
 async function main() {
   const adapter = new PrismaPg({ connectionString: process.env.DATABASE_URL });

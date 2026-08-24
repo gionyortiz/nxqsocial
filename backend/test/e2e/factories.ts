@@ -7,15 +7,6 @@ export function uid(): string {
   return `${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 }
 
-/**
- * Registration is invite-gated in this env (REQUIRE_INVITE_CODE=true, see .env) —
- * spread this into any /api/auth/register payload so the request isn't rejected
- * with 403 for reasons unrelated to what the test actually exercises.
- */
-export function inviteCodeField(): { inviteCode?: string } {
-  return { inviteCode: process.env.INVITE_CODE ?? process.env.BETA_INVITE_CODE };
-}
-
 export interface TestUser {
   id: string;
   email: string;
@@ -42,7 +33,6 @@ export async function registerUser(
       username,
       password,
       displayName: overrides.displayName ?? 'Test User',
-      ...inviteCodeField(),
     })
     .expect(201);
 
@@ -67,20 +57,6 @@ export async function loginUser(
     .send({ email, password })
     .expect(200);
   return body.access_token;
-}
-
-/** Read the latest OTP code for a user from the test DB */
-export async function getOtpCode(
-  prisma: PrismaService,
-  userId: string,
-  channel: 'email' | 'phone',
-): Promise<string> {
-  const otp = await prisma.otpCode.findFirst({
-    where: { userId, channel, used: false },
-    orderBy: { createdAt: 'desc' },
-  });
-  if (!otp) throw new Error(`No active OTP found for user ${userId} channel ${channel}`);
-  return otp.code;
 }
 
 /** Create a post with a small test image buffer */

@@ -1,10 +1,24 @@
 import {
-  Controller, Get, Put, Patch, Post, Delete, Param, Body, Query, Req,
-  UseGuards, UseInterceptors, UploadedFile, BadRequestException,
+  Controller,
+  Get,
+  Put,
+  Patch,
+  Post,
+  Delete,
+  Param,
+  Body,
+  Query,
+  Req,
+  UseGuards,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
   UnsupportedMediaTypeException,
+  ServiceUnavailableException,
+  Logger,
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
-import { diskStorage } from 'multer';
+import { memoryStorage } from 'multer';
 import { extname, join } from 'path';
 import { promises as fs } from 'fs';
 import type { Request } from 'express';
@@ -14,6 +28,10 @@ import { OptionalJwtAuthGuard } from '../auth/optional-jwt-auth.guard';
 import { AdminGuard } from '../auth/admin.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { UsersService } from './users.service';
+import {
+  StorageService,
+  StorageFolder,
+} from '../common/storage/storage.service';
 import { UpdateProfileDto, UpdateSettingsDto } from './users.dto';
 import { IsOptional, IsString } from 'class-validator';
 
@@ -25,11 +43,101 @@ class AdminActionDto {
 
 @Controller('users')
 export class UsersController {
-  constructor(private usersService: UsersService) {}
+  private readonly logger = new Logger(UsersController.name);
 
-  private validateImageUpload(file: Express.Multer.File | undefined, kind: 'avatar' | 'banner') {
+  constructor(
+    private usersService: UsersService,
+    private storage: StorageService,
+  ) {}
+
+  private validateImageUpload(
+    file: Express.Multer.File | undefined,
+    kind: 'avatar' | 'banner',
+  ) {
     if (!file) {
-      throw new BadRequestException(`Select a ${kind === 'avatar' ? 'profile photo' : 'banner image'} before saving`);
+      throw new BadRequestException(
+        `Select a ${kind === 'avatar' ? 'profile photo' : 'banner image'} before saving`,
+      );
+    }
+  }
+
+  private async persistProfileImage(
+    kind: 'avatar' | 'banner',
+    buffer: Buffer,
+    originalName: string,
+    mimeType: string,
+  ): Promise<string> {
+    const folder: StorageFolder = kind === 'avatar' ? 'avatars' : 'banners';
+
+    if (this.storage.isEnabled) {
+      try {
+        return await this.storage.upload(
+          buffer,
+          originalName,
+          mimeType,
+          folder,
+        );
+      } catch (error: any) {
+        if (!this.storage.localDiskFallbackAllowed) {
+          this.logger.error(
+            `${kind} upload to persistent storage failed: ${error?.message ?? 'unknown error'}`,
+          );
+          throw new ServiceUnavailableException(
+            'Image storage is temporarily unavailable. Please try again shortly.',
+          );
+        }
+        this.logger.warn(
+          `${kind} upload to persistent storage failed in development; using local disk: ${error?.message ?? 'unknown error'}`,
+        );
+      }
+    } else if (!this.storage.localDiskFallbackAllowed) {
+      throw new ServiceUnavailableException(
+        'Image storage is not configured. Please contact support.',
+      );
+    }
+
+    const extension =
+      extname(originalName) ||
+      (
+        {
+          'image/jpeg': '.jpg',
+          'image/png': '.png',
+          'image/webp': '.webp',
+          'image/gif': '.gif',
+          'image/heic': '.heic',
+          'image/heif': '.heif',
+        } as Record<string, string>
+      )[mimeType] ||
+      '';
+    const filename = `${kind === 'banner' ? 'banner-' : ''}${randomUUID()}${extension}`;
+    const uploadDirectory = join(process.cwd(), 'uploads', folder);
+    await fs.mkdir(uploadDirectory, { recursive: true });
+    await fs.writeFile(join(uploadDirectory, filename), buffer);
+    return `/api/uploads/${folder}/${filename}`;
+  }
+
+  private async commitProfileImage(
+    kind: 'avatar' | 'banner',
+    userId: string,
+    imageUrl: string,
+  ) {
+    const folder: StorageFolder = kind === 'avatar' ? 'avatars' : 'banners';
+    try {
+      return kind === 'avatar'
+        ? await this.usersService.updateAvatar(userId, imageUrl)
+        : await this.usersService.updateBanner(userId, imageUrl);
+    } catch (error) {
+      // The upload completed but the database did not accept the new
+      // reference. Remove only an object positively owned by this bucket and
+      // prefix so failed profile updates do not accumulate orphaned media.
+      await this.storage
+        .deleteManagedObject(imageUrl, [folder])
+        .catch((cleanupError: any) => {
+          this.logger.warn(
+            `Could not clean up failed ${kind} upload: ${cleanupError?.message ?? 'unknown storage error'}`,
+          );
+        });
+      throw error;
     }
   }
 
@@ -98,7 +206,11 @@ export class UsersController {
   /** Lock account — prevents login without deleting data. */
   @Post('admin/:id/lock')
   @UseGuards(JwtAuthGuard, AdminGuard)
-  lockAccount(@Param('id') id: string, @CurrentUser() admin: any, @Body() dto: AdminActionDto) {
+  lockAccount(
+    @Param('id') id: string,
+    @CurrentUser() admin: any,
+    @Body() dto: AdminActionDto,
+  ) {
     return this.usersService.adminLockAccount(id, admin.id, dto.reason);
   }
 
@@ -159,12 +271,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('avatar', {
-      storage: diskStorage({
-        destination: './uploads/avatars',
-        filename: (_req, file, cb) => {
-          cb(null, `${randomUUID()}${extname(file.originalname)}`);
-        },
-      }),
+      storage: memoryStorage(),
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.match(/^image\/(jpeg|png|webp|gif)$/)) {
           return cb(new Error('Only image files allowed'), false);
@@ -174,17 +281,27 @@ export class UsersController {
       limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
-  uploadAvatar(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
+  async uploadAvatar(
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     this.validateImageUpload(file, 'avatar');
-    const avatarUrl = `/api/uploads/avatars/${file.filename}`;
-    return this.usersService.updateAvatar(user.id, avatarUrl);
+    const avatarUrl = await this.persistProfileImage(
+      'avatar',
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+    );
+    return this.commitProfileImage('avatar', user.id, avatarUrl);
   }
 
   /** Native mobile upload path that avoids React Native multipart/FormData. */
   @Patch('me/avatar/raw')
   @UseGuards(JwtAuthGuard)
   async uploadAvatarRaw(@CurrentUser() user: any, @Req() req: Request) {
-    const mimeType = String(req.headers['content-type'] || '').split(';', 1)[0].toLowerCase();
+    const mimeType = String(req.headers['content-type'] || '')
+      .split(';', 1)[0]
+      .toLowerCase();
     const extensions: Record<string, string> = {
       'image/jpeg': '.jpg',
       'image/png': '.png',
@@ -195,7 +312,9 @@ export class UsersController {
     };
     const extension = extensions[mimeType];
     if (!extension) {
-      throw new UnsupportedMediaTypeException('Select a JPEG, PNG, WebP, GIF, or HEIC image');
+      throw new UnsupportedMediaTypeException(
+        'Select a JPEG, PNG, WebP, GIF, or HEIC image',
+      );
     }
 
     const maxBytes = 10 * 1024 * 1024;
@@ -210,7 +329,9 @@ export class UsersController {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       totalBytes += buffer.length;
       if (totalBytes > maxBytes) {
-        throw new BadRequestException('Profile photo must be smaller than 10 MB');
+        throw new BadRequestException(
+          'Profile photo must be smaller than 10 MB',
+        );
       }
       chunks.push(buffer);
     }
@@ -218,12 +339,13 @@ export class UsersController {
       throw new BadRequestException('Select a profile photo before saving');
     }
 
-    const filename = `${randomUUID()}${extension}`;
-    const uploadDirectory = join(process.cwd(), 'uploads', 'avatars');
-    await fs.mkdir(uploadDirectory, { recursive: true });
-    await fs.writeFile(join(uploadDirectory, filename), Buffer.concat(chunks));
-
-    return this.usersService.updateAvatar(user.id, `/api/uploads/avatars/${filename}`);
+    const avatarUrl = await this.persistProfileImage(
+      'avatar',
+      Buffer.concat(chunks),
+      `avatar${extension}`,
+      mimeType,
+    );
+    return this.commitProfileImage('avatar', user.id, avatarUrl);
   }
 
   @Delete('me/avatar')
@@ -236,12 +358,7 @@ export class UsersController {
   @UseGuards(JwtAuthGuard)
   @UseInterceptors(
     FileInterceptor('banner', {
-      storage: diskStorage({
-        destination: './uploads/avatars',
-        filename: (_req, file, cb) => {
-          cb(null, `banner-${randomUUID()}${extname(file.originalname)}`);
-        },
-      }),
+      storage: memoryStorage(),
       fileFilter: (_req, file, cb) => {
         if (!file.mimetype.match(/^image\/(jpeg|png|webp|gif)$/)) {
           return cb(new Error('Only image files allowed'), false);
@@ -251,10 +368,18 @@ export class UsersController {
       limits: { fileSize: 10 * 1024 * 1024 },
     }),
   )
-  uploadBanner(@CurrentUser() user: any, @UploadedFile() file: Express.Multer.File) {
+  async uploadBanner(
+    @CurrentUser() user: any,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
     this.validateImageUpload(file, 'banner');
-    const bannerUrl = `/api/uploads/avatars/${file.filename}`;
-    return this.usersService.updateBanner(user.id, bannerUrl);
+    const bannerUrl = await this.persistProfileImage(
+      'banner',
+      file.buffer,
+      file.originalname,
+      file.mimetype,
+    );
+    return this.commitProfileImage('banner', user.id, bannerUrl);
   }
 
   @Delete('me/banner')

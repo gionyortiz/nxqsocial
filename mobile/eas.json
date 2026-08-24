@@ -9,17 +9,20 @@
       "distribution": "internal",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
+        "EXPO_PUBLIC_TURNSTILE_MOBILE_URL": "https://nxqsocial.com/turnstile/mobile-signup",
         "EXPO_PUBLIC_USE_RN_FETCH": "false",
         "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
       }
     },
     "preview": {
       "distribution": "internal",
+      "channel": "preview",
       "android": {
         "buildType": "apk"
       },
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
+        "EXPO_PUBLIC_TURNSTILE_MOBILE_URL": "https://nxqsocial.com/turnstile/mobile-signup",
         "EXPO_PUBLIC_USE_RN_FETCH": "false",
         "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
       }
@@ -28,6 +31,7 @@
       "distribution": "store",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
+        "EXPO_PUBLIC_TURNSTILE_MOBILE_URL": "https://nxqsocial.com/turnstile/mobile-signup",
         "EXPO_PUBLIC_USE_RN_FETCH": "false",
         "EXPO_PUBLIC_LIVE_NATIVE_ENABLED": "false",
         "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
@@ -37,6 +41,7 @@
       "distribution": "store",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
+        "EXPO_PUBLIC_TURNSTILE_MOBILE_URL": "https://nxqsocial.com/turnstile/mobile-signup",
         "EXPO_PUBLIC_USE_RN_FETCH": "false",
         "EXPO_PUBLIC_LIVE_NATIVE_ENABLED": "true",
         "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
@@ -44,8 +49,10 @@
     },
     "production": {
       "autoIncrement": true,
+      "channel": "production",
       "env": {
         "EXPO_PUBLIC_API_BASE_URL": "https://api.nxqsocial.com/api",
+        "EXPO_PUBLIC_TURNSTILE_MOBILE_URL": "https://nxqsocial.com/turnstile/mobile-signup",
         "EXPO_PUBLIC_USE_RN_FETCH": "false",
         "EXPO_PUBLIC_LIVE_NATIVE_ENABLED": "false",
         "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"

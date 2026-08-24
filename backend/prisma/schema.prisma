@@ -22,6 +22,7 @@ model User {
   verificationStatus VerificationStatus @default(BASIC)
   trustScore         Int                @default(10)
   emailVerified      Boolean            @default(false)
+  emailVerificationRequired Boolean     @default(false)
   phoneVerified      Boolean            @default(false)
   emailNotifications Boolean            @default(true)
   isSuspended        Boolean            @default(false)
@@ -138,6 +139,7 @@ model MediaAsset {
   moderationStatus ModerationStatus @default(PENDING)
   safetyJobId      String?
   safetyResult     Json?
+  finalizationToken String?
   order            Int              @default(0)
   createdAt        DateTime         @default(now())
   updatedAt        DateTime         @updatedAt
@@ -147,6 +149,22 @@ model MediaAsset {
   user  User   @relation(fields: [userId], references: [id], onDelete: Cascade)
   post  Post?  @relation(fields: [postId], references: [id], onDelete: SetNull)
   story Story? @relation(fields: [storyId], references: [id], onDelete: SetNull)
+}
+
+model ObjectCleanupJob {
+  id              String            @id @default(cuid())
+  kind            ObjectCleanupKind
+  reference       String
+  allowedPrefixes String[]          @default([])
+  source          String
+  attempts        Int               @default(0)
+  nextAttemptAt   DateTime          @default(now())
+  lastError       String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@unique([kind, reference])
+  @@index([nextAttemptAt, createdAt])
 }
 
 model Story {
@@ -450,10 +468,19 @@ enum ModerationStatus {
 
 enum UploadStatus {
   PENDING
+  FINALIZING
   TRANSCODING
   SCANNING
   PUBLISHED
   REJECTED
+  REMOVING
+}
+
+enum ObjectCleanupKind {
+  PUBLIC_STORAGE
+  QUARANTINE_STORAGE
+  MODERATION_STORAGE
+  LOCAL_UPLOAD
 }
 
 enum ReportReason {

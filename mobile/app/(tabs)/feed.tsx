@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Platform, Pressable, RefreshControl, SafeAreaView, ScrollView, Share, Text, View } from 'react-native';
 import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
@@ -9,6 +9,7 @@ import { useAuth } from '@/lib/auth';
 import { PostMedia } from '@/components/PostMedia';
 import { mobileProof } from '@/lib/runtimeProof';
 import { CreateActionSheet, CreateActionMode } from '@/components/CreateActionSheet';
+import { pauseAllMedia } from '@/lib/mediaPlayback';
 
 interface StoryCandidate {
   id: string;
@@ -195,6 +196,16 @@ export default function FeedScreen() {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
   const [showInsights, setShowInsights] = useState(false);
   const [screenFocused, setScreenFocused] = useState(false);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const activePostIdRef = useRef<string | null>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item: PostItem }> }) => {
+    const nextActivePostId = viewableItems[0]?.item?.id ?? null;
+    if (nextActivePostId === activePostIdRef.current) return;
+    pauseAllMedia();
+    activePostIdRef.current = nextActivePostId;
+    setActivePostId(nextActivePostId);
+  }).current;
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const [storyFeed, setStoryFeed] = useState<StoryFeedAuthorGroup[]>([]);
 
@@ -248,6 +259,7 @@ export default function FeedScreen() {
       load();
       return () => {
         setScreenFocused(false);
+        pauseAllMedia();
       };
     }, [token, mode]),
   );
@@ -478,6 +490,13 @@ export default function FeedScreen() {
         <FlatList
           data={visibleItems}
           keyExtractor={(item) => item.id}
+          viewabilityConfig={viewabilityConfig}
+          onViewableItemsChanged={onViewableItemsChanged}
+          onScrollBeginDrag={() => {
+            pauseAllMedia();
+            activePostIdRef.current = null;
+            setActivePostId(null);
+          }}
           contentContainerStyle={{ paddingHorizontal: 14, paddingTop: 10, paddingBottom: 28 }}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#22d3ee" />}
           ListHeaderComponent={(
@@ -946,7 +965,7 @@ export default function FeedScreen() {
                 onSave={toggleSave}
                 onOpenActions={openPostActions}
                 onOpenAuthor={openUserProfile}
-                shouldPlayMedia={screenFocused}
+                shouldPlayMedia={screenFocused && activePostId === item.id}
               />
               {(index + 1) % 2 === 0 || (items.length === 1 && index === 0) ? (
                 <View style={{ backgroundColor: '#111827', borderRadius: 14, borderWidth: 1, borderColor: '#1f2937', padding: 12, marginBottom: 14, gap: 8 }}>

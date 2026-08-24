@@ -9,7 +9,10 @@ export class MailService {
 
   constructor() {
     const apiKey = process.env.RESEND_API_KEY;
-    this.from = process.env.MAIL_FROM ?? 'NXQ Social <onboarding@resend.dev>';
+    this.from =
+      process.env.EMAIL_FROM ??
+      process.env.MAIL_FROM ??
+      'NXQ Social <onboarding@resend.dev>';
     this.resend = apiKey ? new Resend(apiKey) : null;
     if (!this.resend) {
       this.logger.warn('RESEND_API_KEY not set — emails will be logged, not sent.');
@@ -40,13 +43,24 @@ export class MailService {
 
     if (!this.resend) {
       this.logger.log(`[DEV] Password reset link for ${to}: ${resetUrl}`);
-      return;
+      return true;
     }
 
     try {
-      await this.resend.emails.send({ from: this.from, to, subject, html });
+      const result = await this.resend.emails.send({
+        from: this.from,
+        to,
+        subject,
+        html,
+      });
+      if (result.error) {
+        this.logger.error(`Reset email provider rejected delivery to ${to}`);
+        return false;
+      }
+      return true;
     } catch (err) {
       this.logger.error(`Failed to send reset email to ${to}`, err as any);
+      return false;
     }
   }
 
@@ -71,13 +85,26 @@ export class MailService {
 
     if (!this.resend) {
       this.logger.log(`[DEV] Verification email for ${to}`);
-      return;
+      return true;
     }
 
     try {
-      await this.resend.emails.send({ from: this.from, to, subject, html });
+      const result = await this.resend.emails.send({
+        from: this.from,
+        to,
+        subject,
+        html,
+      });
+      if (result.error) {
+        this.logger.error(
+          `Verification email provider rejected delivery to ${to}`,
+        );
+        return false;
+      }
+      return true;
     } catch (err) {
       this.logger.error(`Failed to send verification email to ${to}`, err as any);
+      return false;
     }
   }
 }

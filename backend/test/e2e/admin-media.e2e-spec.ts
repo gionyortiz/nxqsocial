@@ -22,14 +22,20 @@ async function seedFlaggedAsset(
     mimeType: string;
   }> = {},
 ) {
+  const uploadStatus = overrides.uploadStatus ?? 'PUBLISHED';
+  const s3Key = `images/admin-test/${Date.now()}-${Math.random().toString(36).slice(2)}.jpg`;
   return prisma.mediaAsset.create({
     data: {
       userId,
-      s3Key: `admin-test/${Date.now()}-${Math.random().toString(36).slice(2)}`,
-      bucket: 'test-bucket',
+      s3Key,
+      bucket: 'test-public-bucket',
+      url:
+        uploadStatus === 'PUBLISHED'
+          ? `https://r2.example.com/test/${s3Key}`
+          : null,
       mimeType: overrides.mimeType ?? 'image/jpeg',
       size: 50_000,
-      uploadStatus: (overrides.uploadStatus ?? 'PUBLISHED') as any,
+      uploadStatus: uploadStatus as any,
       moderationStatus: (overrides.moderationStatus ?? 'FLAGGED') as any,
       safetyResult: {
         safe: false,
@@ -184,7 +190,9 @@ describe('Admin Media Review E2E', () => {
       expect(body.success).toBe(true);
       expect(body.moderationStatus).toBe('APPROVED');
 
-      const updated = await prisma.mediaAsset.findUnique({ where: { id: asset.id } });
+      const updated = await prisma.mediaAsset.findUnique({
+        where: { id: asset.id },
+      });
       expect(updated?.moderationStatus).toBe('APPROVED');
 
       await prisma.mediaAsset.delete({ where: { id: asset.id } });
@@ -206,7 +214,9 @@ describe('Admin Media Review E2E', () => {
         .set('Authorization', `Bearer ${adminUser.access_token}`)
         .expect(200);
 
-      const updatedPost = await prisma.post.findUnique({ where: { id: post.id } });
+      const updatedPost = await prisma.post.findUnique({
+        where: { id: post.id },
+      });
       expect(updatedPost?.status).toBe('PUBLISHED');
 
       await prisma.post.delete({ where: { id: post.id } });
@@ -236,10 +246,14 @@ describe('Admin Media Review E2E', () => {
       expect(body.success).toBe(true);
       expect(body.moderationStatus).toBe('REJECTED');
 
-      const updated = await prisma.mediaAsset.findUnique({ where: { id: asset.id } });
+      const updated = await prisma.mediaAsset.findUnique({
+        where: { id: asset.id },
+      });
       expect(updated?.uploadStatus).toBe('REJECTED');
       expect(updated?.moderationStatus).toBe('REJECTED');
-      expect((updated?.safetyResult as any)?.adminRejectionReason).toBe('Contains explicit content');
+      expect((updated?.safetyResult as any)?.adminRejectionReason).toBe(
+        'Contains explicit content',
+      );
 
       await prisma.mediaAsset.delete({ where: { id: asset.id } });
     });
@@ -261,7 +275,9 @@ describe('Admin Media Review E2E', () => {
         .send({ reason: 'Policy violation' })
         .expect(200);
 
-      const updatedPost = await prisma.post.findUnique({ where: { id: post.id } });
+      const updatedPost = await prisma.post.findUnique({
+        where: { id: post.id },
+      });
       expect(updatedPost?.status).toBe('REMOVED');
 
       await prisma.post.delete({ where: { id: post.id } });
@@ -272,7 +288,7 @@ describe('Admin Media Review E2E', () => {
   // ── Remove ────────────────────────────────────────────────────────────────
 
   describe('DELETE /admin/media/:id', () => {
-    it('sets moderationStatus to REMOVED and nulls the URL', async () => {
+    it('removes the database row after object cleanup succeeds', async () => {
       const asset = await seedFlaggedAsset(prisma, regularUser.id);
 
       const { body } = await request(app.getHttpServer())
@@ -283,11 +299,10 @@ describe('Admin Media Review E2E', () => {
       expect(body.success).toBe(true);
       expect(body.moderationStatus).toBe('REMOVED');
 
-      const updated = await prisma.mediaAsset.findUnique({ where: { id: asset.id } });
-      expect(updated?.moderationStatus).toBe('REMOVED');
-      expect(updated?.url).toBeNull();
-
-      await prisma.mediaAsset.delete({ where: { id: asset.id } });
+      const updated = await prisma.mediaAsset.findUnique({
+        where: { id: asset.id },
+      });
+      expect(updated).toBeNull();
     });
 
     it('returns 404 for unknown asset', async () => {

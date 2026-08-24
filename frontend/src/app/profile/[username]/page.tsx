@@ -17,7 +17,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { useCallStore } from '@/store/call';
 import { fetchUserLive } from '@/lib/live';
-import { callsVisible, startCall } from '@/lib/calls';
+import { callsVisible, fetchCallServerConfig, startCall } from '@/lib/calls';
 import { formatCount, resolveMediaUrl } from '@/lib/utils';
 
 interface MediaAsset { id: string; url: string; thumbnailUrl?: string; mimeType: string; }
@@ -103,6 +103,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
   const [blocking, setBlocking] = useState(false);
   const [startingCall, setStartingCall] = useState(false);
   const [callPickerOpen, setCallPickerOpen] = useState(false);
+  const [callConfigured, setCallConfigured] = useState(false);
   const [liveRoom, setLiveRoom] = useState<string | null>(null);
   const [lightboxPost, setLightboxPost] = useState<Post | null>(null);
 
@@ -114,6 +115,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [lightboxPost]);
+
+  useEffect(() => {
+    let active = true;
+    fetchCallServerConfig().then((cfg) => {
+      if (active) setCallConfigured(cfg.enabled);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   useEffect(() => {
     let active = true;
@@ -326,7 +337,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </>
               ) : (
                 <>
-                  {callsVisible(me?.role) && (
+                  {callsVisible(me?.role) && callConfigured && (
                     <button
                       onClick={() => setCallPickerOpen(true)}
                       disabled={startingCall}
@@ -744,7 +755,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       )}
 
       {/* ── Call picker (desktop) ───────────────────────────────────────────── */}
-      {callPickerOpen && callsVisible(me?.role) && !isMe && (
+      {callPickerOpen && callsVisible(me?.role) && callConfigured && !isMe && (
         <div className="hidden sm:flex fixed inset-0 z-50 items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-5">
             <div className="flex items-center justify-between mb-3">
@@ -793,7 +804,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
       )}
 
       {/* ── Call picker (mobile action sheet) ───────────────────────────────── */}
-      {callPickerOpen && callsVisible(me?.role) && !isMe && (
+      {callPickerOpen && callsVisible(me?.role) && callConfigured && !isMe && (
         <div className="sm:hidden fixed inset-0 z-50 bg-black/50 backdrop-blur-sm">
           <button
             type="button"

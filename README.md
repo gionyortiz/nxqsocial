@@ -2,7 +2,8 @@
 
 A trust-first social platform for verified humans — safer feeds, creator-first media, and anti-bot protection.
 
-> **Status: Private Beta** — invite-only access. Production deployment in progress.
+> **Status: Release candidate** — open-registration hardening is implemented;
+> Railway staging verification and production rollout are still pending.
 
 ## Release Status
 
@@ -12,11 +13,11 @@ Current Apple + Google Play release tracking lives in [docs/NXQ_SOCIAL_RELEASE_S
 
 | Layer | Tech |
 |---|---|
-| Frontend | Next.js 15 (App Router), TypeScript, Tailwind CSS |
+| Frontend | Next.js 16 (App Router), TypeScript, Tailwind CSS |
 | Backend | NestJS, TypeScript |
 | Database | PostgreSQL + Prisma ORM |
-| Auth | JWT + configurable invite gate |
-| File storage | AWS S3 signed uploads |
+| Auth | JWT + Cloudflare Turnstile + required email verification |
+| File storage | S3-compatible direct uploads with private quarantine |
 | Safety | Text scan + AWS Rekognition media scan |
 | Verification | Stripe Identity + email/phone OTP |
 | Moderation | Reports, audit logs, admin media review |
@@ -25,27 +26,30 @@ Current Apple + Google Play release tracking lives in [docs/NXQ_SOCIAL_RELEASE_S
 
 NXQ Social is built around verified human identity from day one:
 
-- **Configurable invite gating** — switch between closed beta and open registration via env flag
-- **Email & phone OTP verification** — required before full access
+- **Bot-resistant open registration** — Cloudflare Turnstile is verified server-side before account creation
+- **Mandatory email verification** — new accounts receive only a purpose-limited verification session until the six-digit code is confirmed
+- **Optional phone OTP verification** — raises account trust after signup
 - **Stripe Identity verification** — government ID check for verified badge
 - **Trust score system** — progressive trust based on verification level
-- **Anti-bot rate limits** — per-endpoint throttling
+- **Durable anti-bot rate limits** — shared Redis-backed per-endpoint throttling with bounded verification attempts
 - **Content reports** — user-submitted reports with admin resolution
 - **Admin media review** — manual approval queue for flagged uploads
 - **Audit logs** — immutable record of moderation actions
 - **AWS Rekognition media scan** — automatic safety scanning on upload
-- **Moderation status pipeline** — `pending → scanning → approved/rejected`
+- **Moderation status pipeline** — fenced finalization, transcode, scan, publish,
+  reject, and durable cleanup states
 
 ## Private Beta Status
 
 | Feature | Status |
 |---|---|
-| Registration + configurable invite gate | ✅ Live |
-| Email / phone OTP | ✅ Live |
+| Turnstile-protected open registration | 🧪 Staging verification |
+| Required new-account email verification + optional phone OTP | 🧪 Staging verification |
 | JWT auth | ✅ Live |
 | User profiles + follow/unfollow | ✅ Live |
-| Photo & video uploads (S3) | ✅ Live |
-| Media safety scanning (Rekognition) | ✅ Live |
+| Photo & video uploads (current local-volume production) | ✅ Live |
+| Quarantined S3/R2 uploads + durable cleanup | 🧪 Staging verification |
+| Media safety scanning (Rekognition) | 🧪 Staging verification |
 | Infinite-scroll feed | ✅ Live |
 | Vertical Reels | ✅ Live |
 | Like & comment | ✅ Live |
@@ -53,7 +57,7 @@ NXQ Social is built around verified human identity from day one:
 | Reports + admin moderation | ✅ Live |
 | Audit log | ✅ Live |
 | Admin media review | ✅ Live |
-| Health checks (`/api/health/ready`) | ✅ Live |
+| Storage-aware health checks (`/api/health/ready`) | 🧪 Staging verification |
 | Direct messages | 🔜 Phase 2 |
 | Stories | 🔜 Phase 2 |
 | Creator analytics | 🔜 Phase 2 |
@@ -104,7 +108,7 @@ See [DEPLOY.md](./DEPLOY.md) for the full production runbook covering:
 - Cloudflare DNS setup
 - Nginx + SSL (certbot)
 - Stripe webhook configuration
-- S3 CORS configuration
+- Isolated public/quarantine storage and moderation configuration
 - Health check verification
 - Smoke test script
 
@@ -113,7 +117,9 @@ See [DEPLOY.md](./DEPLOY.md) for the full production runbook covering:
 ### Auth & Registration
 | Method | Path | Auth | Description |
 |---|---|---|---|
-| POST | /api/auth/register | Optional or required (config) | Register user |
+| POST | /api/auth/register | Turnstile | Create a pending account and send an email code |
+| POST | /api/auth/verify-email | Verification token | Verify the code and receive a normal session |
+| POST | /api/auth/resend-verification | Verification token | Resend the email code (rate limited) |
 | POST | /api/auth/login | - | Login |
 | GET | /api/auth/me | JWT | Current user |
 
@@ -169,7 +175,7 @@ See [DEPLOY.md](./DEPLOY.md) for the full production runbook covering:
 | Method | Path | Auth | Description |
 |---|---|---|---|
 | GET | /api/health | - | Liveness check |
-| GET | /api/health/ready | - | Readiness (DB + Redis) |
+| GET | /api/health/ready | - | Readiness (DB + Redis + object storage) |
 
 ## Environment Variables
 

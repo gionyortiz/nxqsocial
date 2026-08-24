@@ -7,9 +7,9 @@ Thumbs.db
 # ── Secrets — NEVER commit these ──────────────────────────────────────────────
 # Root docker-compose secrets file (see DEPLOY.md §2)
 .env
-.env.prod
-.env.staging
-.env.local
+.env.*
+!.env.example
+!.env.*.example
 
 # ── Dependencies ──────────────────────────────────────────────────────────────
 node_modules/
@@ -18,6 +18,19 @@ node_modules/
 dist/
 .next/
 out/
+
+# Runtime-generated user media must live in object storage/volumes, never Git.
+backend/uploads/
+
+# Local mobile verification/build artifacts.
+mobile/dist-*-check/
+mobile/tmp/
+mobile/*.aab
+mobile/*.apk
+mobile/*.ipa
+
+# Accidental shell-help capture; never include it in a release.
+/hell*pwsh*
 
 password.txt
 apple-reviewer-credentials.txt

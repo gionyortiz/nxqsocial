@@ -13,12 +13,14 @@ export const REDIS_CLIENT = 'REDIS_CLIENT';
       useFactory: (config: ConfigService) => {
         const url = config.get<string>('REDIS_URL', 'redis://localhost:6379');
         const client = new Redis(url, {
-          maxRetriesPerRequest: null,
+          maxRetriesPerRequest: 1,
+          connectTimeout: 4000,
+          commandTimeout: 5000,
           enableReadyCheck: true,
           lazyConnect: true,
         });
         client.on('error', (err) => {
-          // Log but don't crash — fall back gracefully if Redis is down
+          // Security-sensitive calls fail closed with a bounded 503 response.
           console.warn('[Redis] connection error:', err.message);
         });
         return client;

@@ -11,6 +11,12 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import Logo from '@/components/Logo';
+import {
+  PENDING_EMAIL_VERIFICATION_KEY,
+  RegisterResponse,
+  apiErrorMessage,
+  deadlineAfterSeconds,
+} from '@/lib/signup';
 
 const schema = z.object({
   email: z.string().email('Invalid email'),
@@ -30,12 +36,32 @@ export default function LoginPage() {
   const onSubmit = async (data: FormData) => {
     setServerError('');
     try {
-      const { data: res } = await api.post('/auth/login', data);
+      const { data: res } = await api.post<RegisterResponse>('/auth/login', data);
+      if (res.requiresEmailVerification === true) {
+        if (!res.verification_token || !res.user?.email) {
+          setServerError('Email verification is required, but the verification session was incomplete.');
+          return;
+        }
+        const resendAfterSeconds = res.verification?.sent === false
+          ? 0
+          : res.verification?.resendAfterSeconds ?? 60;
+        sessionStorage.setItem(PENDING_EMAIL_VERIFICATION_KEY, JSON.stringify({
+          verificationToken: res.verification_token,
+          email: res.user.email,
+          resendAvailableAt: deadlineAfterSeconds(resendAfterSeconds),
+        }));
+        router.push('/verify-email');
+        return;
+      }
+      if (!res.user || !res.access_token) {
+        setServerError('Login returned an incomplete session. Please try again.');
+        return;
+      }
+      sessionStorage.removeItem(PENDING_EMAIL_VERIFICATION_KEY);
       setAuth(res.user, res.access_token);
       router.push('/feed');
     } catch (err: unknown) {
-      const message = (err as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setServerError(message ?? 'Login failed');
+      setServerError(apiErrorMessage(err, 'Login failed'));
     }
   };
 

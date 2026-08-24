@@ -2,9 +2,12 @@ import { Module } from '@nestjs/common';
 import { ConfigModule } from '@nestjs/config';
 import { ServeStaticModule } from '@nestjs/serve-static';
 import { ThrottlerModule } from '@nestjs/throttler';
+import type Redis from 'ioredis';
 import { join } from 'path';
+import type { ServerResponse } from 'http';
 import { PrismaModule } from './prisma/prisma.module';
-import { RedisModule } from './redis/redis.module';
+import { REDIS_CLIENT, RedisModule } from './redis/redis.module';
+import { RedisThrottlerStorage } from './redis/redis-throttler.storage';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { PostsModule } from './posts/posts.module';
@@ -31,17 +34,23 @@ import { NotificationFeedModule } from './notification-feed/notification-feed.mo
 import { AiModule } from './ai/ai.module';
 import { MessagesModule } from './messages/messages.module';
 import { getClientIpFromRequest } from './common/network/client-ip';
+import { validateEnvironment } from './config/environment';
 
 @Module({
   imports: [
-    ConfigModule.forRoot({ isGlobal: true }),
+    ConfigModule.forRoot({ isGlobal: true, validate: validateEnvironment }),
     // Rate-limit storage for auth endpoints (applied per-route in AuthController).
     // Skipped under tests so e2e suites can register/login freely.
-    ThrottlerModule.forRoot({
-      throttlers: [{ name: 'default', ttl: 60000, limit: 60 }],
-      skipIf: () => process.env.NODE_ENV === 'test',
-      getTracker: (req) => getClientIpFromRequest(req),
-      errorMessage: 'Too many attempts. Please wait a minute and try again.',
+    ThrottlerModule.forRootAsync({
+      imports: [RedisModule],
+      inject: [REDIS_CLIENT],
+      useFactory: (redis: Redis) => ({
+        throttlers: [{ name: 'default', ttl: 60000, limit: 60 }],
+        storage: new RedisThrottlerStorage(redis),
+        skipIf: () => process.env.NODE_ENV === 'test',
+        getTracker: (req) => getClientIpFromRequest(req),
+        errorMessage: 'Too many attempts. Please wait a minute and try again.',
+      }),
     }),
     StorageModule,
     ServeStaticModule.forRoot({
@@ -50,8 +59,21 @@ import { getClientIpFromRequest } from './common/network/client-ip';
       rootPath: join(process.cwd(), 'uploads'),
       serveRoot: '/api/uploads',
       serveStaticOptions: {
-        setHeaders: (res) => {
+        setHeaders: (res: ServerResponse) => {
           // Allow cross-origin <img>/<video> loads from the frontend domain.
+          res.setHeader('Access-Control-Allow-Origin', '*');
+          res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+          res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
+        },
+      },
+    }),
+    // Backward-compatibility: some old rows still point to /uploads/*.
+    // Keep this route until data migration fully normalizes to /api/uploads/*.
+    ServeStaticModule.forRoot({
+      rootPath: join(process.cwd(), 'uploads'),
+      serveRoot: '/uploads',
+      serveStaticOptions: {
+        setHeaders: (res: ServerResponse) => {
           res.setHeader('Access-Control-Allow-Origin', '*');
           res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
           res.setHeader('Cache-Control', 'public, max-age=31536000, immutable');
@@ -87,4 +109,3 @@ import { getClientIpFromRequest } from './common/network/client-ip';
   ],
 })
 export class AppModule {}
-

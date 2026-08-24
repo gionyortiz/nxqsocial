@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, SafeAreaView, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -35,6 +35,16 @@ export default function UserProfileScreen() {
   const [followBusy, setFollowBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [screenFocused, setScreenFocused] = useState(false);
+  const [activePostId, setActivePostId] = useState<string | null>(null);
+  const activePostIdRef = useRef<string | null>(null);
+  const viewabilityConfig = useRef({ itemVisiblePercentThreshold: 60 }).current;
+  const onViewableItemsChanged = useRef(({ viewableItems }: { viewableItems: Array<{ item: PostItem }> }) => {
+    const nextActivePostId = viewableItems[0]?.item?.id ?? null;
+    if (nextActivePostId === activePostIdRef.current) return;
+    pauseAllMedia();
+    activePostIdRef.current = nextActivePostId;
+    setActivePostId(nextActivePostId);
+  }).current;
 
   const load = async () => {
     if (!token || !username) return;
@@ -64,6 +74,7 @@ export default function UserProfileScreen() {
       setScreenFocused(true);
       return () => {
         setScreenFocused(false);
+        pauseAllMedia();
       };
     }, []),
   );
@@ -197,6 +208,13 @@ export default function UserProfileScreen() {
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
+        viewabilityConfig={viewabilityConfig}
+        onViewableItemsChanged={onViewableItemsChanged}
+        onScrollBeginDrag={() => {
+          pauseAllMedia();
+          activePostIdRef.current = null;
+          setActivePostId(null);
+        }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#22d3ee" />}
         contentContainerStyle={{ paddingBottom: 34 }}
         ListHeaderComponent={(
@@ -314,24 +332,8 @@ export default function UserProfileScreen() {
                       <Text style={{ color: '#cbd5e1', fontWeight: '800' }}>Video</Text>
                     </Pressable>
                   </View>
-                  <View style={{ backgroundColor: '#1a2332', borderRadius: 8, padding: 8, borderWidth: 1, borderColor: '#334155' }}>
-                    <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>You: {user?.username || 'loading'}</Text>
-                    <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>Viewing: {profile?.username}</Text>
-                    <Text style={{ color: '#cbd5e1', fontSize: 11, fontFamily: 'monospace' }}>Auth: {token ? '✓' : '✗'}</Text>
-                  </View>
                 </View>
               ) : null}
-
-              {/* ALWAYS-VISIBLE DEBUG TEST SECTION */}
-              <View style={{ backgroundColor: '#2a3f4d', borderRadius: 8, padding: 12, marginTop: 12, marginHorizontal: 0, borderWidth: 1, borderColor: '#4a5f6d' }}>
-                <Text style={{ color: '#67e8f9', fontWeight: '900', marginBottom: 8 }}>TEST: Button Response</Text>
-                <Pressable
-                  onPress={() => Alert.alert('SUCCESS', 'This button IS clickable! Call button issue is NOT about button responsiveness.')}
-                  style={{ backgroundColor: '#0ea5e9', borderRadius: 8, padding: 12, alignItems: 'center' }}
-                >
-                  <Text style={{ color: '#fff', fontWeight: '900' }}>Tap Here to Test</Text>
-                </Pressable>
-              </View>
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 10 }}>
                 <Text style={{ color: '#f8fafc', fontWeight: '900', fontSize: 18, letterSpacing: -0.2 }}>Posts</Text>
@@ -345,7 +347,7 @@ export default function UserProfileScreen() {
         renderItem={({ item }) => {
           return (
             <View style={{ backgroundColor: '#0f172a', borderRadius: 18, marginHorizontal: 16, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#233047' }}>
-              <PostMedia asset={item.media?.[0]} style={{ height: 300 }} shouldPlay={screenFocused} />
+              <PostMedia asset={item.media?.[0]} style={{ height: 300 }} shouldPlay={screenFocused && activePostId === item.id} />
               <View style={{ padding: 12, gap: 8 }}>
                 {item.caption ? <Text style={{ color: '#e2e8f0', lineHeight: 20 }}>{item.caption}</Text> : null}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>

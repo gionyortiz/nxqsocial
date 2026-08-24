@@ -4,7 +4,8 @@
 #   2. Copy frontend/.env.local.example → frontend/.env.prod and fill in all values
 #   3. docker compose -f docker-compose.prod.yml up -d
 #
-# The backend runs migrations automatically on startup.
+# The Compose backend command runs migrations before startup. Railway uses the
+# same pinned command as a separate pre-deploy step (see docs/RAILWAY_STAGING.md).
 # Run seed once after first deploy:
 #   docker compose -f docker-compose.prod.yml exec backend npx prisma db seed
 
@@ -45,17 +46,19 @@ services:
     environment:
       DATABASE_URL: "postgresql://${POSTGRES_USER}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-nxqsocial}"
       REDIS_URL: "redis://:${REDIS_PASSWORD}@redis:6379"
+      S3_PUBLIC_BASE_URL: ${S3_PUBLIC_BASE_URL:-https://media.nxqsocial.com}
+    command: ["npm", "run", "start:with-migrations"]
     depends_on:
       postgres:
         condition: service_healthy
       redis:
         condition: service_healthy
     ports:
-      - "3000:3000"
+      - "[::1]:3000:3000"
     volumes:
       - backend_uploads:/app/uploads
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3000/api/health/ready || exit 1"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -65,15 +68,21 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
       args:
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:?NEXT_PUBLIC_API_URL is required and must be the public HTTPS API URL ending in /api}
+        NEXT_PUBLIC_TURNSTILE_SITE_KEY: ${NEXT_PUBLIC_TURNSTILE_SITE_KEY:?NEXT_PUBLIC_TURNSTILE_SITE_KEY is required}
         NEXT_PUBLIC_CALLS_ENABLED: ${NEXT_PUBLIC_CALLS_ENABLED:-false}
         NEXT_PUBLIC_LIVE_ENABLED: ${NEXT_PUBLIC_LIVE_ENABLED:-false}
     restart: unless-stopped
     ports:
-      - "3001:3001"
+      - "[::1]:3001:3001"
     depends_on:
       backend:
         condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   pg_data:

@@ -1,16 +1,21 @@
 import { INestApplication } from '@nestjs/common';
 import { createTestApp } from './test-app';
-import { registerUser, getOtpCode, cleanupTestUsers, inviteCodeField } from './factories';
+import { registerUser, cleanupTestUsers } from './factories';
 import { PrismaService } from '../../src/prisma/prisma.service';
+import { NotificationsService } from '../../src/notifications/notifications.service';
 import request from 'supertest';
 
 describe('OTP Verification + Trust Score E2E', () => {
   let app: INestApplication;
   let prisma: PrismaService;
+  let notificationsMock: jest.Mocked<
+    Pick<NotificationsService, 'sendEmailOtp' | 'sendPhoneOtp'>
+  >;
 
   beforeAll(async () => {
     const ctx = await createTestApp();
     app = ctx.app;
+    notificationsMock = ctx.notificationsMock;
     prisma = app.get(PrismaService);
   });
 
@@ -29,14 +34,19 @@ describe('OTP Verification + Trust Score E2E', () => {
       .set('Authorization', `Bearer ${user.access_token}`)
       .expect(200);
 
-    // 2. Read code from DB
-    const code = await getOtpCode(prisma, user.id, 'email');
+    // 2. Capture the raw code delivered by the notification boundary. The DB
+    // stores only a keyed digest, so reading `OtpCode.code` is intentionally
+    // not a valid way to recover a verification code.
+    const code = [...notificationsMock.sendEmailOtp.mock.calls]
+      .reverse()
+      .find(([recipient]) => recipient === user.email)?.[1];
+    expect(code).toMatch(/^\d{6}$/);
 
     // 3. Verify OTP
     const { body } = await request(app.getHttpServer())
       .post('/api/otp/verify')
       .set('Authorization', `Bearer ${user.access_token}`)
-      .send({ channel: 'email', code })
+      .send({ channel: 'email', code: code! })
       .expect(200);
 
     expect(body.verified).toBe(true);
@@ -56,13 +66,16 @@ describe('OTP Verification + Trust Score E2E', () => {
       .set('Authorization', `Bearer ${user.access_token}`)
       .expect(200);
 
-    const code = await getOtpCode(prisma, user.id, 'email');
+    const code = [...notificationsMock.sendEmailOtp.mock.calls]
+      .reverse()
+      .find(([recipient]) => recipient === user.email)?.[1];
+    expect(code).toMatch(/^\d{6}$/);
 
     // First verify — should succeed
     await request(app.getHttpServer())
       .post('/api/otp/verify')
       .set('Authorization', `Bearer ${user.access_token}`)
-      .send({ channel: 'email', code })
+      .send({ channel: 'email', code: code! })
       .expect(200);
 
     // Second send-email — already verified
@@ -97,7 +110,6 @@ describe('OTP Verification + Trust Score E2E', () => {
         username: `otpphone_${id}`,
         password: 'P@ssw0rd_Test!',
         displayName: 'Phone OTP User',
-        ...inviteCodeField(),
       })
       .expect(201);
 
@@ -117,14 +129,17 @@ describe('OTP Verification + Trust Score E2E', () => {
       .set('Authorization', `Bearer ${token}`)
       .expect(200);
 
-    // 2. Read code from DB
-    const code = await getOtpCode(prisma, userId, 'phone');
+    // 2. Capture the raw code at the mocked SMS delivery boundary.
+    const code = [...notificationsMock.sendPhoneOtp.mock.calls]
+      .reverse()
+      .find(([recipient]) => recipient === '+15550000001')?.[1];
+    expect(code).toMatch(/^\d{6}$/);
 
     // 3. Verify OTP
     const { body } = await request(app.getHttpServer())
       .post('/api/otp/verify')
       .set('Authorization', `Bearer ${token}`)
-      .send({ channel: 'phone', code })
+      .send({ channel: 'phone', code: code! })
       .expect(200);
 
     expect(body.verified).toBe(true);

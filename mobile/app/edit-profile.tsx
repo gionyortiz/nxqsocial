@@ -2,6 +2,8 @@ import { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as ImagePicker from 'expo-image-picker';
+import * as ImageManipulator from 'expo-image-manipulator';
+import { File, UploadType } from 'expo-file-system';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useAuth } from '@/lib/auth';
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
@@ -39,21 +41,46 @@ export default function EditProfileScreen() {
     const asset = result.assets[0];
     setUploadingAvatar(true);
     try {
-      // This Expo SDK's fetch/FormData implementation only accepts real Blob
-      // parts — the classic RN `{ uri, name, type }` shorthand throws
-      // "Unsupported FormDataPart implementation". Read the local file into
-      // an actual Blob on every platform instead.
-      const form = new FormData();
-      const blob = await (await fetch(asset.uri)).blob();
-      form.append('avatar', blob, asset.fileName || 'avatar.jpg');
+      // Use Expo's native multipart uploader on devices. Passing a web Blob
+      // through React Native FormData causes "Unsupported FormDataPart".
+      let status: number;
+      let body: string;
 
-      const res = await fetch(`${API_BASE_URL}/users/me/avatar`, {
-        method: 'PATCH',
-        headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-        body: form,
-      });
-      const body = await res.text();
-      if (!res.ok) {
+      if (Platform.OS === 'web') {
+        const form = new FormData();
+        const blob = await (await fetch(asset.uri)).blob();
+        form.append('avatar', blob, asset.fileName || 'avatar.jpg');
+
+        const res = await fetch(`${API_BASE_URL}/users/me/avatar`, {
+          method: 'PATCH',
+          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+          body: form,
+        });
+        status = res.status;
+        body = await res.text();
+      } else {
+        const normalized = await ImageManipulator.manipulateAsync(
+          asset.uri,
+          [{ resize: { width: 1024 } }],
+          { compress: 0.85, format: ImageManipulator.SaveFormat.JPEG },
+        );
+        const avatarFile = new File(normalized.uri);
+        const upload = await avatarFile.upload(`${API_BASE_URL}/users/me/avatar/raw`, {
+          httpMethod: 'PATCH',
+          uploadType: UploadType.BINARY_CONTENT,
+          mimeType: 'image/jpeg',
+          headers: {
+            Authorization: `Bearer ${token}`,
+            Accept: 'application/json',
+            'Content-Type': 'image/jpeg',
+          },
+          sessionType: 'foreground',
+        });
+        status = upload.status;
+        body = upload.body;
+      }
+
+      if (status < 200 || status >= 300) {
         const err = (() => { try { return JSON.parse(body || '{}'); } catch { return {} as any; } })();
         throw new Error(err?.message || 'Could not update profile photo');
       }

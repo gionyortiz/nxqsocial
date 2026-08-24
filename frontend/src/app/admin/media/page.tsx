@@ -18,7 +18,7 @@ import { api } from '@/lib/api';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
-type UploadStatus = 'PENDING' | 'SCANNING' | 'PUBLISHED' | 'REJECTED';
+type UploadStatus = 'PENDING' | 'FINALIZING' | 'TRANSCODING' | 'SCANNING' | 'PUBLISHED' | 'REJECTED' | 'REMOVING';
 type ModerationStatus = 'PENDING' | 'APPROVED' | 'FLAGGED' | 'REJECTED' | 'REMOVED';
 type FilterTab = 'FLAGGED' | 'SCANNING' | 'REJECTED' | 'ALL';
 

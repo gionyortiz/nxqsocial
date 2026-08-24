@@ -8,6 +8,7 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { PostsService } from './posts.service';
 import { CreatePostDto } from './posts.dto';
+import { ProductionMultipartGuard } from './production-multipart.guard';
 
 @Controller('posts')
 @UseGuards(JwtAuthGuard)
@@ -15,11 +16,12 @@ export class PostsController {
   constructor(private postsService: PostsService) {}
 
   @Post()
+  @UseGuards(ProductionMultipartGuard)
   @UseInterceptors(
     FileInterceptor('media', {
       storage: memoryStorage(),
       fileFilter: (_req, file, cb) => {
-        if (!file.mimetype.match(/^(image\/(jpeg|png|webp)|video\/mp4)$/)) {
+        if (!file.mimetype.match(/^(image\/(jpeg|png)|video\/mp4)$/)) {
           return cb(
             new BadRequestException('Unsupported file type. Videos must be MP4 (H.264/AAC).'),
             false,

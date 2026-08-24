@@ -1,6 +1,14 @@
 const defaultApiBaseUrl = 'https://api.nxqsocial.com/api';
+const defaultTurnstileMobileUrl = 'https://nxqsocial.com/turnstile/mobile-signup';
 
 export const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL ?? defaultApiBaseUrl;
+
+/**
+ * Public HTTPS page that hosts the Cloudflare Turnstile widget for native apps.
+ * The Turnstile secret is backend-only and must never be placed in Expo config.
+ */
+export const TURNSTILE_MOBILE_URL =
+  process.env.EXPO_PUBLIC_TURNSTILE_MOBILE_URL ?? defaultTurnstileMobileUrl;
 
 /**
  * Mobile Live visibility flag.

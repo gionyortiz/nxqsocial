@@ -16,7 +16,8 @@ Cross-platform Apple + Google Play release tracking is maintained in [docs/NXQ_S
 ## Implemented v1 screens
 
 - Login
-- Register (with invite code field)
+- Register (matching password confirmation, required terms consent, Turnstile,
+  and required email verification)
 - Feed
 - Reels
 - Create post (native photo/video picker)
@@ -84,6 +85,12 @@ Configured identifiers:
 - This app reuses the existing NXQ backend.
 - No new backend was created.
 - Web app and backend remain separate from mobile runtime.
+- The new Turnstile flow adds the native `react-native-webview` module, which
+  is absent from the identified 1.0.6 store binary. It cannot be published as
+  an OTA-only update; it needs a new native build and device review.
+- Expo Doctor currently blocks release because SDK 56's Hermes V1 has a known
+  memory regression. Upgrade to a fixed Expo SDK 57 / React Native 0.86.2+
+  combination in a separately reviewed mobile-release change.
 
 ## Next recommended steps
 

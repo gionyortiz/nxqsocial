@@ -15,7 +15,7 @@ Cross-platform Apple + Google Play release tracking is maintained in [docs/NXQ_S
 |------|----------------|
 | Docker | 24.x |
 | Docker Compose | v2.20 |
-| Node.js (CI / local build only) | 20.x |
+| Node.js (CI / local build only) | 22.x |
 | PostgreSQL (external, optional) | 16.x |
 | Redis (external, optional) | 7.x |
 
@@ -64,7 +64,6 @@ nano frontend/.env.prod
 | Variable | Example |
 |----------|---------|
 | `NEXT_PUBLIC_API_URL` | `https://api.nxqsocial.com/api` |
-| `NEXT_PUBLIC_BETA_MODE` | `true` (set only during closed beta) |
 
 ### Root-level compose secrets
 
@@ -77,7 +76,6 @@ POSTGRES_PASSWORD=<strong-random-password>
 POSTGRES_DB=nxqsocial
 REDIS_PASSWORD=<strong-random-password>
 NEXT_PUBLIC_API_URL=https://api.nxqsocial.com/api
-NEXT_PUBLIC_BETA_MODE=false
 EOF
 ```
 
@@ -201,27 +199,31 @@ certbot --nginx -d nxqsocial.com -d www.nxqsocial.com -d api.nxqsocial.com
 
 ---
 
-## 8. Configure S3 Bucket (AWS)
+## 8. Configure object storage and media moderation
 
-1. Create bucket `nxqsocial-media` in your chosen region.
-2. Block all public access **except** for pre-signed URL reads, or attach a bucket policy:
-   ```json
-   {
-     "Version": "2012-10-17",
-     "Statement": [{ "Effect": "Allow", "Principal": "*", "Action": "s3:GetObject", "Resource": "arn:aws:s3:::nxqsocial-media/*" }]
-   }
-   ```
-3. CORS configuration (allows presigned upload PUT from the frontend):
-   ```json
-   [{
-     "AllowedHeaders": ["*"],
-     "AllowedMethods": ["GET", "PUT", "POST", "HEAD"],
-     "AllowedOrigins": ["https://nxqsocial.com", "https://www.nxqsocial.com"],
-     "ExposeHeaders": ["ETag"]
-   }]
-   ```
-4. Create an IAM user with `AmazonS3FullAccess` + `AmazonRekognitionFullAccess` policies.
-5. Add the credentials to `backend/.env.prod`.
+Use three isolated resources; never combine them into one public bucket:
+
+1. A **public media** S3/R2 bucket, exposed only through the approved media
+   hostname (`S3_BUCKET` / `S3_BUCKET_NAME`, `S3_PUBLIC_BASE_URL`).
+2. A **private quarantine** S3/R2 bucket (`S3_QUARANTINE_BUCKET`). Browser PUT
+   CORS belongs here only, must allow the exact frontend origin and required
+   `Content-Type` header, and must not expose an `r2.dev` or custom public URL.
+3. A separate **private AWS moderation** bucket
+   (`REKOGNITION_S3_BUCKET`) in `REKOGNITION_REGION`, with public access
+   blocked. Use distinct, least-privilege Rekognition credentials.
+
+Scope storage credentials only to the two storage buckets and moderation
+credentials only to the moderation prefix and required Rekognition calls. On
+the quarantine bucket, use distinct lifecycle filters: expire client-writable
+`incoming/` objects after 1 day, but retain server-owned
+`processing/media-finalizing/` snapshots for at least 7 days so application
+recovery and transcode retries cannot race storage expiry. Add a short
+lifecycle rule for moderation copies. Do not grant account-wide
+`AmazonS3FullAccess` or `AmazonRekognitionFullAccess`.
+
+The exact variables and safety requirements are documented in
+`backend/.env.example`; the isolated staging setup and test procedure are in
+`docs/RAILWAY_STAGING.md`.
 
 ---
 
@@ -232,10 +234,10 @@ certbot --nginx -d nxqsocial.com -d www.nxqsocial.com -d api.nxqsocial.com
 curl https://api.nxqsocial.com/api/health
 # {"status":"ok","timestamp":"...","uptime":42,"version":"1.0.0"}
 
-# Readiness — returns 200 only if DB and Redis are reachable
+# Readiness — returns 200 only if DB, Redis, and object storage are reachable
 curl https://api.nxqsocial.com/api/health/ready
-# {"status":"ok","db":"ok","redis":"ok"}
-# Returns 503 if either dependency is down
+# {"status":"ready","checks":{"database":"ok","redis":"ok","storage":"ok"}}
+# Returns 503 if any required dependency is down
 ```
 
 ---
@@ -276,7 +278,7 @@ Migrations run automatically on backend restart.
 
 For production observability consider:
 
-- **Uptime monitoring:** Better Uptime, UptimeRobot (ping `/api/health`)
+- **Uptime monitoring:** Better Uptime, UptimeRobot (ping `/api/health/ready`)
 - **Error tracking:** Sentry (add `@sentry/nestjs` + `@sentry/nextjs`)
 - **Metrics:** Prometheus + Grafana (add `@willsoto/nestjs-prometheus`)
 - **Log aggregation:** Axiom, Logtail, or self-hosted Loki

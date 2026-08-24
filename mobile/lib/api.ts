@@ -67,6 +67,43 @@ interface ApiOptions {
   token?: string | null;
   body?: unknown;
   headers?: Record<string, string>;
+  retryNetworkErrors?: boolean;
+}
+
+interface ApiErrorPayload {
+  statusCode?: number;
+  error?: string;
+  message?: string | string[];
+  code?: string;
+  retryAfter?: number;
+}
+
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+  readonly retryAfterSeconds?: number;
+  readonly payload?: ApiErrorPayload;
+
+  constructor({
+    status,
+    message,
+    code,
+    retryAfterSeconds,
+    payload,
+  }: {
+    status: number;
+    message: string;
+    code?: string;
+    retryAfterSeconds?: number;
+    payload?: ApiErrorPayload;
+  }) {
+    super(message);
+    this.name = 'ApiError';
+    this.status = status;
+    this.code = code;
+    this.retryAfterSeconds = retryAfterSeconds;
+    this.payload = payload;
+  }
 }
 
 const NATIVE_NETWORK_RETRY_ATTEMPTS = 3;
@@ -75,6 +112,29 @@ const REQUEST_TIMEOUT_MS = 12000;
 
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+export function parseRetryAfter(value: string | null, nowMs = Date.now()): number | undefined {
+  if (!value) return undefined;
+
+  const trimmed = value.trim();
+  if (/^\d+$/.test(trimmed)) {
+    const deltaSeconds = Number(trimmed);
+    if (Number.isSafeInteger(deltaSeconds)) return deltaSeconds;
+  }
+
+  const retryAtMs = Date.parse(trimmed);
+  if (!Number.isFinite(retryAtMs)) return undefined;
+  return Math.max(0, Math.ceil((retryAtMs - nowMs) / 1000));
+}
+
+function apiErrorMessage(payload: ApiErrorPayload | undefined, status: number): string {
+  if (Array.isArray(payload?.message)) {
+    const joined = payload.message.filter((item): item is string => typeof item === 'string').join(' ');
+    if (joined) return joined;
+  }
+  if (typeof payload?.message === 'string' && payload.message) return payload.message;
+  return `Request failed (${status})`;
 }
 
 function classifyNetworkError(error: unknown): string {
@@ -106,12 +166,13 @@ function isTransientNativeNetworkError(error: unknown): boolean {
 
 export async function apiRequest<T>(
   path: string,
-  { method = 'GET', token, body, headers = {} }: ApiOptions = {},
+  { method = 'GET', token, body, headers = {}, retryNetworkErrors = true }: ApiOptions = {},
 ): Promise<T> {
   let res: Response | null = null;
   let lastError: unknown = null;
+  const maxAttempts = retryNetworkErrors ? NATIVE_NETWORK_RETRY_ATTEMPTS : 1;
 
-  for (let attempt = 1; attempt <= NATIVE_NETWORK_RETRY_ATTEMPTS; attempt += 1) {
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
     try {
@@ -131,7 +192,7 @@ export async function apiRequest<T>(
       clearTimeout(timer);
       lastError = error;
       const isAbort = error instanceof Error && error.name === 'AbortError';
-      const shouldRetry = (isAbort || isTransientNativeNetworkError(error)) && attempt < NATIVE_NETWORK_RETRY_ATTEMPTS;
+      const shouldRetry = (isAbort || isTransientNativeNetworkError(error)) && attempt < maxAttempts;
       if (!shouldRetry) {
         throw new Error(classifyNetworkError(error));
       }
@@ -147,15 +208,34 @@ export async function apiRequest<T>(
   }
 
   if (!res.ok) {
-    let message = `Request failed (${res.status})`;
+    let payload: ApiErrorPayload | undefined;
     try {
-      const data = await res.json();
-      message = data?.message || message;
+      payload = await res.json() as ApiErrorPayload;
     } catch {
       // ignore
     }
-    mobileProof('apiRequest failed', { path, method, status: res.status, reason: message });
-    throw new Error(message);
+
+    const retryAfterFromHeader = parseRetryAfter(res.headers.get('retry-after'));
+    const retryAfterFromBody = typeof payload?.retryAfter === 'number' && Number.isFinite(payload.retryAfter)
+      ? Math.max(0, Math.ceil(payload.retryAfter))
+      : undefined;
+    const retryAfterSeconds = retryAfterFromHeader ?? retryAfterFromBody;
+    const message = apiErrorMessage(payload, res.status);
+    mobileProof('apiRequest failed', {
+      path,
+      method,
+      status: res.status,
+      code: payload?.code,
+      retryAfterSeconds,
+      reason: message,
+    });
+    throw new ApiError({
+      status: res.status,
+      message,
+      code: payload?.code,
+      retryAfterSeconds,
+      payload,
+    });
   }
 
   if (res.status === 204) return undefined as T;
@@ -169,5 +249,9 @@ export async function pingApiHealth(): Promise<{ status: string; timestamp?: str
 export function resolveMediaUrl(url?: string): string {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  return url.startsWith('/') ? `${API_BASE_URL.replace('/api', '')}${url}` : `${API_BASE_URL.replace('/api', '')}/${url}`;
+  // Remove only the trailing API path. A plain `.replace('/api', '')`
+  // matches the hostname in `https://api.nxqsocial.com/api` first and
+  // produces an invalid URL such as `https:/.nxqsocial.com/api/...`.
+  const apiOrigin = API_BASE_URL.replace(/\/api\/?$/, '');
+  return url.startsWith('/') ? `${apiOrigin}${url}` : `${apiOrigin}/${url}`;
 }

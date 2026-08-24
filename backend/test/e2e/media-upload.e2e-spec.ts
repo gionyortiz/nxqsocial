@@ -76,7 +76,9 @@ describe('Media Upload Pipeline E2E', () => {
         .expect(400);
 
       // ValidationPipe returns message as an array
-      const messages: string[] = Array.isArray(body.message) ? body.message : [body.message];
+      const messages: string[] = Array.isArray(body.message)
+        ? body.message
+        : [body.message];
       expect(messages.some((m) => m.includes('mimeType'))).toBe(true);
     });
 
@@ -120,8 +122,15 @@ describe('Media Upload Pipeline E2E', () => {
 
       expect(body.uploadUrl).toMatch(/^https?:\/\//);
       expect(body.mediaId).toBeTruthy();
-      expect(body.s3Key).toMatch(/uploads\/.+\.jpg$/);
+      expect(body.s3Key).toMatch(
+        new RegExp(`^incoming/${userId}/[^/]+\\.jpg$`),
+      );
       expect(body.expiresIn).toBe(600);
+
+      const pendingAsset = await prisma.mediaAsset.findUniqueOrThrow({
+        where: { id: body.mediaId },
+      });
+      expect(pendingAsset.bucket).toBe(ctx.storageMock.quarantineBucketName);
     });
 
     it('complete-upload publishes a safe image (mocked scan)', async () => {
@@ -169,7 +178,7 @@ describe('Media Upload Pipeline E2E', () => {
       const { body: urlBody } = await request(app.getHttpServer())
         .post('/api/media/create-upload-url')
         .set('Authorization', `Bearer ${token}`)
-        .send({ mimeType: 'image/webp', size: 1024 })
+        .send({ mimeType: 'image/jpeg', size: 1024 })
         .expect(201);
 
       await request(app.getHttpServer())
@@ -205,7 +214,7 @@ describe('Media Upload Pipeline E2E', () => {
         .send({ mimeType: 'video/mp4', size: 5 * 1024 * 1024 })
         .expect(201);
 
-      expect(body.s3Key).toMatch(/uploads\/.+\.mp4$/);
+      expect(body.s3Key).toMatch(/^incoming\/[^/]+\/[^/]+\.mp4$/);
     });
 
     it('complete-upload sets video status to TRANSCODING, then SCANNING or PUBLISHED once the async job finishes', async () => {
@@ -226,12 +235,18 @@ describe('Media Upload Pipeline E2E', () => {
       // to poll getStatus() afterward, same as it already does for SCANNING.
       expect(body.uploadStatus).toBe('TRANSCODING');
 
-      // startVideoScan mock returns null → falls back to PUBLISHED once transcoding finishes
-      await new Promise((resolve) => setTimeout(resolve, 500));
-      const { body: finalStatus } = await request(app.getHttpServer())
-        .get(`/api/media/${urlBody.mediaId}/status`)
-        .set('Authorization', `Bearer ${token}`)
-        .expect(200);
+      // Transcoding is deliberately asynchronous. Poll with a bounded wait
+      // rather than assuming ffmpeg completes within a fixed 500 ms window.
+      let finalStatus = body;
+      for (let attempt = 0; attempt < 40; attempt += 1) {
+        await new Promise((resolve) => setTimeout(resolve, 100));
+        const response = await request(app.getHttpServer())
+          .get(`/api/media/${urlBody.mediaId}/status`)
+          .set('Authorization', `Bearer ${token}`)
+          .expect(200);
+        finalStatus = response.body;
+        if (finalStatus.uploadStatus !== 'TRANSCODING') break;
+      }
       expect(['SCANNING', 'PUBLISHED']).toContain(finalStatus.uploadStatus);
     });
   });
@@ -297,9 +312,15 @@ describe('Media Upload Pipeline E2E', () => {
       mediaPrisma = safetyApp.get(PrismaService);
 
       // Override mediaSafetyMock to return unsafe result for this suite
-      safetyCtx.mediaSafetyMock.scanImageFromS3 = jest.fn().mockResolvedValue({
+      safetyCtx.mediaSafetyMock.scanImage.mockResolvedValue({
         safe: false,
-        labels: [{ name: 'Explicit Nudity', confidence: 98, parentName: 'Explicit Nudity' }],
+        labels: [
+          {
+            name: 'Explicit Nudity',
+            confidence: 98,
+            parentName: 'Explicit Nudity',
+          },
+        ],
         topCategory: 'Explicit Nudity',
         maxConfidence: 98,
         provider: 'rekognition',

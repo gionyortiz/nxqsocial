@@ -23,6 +23,7 @@ import { useVideoPlayer, VideoView } from 'expo-video';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { API_BASE_URL, LIVE_NATIVE_ENABLED } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
+import { CreateActionSheet, CreateActionMode } from '@/components/CreateActionSheet';
 
 type UploadErrorView = {
   title: string;
@@ -39,7 +40,7 @@ const AUDIENCES: { value: Audience; label: string; desc: string; icon: keyof typ
 ];
 
 const MEDIA_POLL_INTERVAL_MS = 1500;
-const MEDIA_POLL_MAX_ATTEMPTS = 40; // ~60s ceiling — local ffmpeg job, not Rekognition's 5min timeout
+const MEDIA_POLL_MAX_ATTEMPTS = 240; // ~6 minutes: transcode plus bounded moderation timeout
 
 /**
  * Poll GET /media/:id/status while the video is still being processed
@@ -62,7 +63,7 @@ async function pollMediaUntilProcessed(
     if (status === 'REJECTED') {
       throw new Error(body?.message || 'Video could not be processed.');
     }
-    if (status === 'SCANNING' || status === 'PUBLISHED') {
+    if (status === 'PUBLISHED') {
       return;
     }
 
@@ -70,7 +71,7 @@ async function pollMediaUntilProcessed(
     await new Promise((resolve) => setTimeout(resolve, MEDIA_POLL_INTERVAL_MS));
   }
 
-  throw new Error('Video is still processing. Please try posting again shortly.');
+  throw new Error('Media is still processing. Please check its status and try again shortly.');
 }
 
 function mapUploadError(rawMessage: string, isVideo: boolean): UploadErrorView {
@@ -113,6 +114,18 @@ function mapUploadError(rawMessage: string, isVideo: boolean): UploadErrorView {
     return {
       title: 'Upload Timed Out',
       message: 'The upload took too long. Please retry on a stronger connection.',
+      retryable: true,
+    };
+  }
+
+  if (
+    msg.includes('invalidaccesskeyid')
+    || msg.includes('signaturedoesnotmatch')
+    || msg.includes('storage upload failed (403)')
+  ) {
+    return {
+      title: 'Storage Temporarily Unavailable',
+      message: 'Cloud media upload is unavailable right now. Please retry shortly.',
       retryable: true,
     };
   }
@@ -191,6 +204,7 @@ export default function CreateScreen() {
   const [uploadStatusMessage, setUploadStatusMessage] = useState<string | null>(null);
   const [uploadError, setUploadError] = useState<UploadErrorView | null>(null);
   const [publishedType, setPublishedType] = useState<'image' | 'video' | null>(null);
+  const [showCreateMenu, setShowCreateMenu] = useState(false);
   const previewHeight = 260;
 
   const resetComposer = () => {
@@ -217,7 +231,7 @@ export default function CreateScreen() {
     const fallbackMime = isVideo ? 'video/mp4' : 'image/jpeg';
     const supportedMime = isVideo
       ? (asset.mimeType === 'video/mp4' ? asset.mimeType : fallbackMime)
-      : (asset.mimeType && /^(image\/(jpeg|png|webp))$/.test(asset.mimeType) ? asset.mimeType : fallbackMime);
+      : (asset.mimeType && /^(image\/(jpeg|png))$/.test(asset.mimeType) ? asset.mimeType : fallbackMime);
 
     setAssetUri(asset.uri);
     setAssetType(isVideo ? 'video' : 'image');
@@ -342,6 +356,18 @@ export default function CreateScreen() {
     storeSelectedAsset(captured);
   };
 
+  const chooseReelSource = () => {
+    Alert.alert(
+      'Create a reel',
+      'Choose an existing video or record a new one.',
+      [
+        { text: 'Choose from Library', onPress: () => void pickMedia('video') },
+        { text: 'Record Video', onPress: () => void captureMedia('video') },
+        { text: 'Cancel', style: 'cancel' },
+      ],
+    );
+  };
+
   useEffect(() => {
     if (initialModeHandled.current) return;
     const mode = typeof params.mode === 'string' ? params.mode : undefined;
@@ -355,7 +381,7 @@ export default function CreateScreen() {
     }
 
     if (mode === 'reel') {
-      void captureMedia('video');
+      chooseReelSource();
       return;
     }
 
@@ -372,6 +398,25 @@ export default function CreateScreen() {
       return;
     }
   }, [captureMedia, params.mode, pickMedia, router]);
+
+  const onSelectCreateMode = (mode: CreateActionMode) => {
+    setShowCreateMenu(false);
+    initialModeHandled.current = true;
+    if (mode === 'live') {
+      if (!LIVE_NATIVE_ENABLED) return;
+      const roomId = `live_${user?.id || 'guest'}_${Date.now().toString(36)}`;
+      router.push({ pathname: '/live-native' as never, params: { room: roomId, mode: 'video' } as never });
+      return;
+    }
+    router.setParams({ mode: mode === 'post' ? 'photo' : mode });
+    if (mode === 'post') {
+      void pickMedia('image');
+    } else if (mode === 'reel') {
+      chooseReelSource();
+    } else {
+      void captureMedia('all');
+    }
+  };
 
   const submit = async () => {
     if (!token || !assetUri || !assetType) return;
@@ -419,34 +464,56 @@ export default function CreateScreen() {
         ? (assetName || 'mobile-upload.mp4')
         : 'mobile-upload.jpg';
 
-      // This Expo SDK's fetch/FormData implementation only accepts real Blob
-      // parts (the classic RN `{ uri, name, type }` shorthand throws
-      // "Unsupported FormDataPart implementation"), so read the file into a
-      // real Blob on every platform, not just web.
-      const webBlob = await (await fetch(finalUri)).blob();
+      // Keep large photos and videos on disk on native devices. Converting an
+      // entire video to a web Blob can exhaust memory and its FormData part is
+      // not supported by React Native. Web still requires a Blob.
+      const webBlob = Platform.OS === 'web' ? await (await fetch(finalUri)).blob() : null;
       const uploadFile = Platform.OS === 'web' ? null : new File(finalUri);
-
-      // For local development APIs, skip presigned storage and post multipart directly.
-      const useDirectUpload = !API_BASE_URL.includes('localhost');
-      if (isStory && !useDirectUpload) {
-        throw new Error('Story creation requires cloud storage to be configured.');
+      const finalSize = webBlob?.size ?? uploadFile?.size;
+      if (!finalSize || finalSize < 1) {
+        throw new Error('Prepared upload size is unavailable. Please select the file again.');
       }
-      if (!useDirectUpload) {
+
+      const publishViaMultipart = async () => {
         setUploadProgress(55);
         setUploadStatusMessage('Uploading media...');
-        const form = new FormData();
-        form.append('caption', caption);
-        form.append('type', isVideo ? 'VIDEO' : 'PHOTO');
-        form.append('visibility', visibility);
-        form.append('media', webBlob, filename);
+        let fbStatus: number;
+        let fbBody: string;
 
-        const fbRes = await fetch(`${API_BASE_URL}/posts`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-          body: form,
-        });
-        const fbStatus = fbRes.status;
-        const fbBody = await fbRes.text();
+        if (Platform.OS === 'web') {
+          const form = new FormData();
+          form.append('caption', caption);
+          form.append('type', isVideo ? 'VIDEO' : 'PHOTO');
+          form.append('visibility', visibility);
+          if (!webBlob) throw new Error('Upload file is unavailable.');
+          form.append('media', webBlob, filename);
+
+          const fbRes = await fetch(`${API_BASE_URL}/posts`, {
+            method: 'POST',
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+            body: form,
+          });
+          fbStatus = fbRes.status;
+          fbBody = await fbRes.text();
+        } else {
+          if (!uploadFile) throw new Error('Upload file is unavailable.');
+          const fbUpload = await uploadFile.upload(`${API_BASE_URL}/posts`, {
+            httpMethod: 'POST',
+            uploadType: UploadType.MULTIPART,
+            fieldName: 'media',
+            mimeType: finalMime,
+            headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
+            parameters: {
+              caption,
+              type: isVideo ? 'VIDEO' : 'PHOTO',
+              visibility,
+            },
+            sessionType: 'foreground',
+          });
+          fbStatus = fbUpload.status;
+          fbBody = fbUpload.body;
+        }
+
         if (fbStatus < 200 || fbStatus >= 300) {
           const err = (() => { try { return JSON.parse(fbBody || '{}'); } catch { return {} as any; } })();
           throw new Error(err?.message || `Failed to create post (${fbStatus})`);
@@ -456,11 +523,19 @@ export default function CreateScreen() {
         const postedTypeFallback = assetType;
         resetComposer();
         setPublishedType(postedTypeFallback);
+      };
+
+      // For local development APIs, skip presigned storage and post multipart directly.
+      const useDirectUpload = !API_BASE_URL.includes('localhost');
+      if (isStory && !useDirectUpload) {
+        throw new Error('Story creation requires cloud storage to be configured.');
+      }
+      if (!useDirectUpload) {
+        await publishViaMultipart();
         return;
       }
 
-      // Try presigned direct upload first (requires S3/R2 on server).
-      // Fall back to multipart POST /posts if server returns 400/not-configured.
+      // Production uses only the presigned quarantine/moderation pipeline.
       setUploadProgress(15);
       setUploadStatusMessage('Requesting secure upload URL...');
       const createUploadRes = await fetch(`${API_BASE_URL}/media/create-upload-url`, {
@@ -472,42 +547,17 @@ export default function CreateScreen() {
         },
         body: JSON.stringify({
           mimeType: finalMime,
-          size: assetSize ?? webBlob?.size ?? uploadFile?.size,
+          size: finalSize,
         }),
       });
 
       const createUploadBody = await createUploadRes.text();
 
-      // If server doesn't have S3 configured, fall back to multipart upload via /posts
-      if (!createUploadRes.ok && isStory) {
-        throw new Error('Story creation requires cloud storage to be configured.');
-      }
       if (!createUploadRes.ok) {
-        setUploadProgress(55);
-        setUploadStatusMessage('Uploading media...');
-        const form = new FormData();
-        form.append('caption', caption);
-        form.append('type', isVideo ? 'VIDEO' : 'PHOTO');
-        form.append('visibility', visibility);
-        form.append('media', webBlob, filename);
-
-        const fbRes = await fetch(`${API_BASE_URL}/posts`, {
-          method: 'POST',
-          headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-          body: form,
-        });
-        const fbStatus = fbRes.status;
-        const fbBody = await fbRes.text();
-        if (fbStatus < 200 || fbStatus >= 300) {
-          const err = (() => { try { return JSON.parse(fbBody || '{}'); } catch { return {} as any; } })();
-          throw new Error(err?.message || `Failed to create post (${fbStatus})`);
-        }
-        setUploadProgress(100);
-        setUploadStatusMessage('Published');
-        const postedTypeFallback = assetType;
-        resetComposer();
-        setPublishedType(postedTypeFallback);
-        return;
+        const err = (() => {
+          try { return JSON.parse(createUploadBody || '{}'); } catch { return {} as any; }
+        })();
+        throw new Error(err?.message || `Secure upload could not start (${createUploadRes.status})`);
       }
 
       const uploadTarget = JSON.parse(createUploadBody) as {
@@ -570,14 +620,15 @@ export default function CreateScreen() {
         completeJson = null;
       }
 
-      if (isVideo) {
-        const status = completeJson?.uploadStatus;
-        if (status === 'TRANSCODING' || status === 'PENDING') {
-          setUploadProgress(88);
-          await pollMediaUntilProcessed(API_BASE_URL, token, uploadTarget.mediaId, (message) => {
-            setUploadStatusMessage(message);
-          });
-        }
+      const uploadStatus = completeJson?.uploadStatus;
+      if (uploadStatus === 'REJECTED') {
+        throw new Error(completeJson?.message || 'Media did not pass safety review.');
+      }
+      if (uploadStatus !== 'PUBLISHED') {
+        setUploadProgress(88);
+        await pollMediaUntilProcessed(API_BASE_URL, token, uploadTarget.mediaId, (message) => {
+          setUploadStatusMessage(message);
+        });
       }
 
       setUploadProgress(95);
@@ -656,9 +707,21 @@ export default function CreateScreen() {
                       : 'Pick your audience, add a caption, and share'}
                 </Text>
               </View>
-              <View style={{ width: 44, height: 44, borderRadius: 16, backgroundColor: '#312e81', alignItems: 'center', justifyContent: 'center' }}>
+              <Pressable
+                onPress={() => setShowCreateMenu(true)}
+                disabled={posting}
+                style={({ pressed }) => ({
+                  width: 44,
+                  height: 44,
+                  borderRadius: 16,
+                  backgroundColor: pressed ? '#4338ca' : '#312e81',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  opacity: posting ? 0.6 : 1,
+                })}
+              >
                 <MaterialCommunityIcons name="plus" size={26} color="#fff" />
-              </View>
+              </Pressable>
             </View>
 
             {launchModeLabel ? (
@@ -849,6 +912,7 @@ export default function CreateScreen() {
           </ScrollView>
         </TouchableWithoutFeedback>
       </KeyboardAvoidingView>
+      <CreateActionSheet visible={showCreateMenu} onClose={() => setShowCreateMenu(false)} onSelect={onSelectCreateMode} />
     </SafeAreaView>
   );
 }

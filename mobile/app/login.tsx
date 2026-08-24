@@ -1,9 +1,10 @@
-import { Link, router } from 'expo-router';
-import { useState } from 'react';
+import { Link, router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { API_BASE_URL, SHOW_LOGIN_DEBUG } from '@/lib/config';
-import { pingApiHealth } from '@/lib/api';
+import { ApiError, pingApiHealth } from '@/lib/api';
+import { PasswordField } from '@/components/PasswordField';
 
 const TERMS_URL = 'https://nxqsocial.com/terms';
 const COMMUNITY_GUIDELINES_URL = 'https://nxqsocial.com/community-guidelines';
@@ -11,13 +12,26 @@ const PRIVACY_URL = 'https://nxqsocial.com/privacy';
 
 export default function LoginScreen() {
   const { login } = useAuth();
+  const { notice } = useLocalSearchParams<{ notice?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
   const [debugLog, setDebugLog] = useState<string[]>([]);
   const [loginError, setLoginError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [checkingServer, setCheckingServer] = useState(false);
+  const [retryUntil, setRetryUntil] = useState(0);
+  const [retryInSec, setRetryInSec] = useState(0);
+
+  useEffect(() => {
+    if (!retryUntil) {
+      setRetryInSec(0);
+      return;
+    }
+    const update = () => setRetryInSec(Math.max(0, Math.ceil((retryUntil - Date.now()) / 1000)));
+    update();
+    const timer = setInterval(update, 1000);
+    return () => clearInterval(timer);
+  }, [retryUntil]);
 
   const log = (msg: string) => {
     if (!SHOW_LOGIN_DEBUG) return;
@@ -38,18 +52,27 @@ export default function LoginScreen() {
   };
 
   const onSubmit = async () => {
+    if (loading || retryInSec > 0) return;
     const trimmedEmail = email.trim().toLowerCase();
-    const trimmedPassword = password.trim();
+    // Passwords are exact values; trimming can make valid App Store accounts
+    // fail only in newer TestFlight builds.
+    const submittedPassword = password;
     log(`Attempting login for: ${trimmedEmail}`);
     log(`API: ${API_BASE_URL}`);
     setLoginError(null);
     setLoading(true);
     try {
-      await login(trimmedEmail, trimmedPassword);
+      const outcome = await login(trimmedEmail, submittedPassword);
       log('✅ Login success — redirecting');
-      router.replace('/(tabs)/feed');
+      router.replace(outcome === 'email_verification_required' ? '/verify-email' : '/(tabs)/feed');
     } catch (e: any) {
-      const message = e?.message ?? 'Unable to sign in. Please try again.';
+      const waitSeconds = e instanceof ApiError && e.status === 429
+        ? e.retryAfterSeconds ?? 60
+        : 0;
+      if (waitSeconds > 0) setRetryUntil(Date.now() + waitSeconds * 1000);
+      const message = waitSeconds > 0
+        ? `Too many sign-in attempts. Try again in ${waitSeconds} seconds.`
+        : e?.message ?? 'Unable to sign in. Please try again.';
       setLoginError(message);
       log('❌ Login error: ' + message);
     } finally {
@@ -62,6 +85,12 @@ export default function LoginScreen() {
       <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }} keyboardShouldPersistTaps="handled">
         <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900', marginTop: 40 }}>NXQ Social</Text>
         <Text style={{ color: '#93a1bd', marginBottom: 4 }}>Trust-first social for verified humans.</Text>
+
+        {notice === 'email-already-verified' ? (
+          <View style={{ backgroundColor: '#123021', borderRadius: 12, padding: 12 }}>
+            <Text style={{ color: '#86efac' }}>Your email is already verified. Sign in to continue.</Text>
+          </View>
+        ) : null}
 
         <View style={{ backgroundColor: '#10182b', borderRadius: 12, padding: 14, gap: 8 }}>
           <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>Before logging in, review:</Text>
@@ -98,28 +127,7 @@ export default function LoginScreen() {
           onChangeText={setEmail}
           style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }}
         />
-        <View style={{ position: 'relative', justifyContent: 'center' }}>
-          <TextInput
-            placeholder="Password"
-            placeholderTextColor="#8790ab"
-            secureTextEntry={!showPassword}
-            autoCapitalize="none"
-            autoCorrect={false}
-            spellCheck={false}
-            textContentType="none"
-            autoComplete="off"
-            value={password}
-            onChangeText={setPassword}
-            style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14, paddingRight: 70 }}
-          />
-          <Pressable
-            onPress={() => setShowPassword((v) => !v)}
-            style={{ position: 'absolute', right: 14, paddingVertical: 6, paddingHorizontal: 4 }}
-            hitSlop={10}
-          >
-            <Text style={{ color: '#9ab0ff', fontWeight: '700', fontSize: 12 }}>{showPassword ? 'HIDE' : 'SHOW'}</Text>
-          </Pressable>
-        </View>
+        <PasswordField value={password} onChangeText={setPassword} returnKeyType="go" onSubmitEditing={onSubmit} />
         {SHOW_LOGIN_DEBUG ? (
           <Text style={{ color: '#64748b', fontSize: 11, fontFamily: 'monospace', marginTop: -8 }}>
             Password length: {password.length} character{password.length === 1 ? '' : 's'}
@@ -128,17 +136,21 @@ export default function LoginScreen() {
 
         <Pressable
           onPress={onSubmit}
-          disabled={loading}
+          disabled={loading || retryInSec > 0}
           style={{
             borderRadius: 12,
             backgroundColor: '#6366f1',
             alignItems: 'center',
             justifyContent: 'center',
             paddingVertical: 14,
-            opacity: loading ? 0.7 : 1,
+            opacity: loading || retryInSec > 0 ? 0.7 : 1,
           }}
         >
-          {loading ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '700' }}>Login</Text>}
+          {loading
+            ? <ActivityIndicator color="#fff" />
+            : <Text style={{ color: '#fff', fontWeight: '700' }}>
+              {retryInSec > 0 ? `Try again in ${retryInSec}s` : 'Login'}
+            </Text>}
         </Pressable>
 
         {loginError ? (

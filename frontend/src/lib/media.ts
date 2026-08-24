@@ -1,6 +1,13 @@
 import { api } from './api';
 
-export type UploadStatus = 'PENDING' | 'SCANNING' | 'PUBLISHED' | 'REJECTED';
+export type UploadStatus =
+  | 'PENDING'
+  | 'FINALIZING'
+  | 'TRANSCODING'
+  | 'SCANNING'
+  | 'PUBLISHED'
+  | 'REJECTED'
+  | 'REMOVING';
 
 export interface CreateUploadUrlResponse {
   uploadUrl: string;

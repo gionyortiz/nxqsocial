@@ -3,7 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 
 export default function IndexScreen() {
-  const { token, loading } = useAuth();
+  const { token, pendingVerification, loading } = useAuth();
 
   if (loading) {
     return (
@@ -13,5 +13,7 @@ export default function IndexScreen() {
     );
   }
 
-  return <Redirect href={token ? '/(tabs)/feed' : '/login'} />;
+  if (token) return <Redirect href="/(tabs)/feed" />;
+  if (pendingVerification) return <Redirect href="/verify-email" />;
+  return <Redirect href="/login" />;
 }

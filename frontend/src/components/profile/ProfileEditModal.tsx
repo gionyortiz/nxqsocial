@@ -10,6 +10,55 @@ import { trackFirstEvent } from '@/lib/analytics';
 const ALLOWED_PROFILE_IMAGE_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 const MAX_AVATAR_SIZE = 10 * 1024 * 1024;
 const MAX_BANNER_SIZE = 10 * 1024 * 1024;
+const BANNER_EXPORT_WIDTH = 1500;
+const BANNER_EXPORT_HEIGHT = 500;
+
+async function buildBannerUpload(file: File, zoom: number, offsetX: number, offsetY: number): Promise<File> {
+  const src = URL.createObjectURL(file);
+  try {
+    const img = await new Promise<HTMLImageElement>((resolve, reject) => {
+      const image = new window.Image();
+      image.onload = () => resolve(image);
+      image.onerror = () => reject(new Error('Failed to load banner image'));
+      image.src = src;
+    });
+
+    const canvas = document.createElement('canvas');
+    canvas.width = BANNER_EXPORT_WIDTH;
+    canvas.height = BANNER_EXPORT_HEIGHT;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) throw new Error('Canvas is not available');
+
+    // Start from a full-fit frame so zoom-out does not force an implicit crop.
+    const containScale = Math.min(BANNER_EXPORT_WIDTH / img.width, BANNER_EXPORT_HEIGHT / img.height);
+    const finalScale = containScale * Math.max(0.2, zoom);
+
+    const drawWidth = img.width * finalScale;
+    const drawHeight = img.height * finalScale;
+    const desiredX = (BANNER_EXPORT_WIDTH - drawWidth) / 2 + (offsetX / 100) * (drawWidth * 0.25);
+    const drawX = drawWidth > BANNER_EXPORT_WIDTH
+      ? Math.min(0, Math.max(BANNER_EXPORT_WIDTH - drawWidth, desiredX))
+      : (BANNER_EXPORT_WIDTH - drawWidth) / 2;
+    const desiredY = (BANNER_EXPORT_HEIGHT - drawHeight) / 2 + (offsetY / 100) * (drawHeight * 0.25);
+    const drawY = drawHeight > BANNER_EXPORT_HEIGHT
+      ? Math.min(0, Math.max(BANNER_EXPORT_HEIGHT - drawHeight, desiredY))
+      : (BANNER_EXPORT_HEIGHT - drawHeight) / 2;
+
+    ctx.drawImage(img, drawX, drawY, drawWidth, drawHeight);
+
+    const blob = await new Promise<Blob>((resolve, reject) => {
+      canvas.toBlob((b) => {
+        if (b) resolve(b);
+        else reject(new Error('Failed to render banner image'));
+      }, 'image/jpeg', 0.92);
+    });
+
+    const outputName = file.name.replace(/\.[^.]+$/, '') || 'banner';
+    return new File([blob], `${outputName}-banner.jpg`, { type: 'image/jpeg' });
+  } finally {
+    URL.revokeObjectURL(src);
+  }
+}
 
 interface ProfileSnapshot {
   displayName: string;
@@ -41,6 +90,9 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
   const [bannerFile, setBannerFile] = useState<File | null>(null);
   const [bannerPreview, setBannerPreview] = useState<string | null>(null);
   const [doRemoveBanner, setDoRemoveBanner] = useState(false);
+  const [bannerZoom, setBannerZoom] = useState(1);
+  const [bannerOffsetX, setBannerOffsetX] = useState(0);
+  const [bannerOffsetY, setBannerOffsetY] = useState(0);
 
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
@@ -90,6 +142,9 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
     setBannerFile(file);
     setBannerPreview(URL.createObjectURL(file));
     setDoRemoveBanner(false);
+    setBannerZoom(1);
+    setBannerOffsetX(0);
+    setBannerOffsetY(0);
     e.target.value = '';
   };
 
@@ -103,6 +158,9 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
     setBannerFile(null);
     setBannerPreview(null);
     setDoRemoveBanner(true);
+    setBannerZoom(1);
+    setBannerOffsetX(0);
+    setBannerOffsetY(0);
   };
 
   const handleSave = async () => {
@@ -127,8 +185,9 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
         await api.delete('/users/me/banner');
         updates.bannerUrl = undefined;
       } else if (bannerFile) {
+        const processedBanner = await buildBannerUpload(bannerFile, bannerZoom, bannerOffsetX, bannerOffsetY);
         const fd = new FormData();
-        fd.append('banner', bannerFile);
+        fd.append('banner', processedBanner);
         const { data } = await api.patch('/users/me/banner', fd);
         updates.bannerUrl = data.bannerUrl ? `${data.bannerUrl}?v=${Date.now()}` : data.bannerUrl;
       }
@@ -214,7 +273,17 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
         {/* Banner */}
         <div className="relative h-36 bg-gradient-to-br from-purple-600 via-violet-500 to-pink-500 overflow-hidden group">
           {currentBanner && (
-            <Image src={currentBanner} alt="banner" fill className="object-cover" sizes="100vw" />
+            <Image
+              src={currentBanner}
+              alt="banner"
+              fill
+              className={bannerFile ? 'object-contain' : 'object-cover'}
+              sizes="100vw"
+              style={{
+                transform: bannerFile ? `scale(${bannerZoom}) translateX(${bannerOffsetX}%) translateY(${bannerOffsetY}%)` : undefined,
+                transformOrigin: 'center',
+              }}
+            />
           )}
           <div className="absolute inset-0 bg-black/0 group-hover:bg-black/30 transition-colors flex items-center justify-center gap-3 opacity-0 group-hover:opacity-100">
             <button
@@ -236,6 +305,69 @@ export function ProfileEditModal({ profile, onClose, onSaved }: Props) {
           </div>
           <input ref={bannerInputRef} type="file" accept="image/jpeg,image/png,image/webp,image/gif" className="hidden" onChange={pickBanner} />
         </div>
+
+        {bannerFile && !doRemoveBanner && (
+          <div className="px-6 pt-4 pb-1 grid gap-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Banner Zoom</span>
+                <span className="text-xs text-gray-500">{bannerZoom.toFixed(2)}x</span>
+              </div>
+              <input
+                type="range"
+                min={0.2}
+                max={2.5}
+                step={0.01}
+                value={bannerZoom}
+                onChange={(e) => setBannerZoom(Number(e.target.value))}
+                className="w-full accent-violet-600"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Horizontal Position</span>
+                <span className="text-xs text-gray-500">{bannerOffsetX > 0 ? '+' : ''}{bannerOffsetX}%</span>
+              </div>
+              <input
+                type="range"
+                min={-100}
+                max={100}
+                step={1}
+                value={bannerOffsetX}
+                onChange={(e) => setBannerOffsetX(Number(e.target.value))}
+                className="w-full accent-violet-600"
+              />
+            </div>
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-xs font-semibold text-gray-500 uppercase tracking-wider">Vertical Position</span>
+                <span className="text-xs text-gray-500">{bannerOffsetY > 0 ? '+' : ''}{bannerOffsetY}%</span>
+              </div>
+              <input
+                type="range"
+                min={-100}
+                max={100}
+                step={1}
+                value={bannerOffsetY}
+                onChange={(e) => setBannerOffsetY(Number(e.target.value))}
+                className="w-full accent-violet-600"
+              />
+            </div>
+            <div>
+              <button
+                type="button"
+                onClick={() => {
+                  setBannerZoom(1);
+                  setBannerOffsetX(0);
+                  setBannerOffsetY(0);
+                }}
+                className="text-xs font-semibold text-violet-700 hover:text-violet-800"
+              >
+                Reset banner framing
+              </button>
+            </div>
+          </div>
+        )}
 
         {/* Avatar + action buttons */}
         <div className="px-6 -mt-10 mb-2">

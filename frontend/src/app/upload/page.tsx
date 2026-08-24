@@ -23,10 +23,10 @@ type Phase =
   | 'error';      // network / server error
 
 const ALLOWED_MIME = [
-  'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+  'image/jpeg', 'image/png',
   'video/mp4',
 ];
-const MAX_IMAGE = 10 * 1024 * 1024;   // 10 MB
+const MAX_IMAGE = 5 * 1024 * 1024;    // 5 MiB (moderation provider limit)
 const MAX_VIDEO = 200 * 1024 * 1024;  // 200 MB
 
 type Audience = 'PUBLIC' | 'FOLLOWERS' | 'PRIVATE';
@@ -73,7 +73,7 @@ export default function UploadPage() {
 
   const pickFile = useCallback((f: File) => {
     if (!ALLOWED_MIME.includes(f.type)) {
-      setError('Unsupported file type. Use JPEG, PNG, WebP, GIF, or MP4 (H.264/AAC).');
+      setError('Unsupported file type. Use JPEG, PNG, or MP4 (H.264/AAC).');
       return;
     }
     const limit = f.type.startsWith('video/') ? MAX_VIDEO : MAX_IMAGE;
@@ -173,6 +173,7 @@ export default function UploadPage() {
     setStatusMessage('');
     setModerationStatus(null);
     setScanTimedOut(false);
+
     try {
       const result: CompleteUploadResponse = await runUploadPipeline(file, (pct) => setProgress(pct));
       setMediaId(result.id);
@@ -182,16 +183,16 @@ export default function UploadPage() {
         setPhase('rejected');
         return;
       }
-      if (result.uploadStatus === 'SCANNING') {
+      if (result.uploadStatus !== 'PUBLISHED') {
         setPhase('scanning');
-        setStatusMessage(result.message ?? 'Processing video…');
+        setStatusMessage(result.message ?? 'Processing media…');
         await pollUntilReady(result.id);
         return;
       }
       setPhase('ready');
     } catch (err: unknown) {
-      const fallback = (err as { message?: string })?.message;
-      setError(getApiMessage(err) ?? fallback ?? 'Upload failed');
+      const fallbackMessage = (err as { message?: string })?.message;
+      setError(getApiMessage(err) ?? fallbackMessage ?? 'Upload failed');
       setPhase('error');
     }
   };
@@ -254,7 +255,7 @@ export default function UploadPage() {
                 <p className="font-semibold text-gray-700">Drag photo or video here</p>
                 <p className="text-sm text-purple-600 font-medium mt-1">or browse files</p>
                 <p className="text-xs text-gray-300 mt-3">
-                  JPEG · PNG · WebP · GIF up to 10 MB<br />
+                  JPEG · PNG up to 5 MB<br />
                   MP4 (H.264/AAC) up to 200 MB
                 </p>
               </div>
