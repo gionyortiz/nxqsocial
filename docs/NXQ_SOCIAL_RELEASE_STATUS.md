@@ -11,7 +11,7 @@ This is the single source of truth for the current release state across Apple an
 
 ### 2026-08-23 Expo SDK 57 code-only migration candidate
 
-- The current candidate source targets Expo `57.0.15`, React Native `0.86.2`,
+- The current candidate source targets Expo `57.0.16`, React Native `0.86.2`,
   React Native Reanimated `4.5.1`, Worklets `0.10.1`, and app/runtime `1.0.7`.
 - The required LiveKit Expo plugin and `expo-dev-client` are present. LiveKit is
   pinned to `2.12.0` with WebRTC `144.1.2`, removing the known 144.1.0
@@ -178,7 +178,8 @@ Result:
 
 ## Current Focus
 1. Keep Railway work staging-only; do not publish an Expo/App Store update.
-2. Independently review and commit the Expo SDK 57 code-only candidate.
+2. Keep the committed Expo SDK 57 candidate on the release branch and preserve
+   its fail-closed staging configuration.
 3. Unlock the isolated staging-native profile only after its Railway URLs and
    separate Expo project exist, then run registration and device E2E before
    revisiting store readiness.

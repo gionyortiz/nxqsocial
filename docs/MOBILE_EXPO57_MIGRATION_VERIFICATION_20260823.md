@@ -1,6 +1,6 @@
 # NXQ Social Expo SDK 57 Code-Only Migration Verification
 
-Date: 2026-08-23
+Date: 2026-08-23; dependency compatibility refreshed 2026-08-24
 
 Repository: `E:\webside\app\nexaquantum chat`
 
@@ -8,24 +8,29 @@ Branch: `release/railway-staging-20260823`
 
 Base HEAD: `b2553be0d9dc7f96293b1779b462d54c1e1ce001`
 
+Initial migration commit: `945321e212a50d3c3ce1815bc12963ca87ec9466`
+
 ## Scope boundary
 
-This record covers an uncommitted code-only migration candidate. The two new
-files `mobile/app.config.js` and this verification record are untracked and
-must be explicitly included in any later reviewed commit; omitting
-`mobile/app.config.js` would remove the staging safety boundary. This record
-does not authorize or record an EAS build, Expo update, channel change,
-submission, App Store or Google Play publication, DNS change, or paid action.
+This record began with an uncommitted code-only migration candidate. The two
+new files `mobile/app.config.js` and this verification record were reviewed and
+committed together in `945321e`; omitting `mobile/app.config.js` would remove
+the staging safety boundary. On 2026-08-24, Expo's compatibility registry
+required nine newer SDK 57 patch releases. The manifest and lockfile were
+refreshed, then the dependency, type, config, export, and Android prebuild gates
+below were rerun successfully. This record does not authorize or record an EAS
+build, Expo update, channel change, submission, App Store or Google Play
+publication, DNS change, or paid action.
 
 ## Dependency and runtime result
 
 | Area | Before | Candidate |
 | --- | --- | --- |
-| Expo | `~56.0.20` | `~57.0.15` |
+| Expo | `~56.0.20` | `~57.0.16` |
 | React Native | `0.85.3` | `0.86.2` |
 | Reanimated | `4.3.1` | `4.5.1` |
 | Worklets | `0.8.3` | `0.10.1` |
-| Expo dev client | absent | `~57.0.14` |
+| Expo dev client | absent | `~57.0.15` |
 | LiveKit Expo plugin | absent | `1.0.2` |
 | LiveKit React Native | `^2.11.0` | `2.12.0` |
 | LiveKit WebRTC | `^144.1.0` | `144.1.2` |
@@ -112,10 +117,13 @@ The mobile package has no committed unit or E2E test suite, so no automated
 mobile test count is claimed by this record.
 
 Metro reused a production bundle when variants were switched once without a
-cache clear. The staging export was therefore rerun with `--clear`; its bundle
-SHA-256 (`ECF366371C50342954270EBAC62DC5EF95AC931027479F1A6BC1FF137A98C228`)
-differs from production
-(`BC1B8178896B1078D469C99B07C7B5D97B966067F0703B2D94346F9EE57B2F25`).
+cache clear. The staging export was therefore rerun with `--clear`. After the
+2026-08-24 patch refresh, the staging Android bundle SHA-256
+(`AC856A36F3710D83135B0976DAAECAF0D2FEEA1F26A32003CB4AB86D55E1D6E0`)
+differs from production Android
+(`D64955DE734C05394067A31009A666B2CBC1AF2754927AEC3247EC577ACFB9A7`);
+the production iOS export is
+`9A599CCAC7DF284998EF32FFC04A62BD67DB7877F8B2D90ADED7530107AC3F19`.
 Future local cross-variant export checks must clear Metro's cache. Fresh EAS
 workers do not reuse this local cache.
 
@@ -126,18 +134,21 @@ findings in production dependencies, with zero high or critical findings. The
 suggested automated remedies include incompatible major downgrades of Expo or
 its modules, so no `npm audit fix` or force-fix was applied.
 
+Android prebuild also recommends adding `expo-system-ui` for the configured
+automatic `userInterfaceStyle`. This is a disclosed non-blocking warning, not
+part of the nine-package compatibility refresh.
+
 ## Remaining release gates
 
-1. Independent review of the uncommitted diff and lockfile.
-2. Real Railway staging frontend/API/Turnstile URLs.
-3. A separate Expo staging project ID and reviewed unlock of `staging-native`.
-4. Native Android and iOS staging builds.
-5. Physical-device registration, password/autofill, Turnstile, email
+1. Real Railway staging frontend/API/Turnstile URLs.
+2. A separate Expo staging project ID and reviewed unlock of `staging-native`.
+3. Native Android and iOS staging builds.
+4. Physical-device registration, password/autofill, Turnstile, email
    verification, media, LiveKit audio/video/interruption, notifications, and
    restart testing.
-6. Verify staging API redirects and response-derived media/LiveKit URLs remain
+5. Verify staging API redirects and response-derived media/LiveKit URLs remain
    on isolated staging providers.
-7. Backup/restore and full Railway staging E2E completion before any DNS or
+6. Backup/restore and full Railway staging E2E completion before any DNS or
    store discussion.
 
 Until those gates pass, this candidate is not a final mobile-release verdict

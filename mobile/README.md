@@ -97,7 +97,7 @@ Configured identifiers:
 - The new Turnstile flow adds the native `react-native-webview` module, which
   is absent from the identified 1.0.6 store binary. It cannot be published as
   an OTA-only update; it needs a new native build and device review.
-- The source candidate now targets Expo 57.0.15, React Native 0.86.2, and app
+- The source candidate now targets Expo 57.0.16, React Native 0.86.2, and app
   runtime 1.0.7. Expo Doctor, TypeScript, native JavaScript exports, and local
   Android prebuild checks pass. This removes the SDK 56 Hermes dependency
   blocker from the source tree but does not authorize a store build.
