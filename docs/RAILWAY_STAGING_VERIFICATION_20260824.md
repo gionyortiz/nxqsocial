@@ -8,6 +8,9 @@
   mutation.
 - Railway project/services created so far: **none**.
 - Source branch: `release/railway-staging-20260823`.
+- Verified application-code commit: `c0f8626816583ce5e4d38738d405543253363ca8`,
+  pushed to `origin/release/railway-staging-20260823`. Any following commit in
+  this branch is verification-record-only unless separately revalidated.
 - Preserved production rollback: Windows Docker deployment and retained local
   uploads.
 
@@ -142,8 +145,8 @@ build or update was started during this staging work.
 - Prepare staging-only R2 public/quarantine storage, AWS moderation,
   Turnstile, mail sink, Stripe test, and LiveKit credentials. Production
   credentials and recipient data must not be reused.
-- Push and review the isolated candidate commit; repeat the diff/secret gate on
-  that exact commit before provisioning.
+- Reconfirm that the deployed Railway source contains the verified application
+  commit above and repeat the diff/secret gate on the exact deploy revision.
 - Keep mobile publication blocked until the Hermes regression is removed and a
   native store build containing `react-native-webview` passes device testing.
 
