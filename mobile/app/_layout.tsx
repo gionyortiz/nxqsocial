@@ -19,8 +19,11 @@ try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   const { registerGlobals } = require('@livekit/react-native');
   registerGlobals?.();
-} catch {
+} catch (error) {
   // Native module unavailable (web / Expo Go) — Live runs on native builds only.
+  if (process.env.EXPO_PUBLIC_LIVE_NATIVE_ENABLED === 'true') {
+    console.error('LiveKit native initialization failed.', error);
+  }
 }
 
 export {

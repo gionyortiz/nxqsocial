@@ -4,7 +4,7 @@ import { useFocusEffect } from 'expo-router';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, PostItem, resolveMediaUrl, StoryFeedAuthorGroup } from '@/lib/api';
-import { LIVE_NATIVE_ENABLED } from '@/lib/config';
+import { LIVE_NATIVE_ENABLED, WEB_BASE_URL } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
 import { PostMedia } from '@/components/PostMedia';
 import { mobileProof } from '@/lib/runtimeProof';
@@ -349,7 +349,7 @@ export default function FeedScreen() {
   };
 
   const sharePost = async (post: PostItem) => {
-    const message = `${post.caption || 'Check out this post on NXQ Social'}\nhttps://nxqsocial.com/feed?post=${post.id}`;
+    const message = `${post.caption || 'Check out this post on NXQ Social'}\n${WEB_BASE_URL}/feed?post=${post.id}`;
     try {
       if (Platform.OS === 'web') {
         const webNavigator = typeof navigator !== 'undefined' ? (navigator as any) : undefined;

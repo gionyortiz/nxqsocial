@@ -3,6 +3,7 @@ import * as Device from 'expo-device';
 import * as Notifications from 'expo-notifications';
 import Constants from 'expo-constants';
 import { apiRequest } from './api';
+import { PUSH_NOTIFICATIONS_ENABLED } from './config';
 
 const notificationProjectId =
   Constants.expoConfig?.extra?.eas?.projectId
@@ -12,6 +13,7 @@ const notificationProjectId =
 let cachedToken: string | null = null;
 
 export async function getExpoPushToken(): Promise<string | null> {
+  if (!PUSH_NOTIFICATIONS_ENABLED) return null;
   if (Platform.OS === 'web') return null;
   if (!Device.isDevice) return null;
 

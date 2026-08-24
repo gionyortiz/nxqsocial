@@ -7,6 +7,7 @@ import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 import { pauseAllMedia, registerMediaPauseHandler } from '@/lib/mediaPlayback';
 import { mobileProof } from '@/lib/runtimeProof';
+import { WEB_BASE_URL } from '@/lib/config';
 
 function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
   const [paused, setPaused] = useState(false);
@@ -279,7 +280,7 @@ export default function ReelsScreen() {
   };
 
   const sharePost = async (post: PostItem) => {
-    const message = `${post.caption || 'Check out this reel on NXQ Social'}\nhttps://nxqsocial.com/feed?post=${post.id}`;
+    const message = `${post.caption || 'Check out this reel on NXQ Social'}\n${WEB_BASE_URL}/feed?post=${post.id}`;
     try {
       if (Platform.OS === 'web') {
         const webNavigator = typeof navigator !== 'undefined' ? (navigator as any) : undefined;

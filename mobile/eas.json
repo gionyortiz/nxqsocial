@@ -14,6 +14,27 @@
         "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
       }
     },
+    "staging-native": {
+      "distribution": "internal",
+      "environment": "preview",
+      "autoIncrement": false,
+      "android": {
+        "buildType": "apk"
+      },
+      "env": {
+        "NXQ_MOBILE_VARIANT": "staging",
+        "NXQ_STAGING_CONFIG_READY": "false",
+        "NXQ_STAGING_EAS_PROJECT_ID": "__REQUIRED__",
+        "EXPO_PUBLIC_APP_VARIANT": "staging",
+        "EXPO_PUBLIC_API_BASE_URL": "__REQUIRED__",
+        "EXPO_PUBLIC_TURNSTILE_MOBILE_URL": "__REQUIRED__",
+        "EXPO_PUBLIC_WEB_BASE_URL": "__REQUIRED__",
+        "EXPO_PUBLIC_USE_RN_FETCH": "false",
+        "EXPO_PUBLIC_LIVE_NATIVE_ENABLED": "false",
+        "EXPO_PUBLIC_PUSH_ENABLED": "false",
+        "EXPO_PUBLIC_SHOW_LOGIN_DEBUG": "false"
+      }
+    },
     "preview": {
       "distribution": "internal",
       "channel": "preview",

@@ -38,14 +38,18 @@ npm install
 npm run start
 ```
 
-Open on device:
-
-- iPhone: Expo Go + QR code
-- Android: Expo Go + QR code
+Expo Go can be used only as a limited JavaScript-screen preview. It is not a
+valid test environment for this candidate's native LiveKit/WebRTC plugins.
+Native registration, password/autofill, Turnstile, and LiveKit verification
+must use a separately authorized development or internal staging build.
 
 ## Build Real App Binaries (APK/IPA)
 
 This project is configured to produce installable mobile apps (not just Expo Go previews).
+
+The SDK 57 migration is currently code-only. Do not run an EAS build, update,
+submission, or channel command until the native-release gate in
+`docs/NXQ_SOCIAL_RELEASE_STATUS.md` is explicitly cleared.
 
 1. Install EAS CLI:
 
@@ -59,13 +63,18 @@ npm install -g eas-cli
 eas login
 ```
 
-3. Build internal test binaries:
+3. After the locked `staging-native` profile has been reviewed and supplied
+   with real staging resources, build internal staging binaries:
 
 ```bash
 cd mobile
 npm run build:android
 npm run build:ios
 ```
+
+These scripts target only `staging-native` and currently fail closed. Do not
+substitute the legacy `preview` profile: it routes to production API/Turnstile
+hosts and has an Expo Update channel on the production project.
 
 4. Build production binaries for stores:
 
@@ -88,13 +97,23 @@ Configured identifiers:
 - The new Turnstile flow adds the native `react-native-webview` module, which
   is absent from the identified 1.0.6 store binary. It cannot be published as
   an OTA-only update; it needs a new native build and device review.
-- Expo Doctor currently blocks release because SDK 56's Hermes V1 has a known
-  memory regression. Upgrade to a fixed Expo SDK 57 / React Native 0.86.2+
-  combination in a separately reviewed mobile-release change.
+- The source candidate now targets Expo 57.0.15, React Native 0.86.2, and app
+  runtime 1.0.7. Expo Doctor, TypeScript, native JavaScript exports, and local
+  Android prebuild checks pass. This removes the SDK 56 Hermes dependency
+  blocker from the source tree but does not authorize a store build.
+- The `staging-native` EAS profile is deliberately fail-closed. It has separate
+  app identifiers, no update channel, OTA and push disabled, and required-value
+  sentinels. It refuses to resolve until real Railway staging URLs and a
+  separate staging Expo project are supplied in a reviewed change.
+- The complete code-only verification record is in
+  `docs/MOBILE_EXPO57_MIGRATION_VERIFICATION_20260823.md`.
 
 ## Next recommended steps
 
-1. Integrate `@livekit/react-native` room UI into `app/calls.tsx`.
-2. Add token registration + APNs/FCM flow in `app/push.tsx`.
-3. Add stronger media format validation before upload (MP4/H.264 guidance in picker flow).
-4. Add production auth hardening (refresh token + secure storage).
+1. Independently review and commit the SDK 57 candidate diff.
+2. Provision separate staging URLs and an Expo staging project, then unlock the
+   `staging-native` profile in a reviewed commit.
+3. Run native Android and iOS staging builds and physical-device registration,
+   password/autofill, Turnstile, LiveKit, notification, and restart tests.
+4. Add stronger media format validation before upload (MP4/H.264 guidance in picker flow).
+5. Add production auth hardening (refresh token + secure storage).

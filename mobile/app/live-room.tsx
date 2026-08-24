@@ -4,10 +4,7 @@ import { useLocalSearchParams, router } from 'expo-router';
 import * as WebBrowser from 'expo-web-browser';
 import { apiRequest } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { API_BASE_URL } from '@/lib/config';
-
-const WEB_BASE_URL = (process.env.EXPO_PUBLIC_WEB_BASE_URL
-  ?? API_BASE_URL.replace('://api.', '://').replace('/api', '')).replace(/\/$/, '');
+import { WEB_BASE_URL } from '@/lib/config';
 
 type LiveTokenResponse = {
   token: string;

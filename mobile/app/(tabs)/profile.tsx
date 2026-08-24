@@ -3,6 +3,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Alert, Image, Platform, Pressable, SafeAreaView, ScrollView, Share, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
+import { WEB_BASE_URL } from '@/lib/config';
 
 export default function ProfileScreen() {
   const { user, logout, token } = useAuth();
@@ -75,7 +76,7 @@ export default function ProfileScreen() {
   };
 
   const shareProfile = async () => {
-    const message = `Check out @${user?.username || 'nxq'} on NXQ Social\nhttps://nxqsocial.com/user/${user?.username || ''}`;
+    const message = `Check out @${user?.username || 'nxq'} on NXQ Social\n${WEB_BASE_URL}/user/${user?.username || ''}`;
     try {
       if (Platform.OS === 'web') {
         const webNavigator = typeof navigator !== 'undefined' ? (navigator as any) : undefined;

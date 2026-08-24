@@ -1,6 +1,6 @@
 import Ionicons from '@expo/vector-icons/Ionicons';
 import { useState } from 'react';
-import { Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, TextInput, TextInputProps, View } from 'react-native';
 
 type PasswordFieldProps = Omit<TextInputProps, 'secureTextEntry'> & {
   label?: string;
@@ -34,9 +34,9 @@ export function PasswordField({
           autoCapitalize="none"
           autoCorrect={false}
           spellCheck={false}
-          autoComplete={newPassword ? 'new-password' : 'current-password'}
-          textContentType={newPassword ? 'newPassword' : 'password'}
-          passwordRules={newPassword ? PASSWORD_RULES : undefined}
+          autoComplete={Platform.OS === 'ios' ? undefined : (newPassword ? 'new-password' : 'current-password')}
+          textContentType={Platform.OS === 'ios' ? (newPassword ? 'newPassword' : 'password') : undefined}
+          passwordRules={Platform.OS === 'ios' && newPassword ? PASSWORD_RULES : undefined}
           style={styles.input}
           onFocus={(event) => {
             setFocused(true);

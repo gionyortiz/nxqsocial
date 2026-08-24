@@ -9,6 +9,29 @@ This is the single source of truth for the current release state across Apple an
 
 ## Status Changelog
 
+### 2026-08-23 Expo SDK 57 code-only migration candidate
+
+- The current candidate source targets Expo `57.0.15`, React Native `0.86.2`,
+  React Native Reanimated `4.5.1`, Worklets `0.10.1`, and app/runtime `1.0.7`.
+- The required LiveKit Expo plugin and `expo-dev-client` are present. LiveKit is
+  pinned to `2.12.0` with WebRTC `144.1.2`, removing the known 144.1.0
+  audio-state deadlock path.
+- Expo Doctor passes 21/21, `expo install --check` is clean, TypeScript passes,
+  production Android/iOS JavaScript exports pass, and an isolated staging
+  Android export passes.
+- Production and staging Android CNG prebuilds pass. iOS JavaScript export
+  passes, but native iOS prebuild cannot be generated on this Windows host.
+- `staging-native` is intentionally non-deployable until separate Railway URLs
+  and a separate Expo staging project exist. It has distinct bundle/package
+  identifiers, no channel, OTA disabled, push disabled, and fail-closed config
+  validation that rejects placeholders and production hosts.
+- No EAS build, OTA update, channel mutation, submission, store publication, or
+  paid Expo action was performed.
+
+Release interpretation for this candidate: the SDK 56 Hermes dependency
+blocker is removed from source, but **MOBILE NO-GO remains** until independent
+diff review, native staging builds, and physical-device E2E pass.
+
 ### 2026-08-23 Railway-staging worktree superseding gate
 
 - The public App Store state below remains historical evidence for live version
@@ -145,16 +168,20 @@ Result:
 ## Current Blockers
 - Current iOS/Android source: native WebView is absent from identified 1.0.6
   binaries, so the registration change cannot ship OTA-only.
-- Current iOS/Android source: Expo SDK 56 Hermes regression; upgrade and device
-  verification are required before a native release.
+- Current iOS/Android candidate: the SDK 57 dependency migration passes local
+  checks, but native staging builds and physical-device verification have not
+  been authorized or completed.
+- The `staging-native` profile remains intentionally locked until isolated
+  Railway URLs and a separate Expo project ID are available.
 - Google Play portal status has not been reverified since the historical entry
   above; do not infer production readiness from the old internal-testing note.
 
 ## Current Focus
 1. Keep Railway work staging-only; do not publish an Expo/App Store update.
-2. Separately authorize and review the Expo SDK/native dependency upgrade.
-3. Create a staging-only internal native profile, then run registration and
-   device E2E before revisiting store readiness.
+2. Independently review and commit the Expo SDK 57 code-only candidate.
+3. Unlock the isolated staging-native profile only after its Railway URLs and
+   separate Expo project exist, then run registration and device E2E before
+   revisiting store readiness.
 
 ## Evidence and Supporting Docs
 - docs/QA_ANDROID_PARITY_VERIFICATION.md

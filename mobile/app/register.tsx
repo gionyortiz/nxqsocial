@@ -5,10 +5,11 @@ import { useAuth } from '@/lib/auth';
 import { ApiError } from '@/lib/api';
 import { PasswordField } from '@/components/PasswordField';
 import { TurnstileWidget, TurnstileWidgetState } from '@/components/TurnstileWidget';
+import { WEB_BASE_URL } from '@/lib/config';
 
-const TERMS_URL = 'https://nxqsocial.com/terms';
-const GUIDELINES_URL = 'https://nxqsocial.com/community-guidelines';
-const PRIVACY_URL = 'https://nxqsocial.com/privacy';
+const TERMS_URL = `${WEB_BASE_URL}/terms`;
+const GUIDELINES_URL = `${WEB_BASE_URL}/community-guidelines`;
+const PRIVACY_URL = `${WEB_BASE_URL}/privacy`;
 
 export default function RegisterScreen() {
   const { register } = useAuth();

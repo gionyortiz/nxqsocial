@@ -2,7 +2,7 @@
   "expo": {
     "name": "NXQ Social",
     "slug": "nxq-social-mobile",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "nxqsocial",
@@ -62,6 +62,7 @@
       "expo-notifications",
       "expo-video",
       "expo-font",
+      "@livekit/react-native-expo-plugin",
       "@config-plugins/react-native-webrtc",
       "expo-web-browser"
     ],

@@ -2,13 +2,13 @@ import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Linking, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
-import { API_BASE_URL, SHOW_LOGIN_DEBUG } from '@/lib/config';
+import { API_BASE_URL, SHOW_LOGIN_DEBUG, WEB_BASE_URL } from '@/lib/config';
 import { ApiError, pingApiHealth } from '@/lib/api';
 import { PasswordField } from '@/components/PasswordField';
 
-const TERMS_URL = 'https://nxqsocial.com/terms';
-const COMMUNITY_GUIDELINES_URL = 'https://nxqsocial.com/community-guidelines';
-const PRIVACY_URL = 'https://nxqsocial.com/privacy';
+const TERMS_URL = `${WEB_BASE_URL}/terms`;
+const COMMUNITY_GUIDELINES_URL = `${WEB_BASE_URL}/community-guidelines`;
+const PRIVACY_URL = `${WEB_BASE_URL}/privacy`;
 
 export default function LoginScreen() {
   const { login } = useAuth();

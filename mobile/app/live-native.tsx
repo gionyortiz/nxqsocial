@@ -19,6 +19,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { File, UploadType } from 'expo-file-system';
 import { Track } from 'livekit-client';
 import {
+  AudioSession,
   LiveKitRoom,
   VideoTrack,
   useTracks,
@@ -206,13 +207,16 @@ function LiveStage({
       }
 
       const uploadTarget = await createUploadRes.json() as { uploadUrl: string; mediaId: string };
-      await file.upload(uploadTarget.uploadUrl, {
+      const uploadResult = await file.upload(uploadTarget.uploadUrl, {
         httpMethod: 'PUT',
         uploadType: UploadType.BINARY_CONTENT,
         mimeType,
         headers: { 'Content-Type': mimeType },
         sessionType: 'foreground',
       });
+      if (uploadResult.status < 200 || uploadResult.status >= 300) {
+        throw new Error(uploadResult.body || `Could not upload photo (${uploadResult.status})`);
+      }
 
       const completeRes = await fetch(`${API_BASE_URL}/media/complete-upload`, {
         method: 'POST',
@@ -414,6 +418,7 @@ export default function NativeLiveScreen() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [roomMode, setRoomMode] = useState<'call' | 'video'>(initialMode);
+  const [audioReadyForCredentials, setAudioReadyForCredentials] = useState<LiveTokenResponse | null>(null);
 
   useEffect(() => {
     mobileProof('Call screen params', {
@@ -461,6 +466,29 @@ export default function NativeLiveScreen() {
     };
     void init();
   }, [authToken, room, isHost, roomMode, isDirectCall]);
+
+  useEffect(() => {
+    if (!creds || error) return;
+
+    let active = true;
+    void AudioSession.startAudioSession()
+      .then(() => {
+        if (active) setAudioReadyForCredentials(creds);
+      })
+      .catch((audioError: unknown) => {
+        if (!active) return;
+        const message = audioError instanceof Error ? audioError.message : 'Could not start call audio.';
+        setError(message);
+      });
+
+    return () => {
+      active = false;
+      void AudioSession.stopAudioSession().catch((audioError: unknown) => {
+        const message = audioError instanceof Error ? audioError.message : 'Unknown audio-session error';
+        mobileProof('LiveKit audio session stop failed', { message });
+      });
+    };
+  }, [creds, error]);
 
   const closeLive = async () => {
     if (isDirectCall && authToken) {
@@ -525,6 +553,15 @@ export default function NativeLiveScreen() {
         <Pressable onPress={() => router.back()} style={styles.primaryBtn}>
           <Text style={styles.primaryText}>Back</Text>
         </Pressable>
+      </SafeAreaView>
+    );
+  }
+
+  if (audioReadyForCredentials !== creds) {
+    return (
+      <SafeAreaView style={[styles.fill, styles.center]}>
+        <ActivityIndicator color="#8b5cf6" />
+        <Text style={styles.dim}>Preparing call audio...</Text>
       </SafeAreaView>
     );
   }
