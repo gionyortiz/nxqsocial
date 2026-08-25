@@ -61,6 +61,17 @@ test("password confirmation must match before any request can run", () => {
   );
 });
 
+test("Turnstile tokens above the API limit fail before any request can run", () => {
+  assert.throws(
+    () =>
+      loadConfig(
+        ["node", "script"],
+        validEnvironment({ SMOKE_TURNSTILE_TOKEN: "x".repeat(2049) }),
+      ),
+    /SMOKE_TURNSTILE_TOKEN exceeds the API limit/,
+  );
+});
+
 test("registration payload includes consent and Turnstile but omits form-only confirmation", () => {
   const config = loadConfig(["node", "script"], validEnvironment());
   const payload = buildRegistrationPayload(config);

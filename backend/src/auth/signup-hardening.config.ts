@@ -15,9 +15,7 @@ export function turnstileTestBypassEnabled(): boolean {
 }
 
 export function allowedTurnstileHostnames(): Set<string> {
-  const raw =
-    process.env.TURNSTILE_ALLOWED_HOSTNAMES ??
-    'nxqsocial.com,www.nxqsocial.com';
+  const raw = process.env.TURNSTILE_ALLOWED_HOSTNAMES ?? '';
   return new Set(
     raw
       .split(',')

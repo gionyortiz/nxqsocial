@@ -54,6 +54,11 @@ describe('signup hardening configuration', () => {
       'mobile.nxqsocial.com',
     ]);
   });
+
+  it('returns no allowed hostnames when the allowlist is not configured', () => {
+    delete process.env.TURNSTILE_ALLOWED_HOSTNAMES;
+    expect([...allowedTurnstileHostnames()]).toEqual([]);
+  });
 });
 
 function restoreEnv(name: string, value: string | undefined) {

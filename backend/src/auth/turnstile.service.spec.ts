@@ -76,6 +76,8 @@ describe('TurnstileService', () => {
       'provider rejection',
       { success: false, action: 'register', hostname: 'nxqsocial.com' },
     ],
+    ['missing action', { success: true, hostname: 'nxqsocial.com' }],
+    ['missing hostname', { success: true, action: 'register' }],
   ])(
     'rejects %s with the stable invalid-token code',
     async (_label, result) => {
@@ -118,6 +120,87 @@ describe('TurnstileService', () => {
     );
   });
 
+  it('fails closed when the hostname allowlist is missing', async () => {
+    delete process.env.TURNSTILE_ALLOWED_HOSTNAMES;
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as typeof fetch;
+
+    await expectCode(
+      service.verifySignup('widget-token', '203.0.113.10'),
+      503,
+      'TURNSTILE_UNAVAILABLE',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('fails closed when Siteverify returns a non-success HTTP status', async () => {
+    global.fetch = jest.fn().mockResolvedValue({ ok: false }) as typeof fetch;
+
+    await expectCode(
+      service.verifySignup('widget-token', '203.0.113.10'),
+      503,
+      'TURNSTILE_UNAVAILABLE',
+    );
+  });
+
+  it.each([
+    ['a non-object body', null],
+    [
+      'a non-boolean success value',
+      {
+        success: 'true',
+        action: 'register',
+        hostname: 'nxqsocial.com',
+      },
+    ],
+    [
+      'a non-string action',
+      { success: true, action: 1, hostname: 'nxqsocial.com' },
+    ],
+    [
+      'a non-string hostname',
+      { success: true, action: 'register', hostname: 1 },
+    ],
+  ])('fails closed when Siteverify returns %s', async (_label, result) => {
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue(result),
+    }) as typeof fetch;
+
+    await expectCode(
+      service.verifySignup('widget-token', '203.0.113.10'),
+      503,
+      'TURNSTILE_UNAVAILABLE',
+    );
+  });
+
+  it('rejects an oversized token without sending it to Siteverify', async () => {
+    const fetchMock = jest.fn();
+    global.fetch = fetchMock as typeof fetch;
+
+    await expectCode(
+      service.verifySignup('x'.repeat(2049), '203.0.113.10'),
+      400,
+      'TURNSTILE_INVALID',
+    );
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it('does not expose the secret or token in a verification error', async () => {
+    const token = 'private-widget-token';
+    process.env.TURNSTILE_SECRET_KEY = 'private-secret-key';
+    global.fetch = jest
+      .fn()
+      .mockRejectedValue(new Error('network down')) as typeof fetch;
+
+    const response = await capturedErrorResponse(
+      service.verifySignup(token, '203.0.113.10'),
+    );
+    const serialized = JSON.stringify(response);
+    expect(serialized).not.toContain(token);
+    expect(serialized).not.toContain(process.env.TURNSTILE_SECRET_KEY);
+  });
+
   it('allows the explicit bypass only during tests', async () => {
     process.env.TURNSTILE_TEST_BYPASS = 'true';
     const fetchMock = jest.fn();
@@ -135,6 +218,16 @@ describe('TurnstileService', () => {
     );
   });
 });
+
+async function capturedErrorResponse(promise: Promise<void>): Promise<unknown> {
+  try {
+    await promise;
+    throw new Error('Expected Turnstile verification to fail');
+  } catch (error) {
+    const exception = error as { getResponse?: () => unknown };
+    return exception.getResponse?.();
+  }
+}
 
 async function expectCode(
   promise: Promise<void>,

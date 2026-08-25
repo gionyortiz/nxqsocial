@@ -204,7 +204,7 @@ function loadConfig(
 
   validateDeliverableEmail(email);
   validatePassword(password, passwordConfirmation);
-  if (turnstileToken.length > 4096) {
+  if (turnstileToken.length > 2048) {
     throw new Error("SMOKE_TURNSTILE_TOKEN exceeds the API limit");
   }
   if (verificationCode && !/^\d{6}$/.test(verificationCode)) {

@@ -81,7 +81,7 @@ export class RegisterDto {
   @ValidateIf((_object, value) => value !== undefined)
   @IsString()
   @MinLength(1)
-  @MaxLength(4096)
+  @MaxLength(2048)
   turnstileToken?: string;
 }
 
