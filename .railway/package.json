@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "apply": "node apply.mjs",
     "plan": "node plan.mjs",
     "plan:verbose": "node plan.mjs --verbose",
     "validate": "node --import tsx validate.mjs"

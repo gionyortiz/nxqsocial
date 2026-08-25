@@ -9,6 +9,8 @@ export const NXQ_SOCIAL_STAGING_TARGET = {
     apiBaseUrl: 'https://api-staging.nxqsocial.com/api',
   },
   resources: {
+    r2Endpoint:
+      'https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com',
     publicBucket: 'nxqsocial-staging-public',
     quarantineBucket: 'nxqsocial-staging-quarantine',
     moderationBucket: 'nxqsocial-staging-moderation-private',

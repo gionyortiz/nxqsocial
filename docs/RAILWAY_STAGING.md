@@ -77,12 +77,12 @@ outbound sink are not ready, use synthetic data instead.
 
 Create four services in one Railway staging environment:
 
-| Service | Source/root | Public exposure | Deployment check |
-| --- | --- | --- | --- |
-| `backend` | GitHub, `/backend`, Dockerfile | Access-gated custom domain or sanitized-data test domain | `/api/health/ready` |
-| `frontend` | GitHub, `/frontend`, Dockerfile | Access-gated custom domain | `/health` |
-| PostgreSQL | Railway PostgreSQL | none | offline restore + backend readiness |
-| Redis | Railway Redis | none | backend readiness |
+| Service    | Source/root                     | Public exposure                                          | Deployment check                    |
+| ---------- | ------------------------------- | -------------------------------------------------------- | ----------------------------------- |
+| `backend`  | GitHub, `/backend`, Dockerfile  | Access-gated custom domain or sanitized-data test domain | `/api/health/ready`                 |
+| `frontend` | GitHub, `/frontend`, Dockerfile | Access-gated custom domain                               | `/health`                           |
+| PostgreSQL | Railway PostgreSQL              | none                                                     | offline restore + backend readiness |
+| Redis      | Railway Redis                   | none                                                     | backend readiness                   |
 
 Use Railway private networking for PostgreSQL and Redis. Do not define a fixed
 Railway `PORT`; Railway injects it. The web containers bind to `0.0.0.0`.
@@ -150,14 +150,13 @@ APP_BASE_URL=https://staging.nxqsocial.com
 API_BASE_URL=https://api-staging.nxqsocial.com/api
 ```
 
-Set the remaining backend values in Railway without committing their values:
+Create the following Railway shared variables without committing their values.
+The IaC connects them to the appropriate backend or frontend service:
 
 ```text
 JWT_SECRET
-JWT_EXPIRES_IN
-SIGNUP_HARDENING_ENABLED=true
 TURNSTILE_SECRET_KEY
-TURNSTILE_ALLOWED_HOSTNAMES
+NEXT_PUBLIC_TURNSTILE_SITE_KEY
 OTP_PEPPER
 RESEND_API_KEY
 EMAIL_FROM
@@ -167,26 +166,24 @@ LIVEKIT_URL
 LIVEKIT_API_KEY
 LIVEKIT_API_SECRET
 
-# Staging R2 object storage
-S3_ENDPOINT
-S3_BUCKET
-S3_QUARANTINE_BUCKET
-S3_PUBLIC_BASE_URL
+# Staging R2 object storage credentials
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
-AWS_REGION=auto
 
 # Separate AWS moderation account/bucket
 REKOGNITION_REGION
 REKOGNITION_ACCESS_KEY_ID
 REKOGNITION_SECRET_ACCESS_KEY
-REKOGNITION_S3_BUCKET
-
-# Leave blank on direct Railway staging traffic.
-TRUSTED_PROXY_IPS
-TRUSTED_PROXY_CIDRS
-CLOUDFLARE_PROXY_CIDRS
 ```
+
+The IaC sets `JWT_EXPIRES_IN`, `SIGNUP_HARDENING_ENABLED`,
+`TURNSTILE_ALLOWED_HOSTNAMES`, `TURNSTILE_TEST_BYPASS`, the exact NXQSocial R2
+account endpoint, the three staging bucket identities, `S3_PUBLIC_BASE_URL`,
+`AWS_REGION`, and the frontend feature flags to reviewed non-secret values. It
+binds `LIVEKIT_EXPECTED_STAGING_URL` to the same shared `LIVEKIT_URL` reference
+so the backend preflight still requires an exact staging match without
+duplicating a secret-store value. Direct Railway staging traffic leaves the
+trusted-proxy override variables unset.
 
 The application origins are not free-form staging inputs. They must remain this
 single approved set; the release preflight rejects missing, alternate,
@@ -343,7 +340,6 @@ for the sanitized application staging copy.
 6. Require `missing=0`, review the target inventory, and confirm both staging
    R2 bucket identities. In that one controlled process, set every execution
    gate:
-
    - `MIGRATE_LOCAL_MEDIA_CONFIRM=UPLOAD_AND_UPDATE`;
    - `MIGRATE_EXPECTED_DATABASE_URL_SHA256` to the lowercase 64-character
      SHA-256 digest of the exact staging `DATABASE_URL` (hash only; never print

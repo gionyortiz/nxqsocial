@@ -52,6 +52,28 @@ mismatched identities even when invoked directly. The wrapper rejects
 value-decryption/display flags, never prints status JSON, and never calls
 `railway config apply`.
 
+After every required staging shared variable exists and the reviewed commit is
+clean, pushed, and green in CI, the separate apply wrapper performs the same
+exact target and CLI checks again. It additionally proves the local commit
+equals the remote staging branch, refuses missing or placeholder shared
+variables, and reruns the exact `2 add, 0 change, 0 destroy` plan before
+invoking a non-destructive apply:
+
+```powershell
+$env:RAILWAY_CLI_PATH = 'C:\Tools\Railway\v5.43.3\railway.exe'
+npm --prefix .railway run apply
+```
+
+The apply wrapper accepts no arguments and never enables variable decryption,
+value display, destructive confirmation, or non-interactive approval. It
+requires the GitHub CLI to confirm the exact pushed commit's `CI` workflow
+succeeded, and passes only a minimal operating-system environment to every
+child process so unrelated provider credentials are not inherited. The release
+preflight also does not auto-load repository `.env` files. It rechecks the
+target immediately before opening Railway's own interactive apply prompt;
+confirm only after that final displayed plan is still exactly two service
+additions with no other changes.
+
 The offline CI check executes `npm --prefix .railway run validate`. That parses
 and evaluates the TypeScript definition with the exact approved context,
 asserts its resource inventory, and proves that missing or incorrect target
@@ -69,6 +91,34 @@ Do not apply if the plan contains a database or volume change, a domain, a
 deletion, or any resource outside this staging project. Applying this plan,
 adding credentials, assigning domains, or deploying services all require a
 separate authorization and operational review.
+
+## Required staging shared variables
+
+The application services reference provider values through Railway shared
+variables so no credential is stored in this repository or in the IaC plan.
+The following shared-variable names must all exist before an apply:
+
+- `JWT_SECRET`
+- `OTP_PEPPER`
+- `TURNSTILE_SECRET_KEY`
+- `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
+- `AWS_ACCESS_KEY_ID`
+- `AWS_SECRET_ACCESS_KEY`
+- `REKOGNITION_REGION`
+- `REKOGNITION_ACCESS_KEY_ID`
+- `REKOGNITION_SECRET_ACCESS_KEY`
+- `RESEND_API_KEY`
+- `EMAIL_FROM`
+- `STRIPE_SECRET_KEY`
+- `STRIPE_WEBHOOK_SECRET`
+- `LIVEKIT_URL`
+- `LIVEKIT_API_KEY`
+- `LIVEKIT_API_SECRET`
+
+The public staging origins, exact NXQSocial R2 account endpoint, staging bucket
+identities, Turnstile hostname, feature flags, and R2 region are non-secret and
+remain pinned in the IaC definition. Never substitute production provider
+credentials for missing staging variables.
 
 ## Migration notes
 

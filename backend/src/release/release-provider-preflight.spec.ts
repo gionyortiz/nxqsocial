@@ -12,7 +12,7 @@ const validEnvironment = () => ({
   APP_BASE_URL: NXQ_SOCIAL_STAGING_TARGET.application.frontendOrigin,
   FRONTEND_URL: NXQ_SOCIAL_STAGING_TARGET.application.frontendOrigin,
   API_BASE_URL: NXQ_SOCIAL_STAGING_TARGET.application.apiBaseUrl,
-  S3_ENDPOINT: 'https://abc123.r2.cloudflarestorage.com',
+  S3_ENDPOINT: NXQ_SOCIAL_STAGING_TARGET.resources.r2Endpoint,
   S3_BUCKET: NXQ_SOCIAL_STAGING_TARGET.resources.publicBucket,
   S3_QUARANTINE_BUCKET: NXQ_SOCIAL_STAGING_TARGET.resources.quarantineBucket,
   S3_PUBLIC_BASE_URL: NXQ_SOCIAL_STAGING_TARGET.resources.publicMediaOrigin,
@@ -116,6 +116,18 @@ describe('validateFullStagingReleaseProviders', () => {
 
     expect(() => validateFullStagingReleaseProviders(environment)).toThrow(
       /S3_ENDPOINT must be an exact public HTTPS origin[\s\S]*S3_PUBLIC_BASE_URL must be an exact public HTTPS origin[\s\S]*LIVEKIT_URL must be an exact public WSS origin/,
+    );
+  });
+
+  it('pins R2 to the approved NXQSocial Cloudflare account', () => {
+    expect(() =>
+      validateFullStagingReleaseProviders({
+        ...validEnvironment(),
+        S3_ENDPOINT:
+          'https://ffffffffffffffffffffffffffffffff.r2.cloudflarestorage.com',
+      }),
+    ).toThrow(
+      'S3_ENDPOINT must match the approved NXQSocial Cloudflare account',
     );
   });
 

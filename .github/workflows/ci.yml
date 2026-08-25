@@ -179,6 +179,8 @@ jobs:
         run: |
           test -s .railway/package.json
           test -s .railway/package-lock.json
+          test -s .railway/apply.mjs
+          test -s .railway/child-environment.mjs
           test -s .railway/plan.mjs
           test -s .railway/railway.ts
 
@@ -186,7 +188,10 @@ jobs:
         run: npm ci --prefix .railway
 
       - name: Syntax-check offline plan entrypoint
-        run: node --check .railway/plan.mjs
+        run: |
+          node --check .railway/apply.mjs
+          node --check .railway/child-environment.mjs
+          node --check .railway/plan.mjs
 
       - name: Parse and evaluate the IaC definition offline
         run: npm --prefix .railway run validate

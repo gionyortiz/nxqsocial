@@ -191,6 +191,11 @@ function validateR2(environment: ReleaseEnvironment, issues: string[]) {
   ) {
     issues.push('[R2] S3_ENDPOINT must be a Cloudflare R2 account endpoint');
   }
+  if (endpoint && endpoint !== NXQ_SOCIAL_STAGING_TARGET.resources.r2Endpoint) {
+    issues.push(
+      '[R2] S3_ENDPOINT must match the approved NXQSocial Cloudflare account',
+    );
+  }
   if (publicUrl && publicUrl.hostname.endsWith('.r2.cloudflarestorage.com')) {
     issues.push(
       '[R2] S3_PUBLIC_BASE_URL must be a public media origin, not the private R2 API endpoint',

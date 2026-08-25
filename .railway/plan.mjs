@@ -2,6 +2,7 @@ import { spawnSync } from "node:child_process";
 import { existsSync } from "node:fs";
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { createChildEnvironment } from "./child-environment.mjs";
 
 const railwayDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(railwayDirectory, "..");
@@ -17,18 +18,20 @@ const expectedEnvironment = {
 const requestedPlanArguments = process.argv.slice(2);
 if (
   requestedPlanArguments.some((argument) => argument !== "--verbose") ||
-  requestedPlanArguments.filter((argument) => argument === "--verbose")
-    .length > 1
+  requestedPlanArguments.filter((argument) => argument === "--verbose").length >
+    1
 ) {
   throw new Error(
     "Only the non-secret --verbose plan flag is allowed by this wrapper.",
   );
 }
 const executable = resolveRailwayExecutable();
+const cliEnvironment = createChildEnvironment({ _: executable });
 
 const versionResult = spawnSync(executable, ["--version"], {
   cwd: repositoryRoot,
   encoding: "utf8",
+  env: cliEnvironment,
   stdio: ["ignore", "pipe", "pipe"],
 });
 
@@ -42,7 +45,6 @@ if (
   );
 }
 
-const cliEnvironment = { ...process.env, _: executable };
 const statusResult = spawnSync(executable, ["status", "--json"], {
   cwd: repositoryRoot,
   encoding: "utf8",
