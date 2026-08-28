@@ -74,12 +74,11 @@ export default defineRailway((ctx) => {
       builder: "DOCKERFILE",
       dockerfilePath: "Dockerfile",
     },
+    preDeployCommand:
+      "node dist/scripts/release-provider-preflight.js && npm run db:migrate:deploy",
     deploy: {
-      preDeployCommand:
-        "node dist/scripts/release-provider-preflight.js && npm run db:migrate:deploy",
       healthcheckPath: "/api/health/ready",
       healthcheckTimeout: 300,
-      restartPolicyType: "ON_FAILURE",
       restartPolicyMaxRetries: 5,
       drainingSeconds: 20,
     },
@@ -132,7 +131,6 @@ export default defineRailway((ctx) => {
     deploy: {
       healthcheckPath: "/health",
       healthcheckTimeout: 300,
-      restartPolicyType: "ON_FAILURE",
       restartPolicyMaxRetries: 5,
       drainingSeconds: 20,
     },

@@ -127,8 +127,8 @@ injection, domains, and deployment remain separate operational actions.
 - Healthcheck path: `/api/health/ready`
 - Healthcheck timeout: 300 seconds
 - Project IaC source: `/.railway/railway.ts`
-- Restart policy: on failure, at most 5 retries (prevents an unbounded staging
-  crash loop from consuming the authorized budget)
+- Restart policy: Railway's default on-failure policy, capped at 5 retries
+  (prevents an unbounded staging crash loop from consuming the authorized budget)
 - Draining time: at least 20 seconds
 
 The pre-deploy container has no persistent volume. Its only permitted sequence
@@ -293,7 +293,7 @@ signature enforcement; never bypass Access for the whole API.
 - Healthcheck path: `/health`
 - Healthcheck timeout: 300 seconds
 - Project IaC source: `/.railway/railway.ts`
-- Restart policy: on failure, at most 5 retries
+- Restart policy: Railway's default on-failure policy, capped at 5 retries
 - Draining time: at least 20 seconds
 
 The project IaC pins the first three non-secret build variables. Supply the
