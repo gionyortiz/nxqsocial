@@ -24,7 +24,8 @@ const validEnvironment = () => ({
   EMAIL_FROM: 'NXQ Social Staging <staging@mail.nxqsocial.com>',
   SIGNUP_HARDENING_ENABLED: 'true',
   TURNSTILE_SECRET_KEY: 'turnstile_secret_1234567890',
-  TURNSTILE_ALLOWED_HOSTNAMES: 'staging.nxqsocial.com',
+  TURNSTILE_ALLOWED_HOSTNAMES:
+    NXQ_SOCIAL_STAGING_TARGET.resources.turnstileHostname,
   STRIPE_SECRET_KEY: 'sk_test_12345678901234567890',
   STRIPE_WEBHOOK_SECRET: 'whsec_12345678901234567890',
   LIVEKIT_URL: 'wss://nxq-staging.livekit.cloud',
@@ -153,7 +154,7 @@ describe('validateFullStagingReleaseProviders', () => {
     };
 
     expect(() => validateFullStagingReleaseProviders(environment)).toThrow(
-      /APP_BASE_URL must equal the approved NXQ Social staging frontend origin[\s\S]*FRONTEND_URL must equal the approved NXQ Social staging frontend origin only[\s\S]*API_BASE_URL must equal the approved NXQ Social staging API URL ending in \/api[\s\S]*public media bucket must match the approved staging identity[\s\S]*S3_QUARANTINE_BUCKET must match the approved staging identity[\s\S]*S3_PUBLIC_BASE_URL must match the approved staging media origin[\s\S]*EMAIL_FROM must use the approved mail\.nxqsocial\.com domain[\s\S]*TURNSTILE_ALLOWED_HOSTNAMES must equal staging\.nxqsocial\.com only[\s\S]*LIVEKIT_URL hostname must identify staging/,
+      /APP_BASE_URL must equal the approved NXQ Social staging frontend origin[\s\S]*FRONTEND_URL must equal the approved NXQ Social staging frontend origin only[\s\S]*API_BASE_URL must equal the approved NXQ Social staging API URL ending in \/api[\s\S]*public media bucket must match the approved staging identity[\s\S]*S3_QUARANTINE_BUCKET must match the approved staging identity[\s\S]*S3_PUBLIC_BASE_URL must match the approved staging media origin[\s\S]*EMAIL_FROM must use the approved mail\.nxqsocial\.com domain[\s\S]*TURNSTILE_ALLOWED_HOSTNAMES must equal the approved staging frontend hostname only[\s\S]*LIVEKIT_URL hostname must identify staging/,
     );
   });
 

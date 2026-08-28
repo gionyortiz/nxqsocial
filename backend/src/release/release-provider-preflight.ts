@@ -281,7 +281,7 @@ function validateTurnstile(environment: ReleaseEnvironment, issues: string[]) {
     }
     if (hostnames !== NXQ_SOCIAL_STAGING_TARGET.resources.turnstileHostname) {
       issues.push(
-        '[Turnstile] TURNSTILE_ALLOWED_HOSTNAMES must equal staging.nxqsocial.com only',
+        '[Turnstile] TURNSTILE_ALLOWED_HOSTNAMES must equal the approved staging frontend hostname only',
       );
     }
   }
