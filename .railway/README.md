@@ -104,9 +104,6 @@ The following shared-variable names must all exist before an apply:
 - `NEXT_PUBLIC_TURNSTILE_SITE_KEY`
 - `AWS_ACCESS_KEY_ID`
 - `AWS_SECRET_ACCESS_KEY`
-- `REKOGNITION_REGION`
-- `REKOGNITION_ACCESS_KEY_ID`
-- `REKOGNITION_SECRET_ACCESS_KEY`
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 - `STRIPE_SECRET_KEY`
@@ -114,6 +111,12 @@ The following shared-variable names must all exist before an apply:
 - `LIVEKIT_URL`
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
+
+`AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are the standard S3-compatible
+environment names consumed by the SDK, but in this staging definition they are
+scoped Cloudflare R2 credentials. They do not authorize or require an AWS
+account. Staging moderation is pinned to the non-secret `staging-mock` provider;
+no Rekognition, AWS S3 bucket, or IAM credential is used.
 
 The public staging origins, exact NXQSocial R2 account endpoint, staging bucket
 identities, Turnstile hostname, feature flags, and R2 region are non-secret and

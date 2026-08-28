@@ -38,6 +38,28 @@ describe('validateEnvironment', () => {
     expect(validateEnvironment(environment)).toBe(environment);
   });
 
+  it('allows the moderation mock only for an explicit staging release', () => {
+    const environment = {
+      ...validProductionEnvironment(),
+      NXQ_RELEASE_TARGET: 'staging',
+      RAILWAY_ENVIRONMENT_NAME: 'staging',
+      MEDIA_MODERATION_PROVIDER: 'staging-mock',
+      REKOGNITION_REGION: '',
+      REKOGNITION_ACCESS_KEY_ID: '',
+      REKOGNITION_SECRET_ACCESS_KEY: '',
+      REKOGNITION_S3_BUCKET: '',
+    };
+    expect(validateEnvironment(environment)).toBe(environment);
+
+    expect(() =>
+      validateEnvironment({
+        ...environment,
+        NXQ_RELEASE_TARGET: 'production',
+        RAILWAY_ENVIRONMENT_NAME: 'production',
+      }),
+    ).toThrow(/staging-mock is allowed only for the staging release target/);
+  });
+
   it('fails once with the complete missing-variable inventory', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'production' })).toThrow(
       /DATABASE_URL is required[\s\S]*REDIS_URL is required[\s\S]*JWT_SECRET is required[\s\S]*TURNSTILE_SECRET_KEY is required[\s\S]*OTP_PEPPER is required/,

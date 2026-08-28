@@ -21,7 +21,7 @@ export interface MediaScanResult {
   labels: Array<{ name: string; confidence: number; parentName?: string }>;
   topCategory?: string;
   maxConfidence: number;
-  provider: 'rekognition' | 'none';
+  provider: 'rekognition' | 'staging-mock' | 'none';
 }
 
 export interface VideoScanStartResult {
@@ -66,30 +66,57 @@ export class MediaSafetyService {
   private readonly enabled: boolean;
   private readonly moderationStorage: S3Client | null;
   private readonly moderationBucket: string;
+  private readonly provider: 'rekognition' | 'staging-mock';
 
   constructor() {
+    const configuredProvider =
+      process.env.MEDIA_MODERATION_PROVIDER?.trim() || 'rekognition';
+    const stagingMock = configuredProvider === 'staging-mock';
+    if (
+      stagingMock &&
+      (process.env.NXQ_RELEASE_TARGET !== 'staging' ||
+        process.env.RAILWAY_ENVIRONMENT_NAME !== 'staging')
+    ) {
+      throw new Error(
+        'The staging moderation mock is allowed only in the staging release target.',
+      );
+    }
+    if (configuredProvider !== 'rekognition' && !stagingMock) {
+      throw new Error('Unsupported media moderation provider.');
+    }
+    this.provider = stagingMock ? 'staging-mock' : 'rekognition';
+
     // These credentials are intentionally independent from R2 media storage.
     // Rekognition video moderation can read only from an AWS S3 bucket.
     const rekognitionRegion = process.env.REKOGNITION_REGION?.trim();
     const rekognitionKeyId = process.env.REKOGNITION_ACCESS_KEY_ID?.trim();
-    const rekognitionSecret =
-      process.env.REKOGNITION_SECRET_ACCESS_KEY?.trim();
-    this.moderationBucket =
-      process.env.REKOGNITION_S3_BUCKET?.trim() ?? '';
+    const rekognitionSecret = process.env.REKOGNITION_SECRET_ACCESS_KEY?.trim();
+    this.moderationBucket = process.env.REKOGNITION_S3_BUCKET?.trim() ?? '';
 
-    this.enabled = !!(
-      rekognitionKeyId &&
-      rekognitionSecret &&
-      this.moderationBucket &&
-      !rekognitionKeyId.startsWith('REPLACE') &&
-      rekognitionRegion &&
-      rekognitionRegion !== 'auto'
-    );
+    this.enabled =
+      stagingMock ||
+      !!(
+        rekognitionKeyId &&
+        rekognitionSecret &&
+        this.moderationBucket &&
+        !rekognitionKeyId.startsWith('REPLACE') &&
+        rekognitionRegion &&
+        rekognitionRegion !== 'auto'
+      );
 
-    if (this.enabled) {
+    if (stagingMock) {
+      this.client = null;
+      this.moderationStorage = null;
+      this.logger.warn(
+        'MediaSafetyService: staging mock enabled for synthetic test data only',
+      );
+    } else if (this.enabled) {
       this.client = new RekognitionClient({
         region: rekognitionRegion,
-        credentials: { accessKeyId: rekognitionKeyId!, secretAccessKey: rekognitionSecret! },
+        credentials: {
+          accessKeyId: rekognitionKeyId!,
+          secretAccessKey: rekognitionSecret!,
+        },
       });
       this.moderationStorage = new S3Client({
         region: rekognitionRegion,
@@ -98,7 +125,9 @@ export class MediaSafetyService {
           secretAccessKey: rekognitionSecret!,
         },
       });
-      this.logger.log(`MediaSafetyService: Rekognition enabled (region=${rekognitionRegion})`);
+      this.logger.log(
+        `MediaSafetyService: Rekognition enabled (region=${rekognitionRegion})`,
+      );
     } else {
       this.client = null;
       this.moderationStorage = null;
@@ -127,6 +156,14 @@ export class MediaSafetyService {
    * Returns a safe result if Rekognition is not configured.
    */
   async scanImage(buffer: Buffer): Promise<MediaScanResult> {
+    if (this.provider === 'staging-mock') {
+      return {
+        safe: true,
+        labels: [],
+        maxConfidence: 0,
+        provider: 'staging-mock',
+      };
+    }
     if (!this.enabled || !this.client) {
       return { safe: true, labels: [], maxConfidence: 0, provider: 'none' };
     }
@@ -151,6 +188,14 @@ export class MediaSafetyService {
    * Rekognition reads from S3 on its own — requires Rekognition role access to S3.
    */
   async scanImageFromS3(bucket: string, key: string): Promise<MediaScanResult> {
+    if (this.provider === 'staging-mock') {
+      return {
+        safe: true,
+        labels: [],
+        maxConfidence: 0,
+        provider: 'staging-mock',
+      };
+    }
     if (!this.enabled || !this.client) {
       return { safe: true, labels: [], maxConfidence: 0, provider: 'none' };
     }
@@ -176,6 +221,9 @@ export class MediaSafetyService {
    * The video must already be in the S3 bucket (bucketName / objectKey).
    */
   async startVideoScanBuffer(buffer: Buffer): Promise<VideoScanStartResult> {
+    if (this.provider === 'staging-mock') {
+      return { status: 'BYPASSED', jobId: null };
+    }
     if (!this.enabled || !this.client || !this.moderationStorage) {
       return { status: 'BYPASSED', jobId: null };
     }
@@ -199,16 +247,27 @@ export class MediaSafetyService {
     filePath: string,
     moderationObjectKey: string,
   ): Promise<VideoScanStartResult> {
+    if (this.provider === 'staging-mock') {
+      return { status: 'BYPASSED', jobId: null };
+    }
     if (!this.enabled || !this.client || !this.moderationStorage) {
       return { status: 'BYPASSED', jobId: null };
     }
     if (!this.isManagedModerationKey(moderationObjectKey)) {
-      throw new Error('Refusing to stage video outside the managed moderation prefix');
+      throw new Error(
+        'Refusing to stage video outside the managed moderation prefix',
+      );
     }
 
     const metadata = await stat(filePath);
-    if (!metadata.isFile() || !Number.isSafeInteger(metadata.size) || metadata.size <= 0) {
-      throw new Error('Video moderation source must be a non-empty regular file');
+    if (
+      !metadata.isFile() ||
+      !Number.isSafeInteger(metadata.size) ||
+      metadata.size <= 0
+    ) {
+      throw new Error(
+        'Video moderation source must be a non-empty regular file',
+      );
     }
 
     const body = createReadStream(filePath);
@@ -266,7 +325,9 @@ export class MediaSafetyService {
   async cleanupVideoScanObject(objectKey: string | undefined): Promise<void> {
     if (!objectKey || !this.moderationStorage || !this.moderationBucket) return;
     if (!this.isManagedModerationKey(objectKey)) {
-      throw new Error('Refusing to delete outside the managed moderation prefix');
+      throw new Error(
+        'Refusing to delete outside the managed moderation prefix',
+      );
     }
     await this.moderationStorage.send(
       new DeleteObjectCommand({
@@ -282,7 +343,9 @@ export class MediaSafetyService {
       objectKey.endsWith('.mp4') &&
       !objectKey.includes('\\') &&
       !objectKey.includes('//') &&
-      !objectKey.split('/').some((segment) => !segment || segment === '.' || segment === '..')
+      !objectKey
+        .split('/')
+        .some((segment) => !segment || segment === '.' || segment === '..')
     );
   }
 
@@ -291,6 +354,7 @@ export class MediaSafetyService {
     objectKey: string,
     clientRequestToken?: string,
   ): Promise<string | null> {
+    if (this.provider === 'staging-mock') return null;
     if (!this.enabled || !this.client) {
       return null;
     }
@@ -311,7 +375,13 @@ export class MediaSafetyService {
     }
   }
 
-  async startVideoScanJob(bucketName: string, objectKey: string): Promise<VideoScanStartResult> {
+  async startVideoScanJob(
+    bucketName: string,
+    objectKey: string,
+  ): Promise<VideoScanStartResult> {
+    if (this.provider === 'staging-mock') {
+      return { status: 'BYPASSED', jobId: null };
+    }
     if (!this.enabled || !this.client) {
       return { status: 'BYPASSED', jobId: null };
     }
@@ -334,6 +404,14 @@ export class MediaSafetyService {
    * Returns null if the job is still in progress.
    */
   async getVideoScanResult(jobId: string): Promise<MediaScanResult | null> {
+    if (this.provider === 'staging-mock') {
+      return {
+        safe: true,
+        labels: [],
+        maxConfidence: 0,
+        provider: 'staging-mock',
+      };
+    }
     if (!this.enabled || !this.client) return null;
 
     try {
@@ -355,12 +433,29 @@ export class MediaSafetyService {
   }
 
   async pollVideoScan(jobId: string): Promise<VideoScanPollResult> {
+    if (this.provider === 'staging-mock') {
+      return {
+        status: 'SUCCEEDED',
+        result: {
+          safe: true,
+          labels: [],
+          maxConfidence: 0,
+          provider: 'staging-mock',
+        },
+      };
+    }
     if (!this.enabled || !this.client) {
-      return { status: 'FAILED', failureReason: 'Scanner unavailable', userMessage: 'Video safety review is unavailable right now.' };
+      return {
+        status: 'FAILED',
+        failureReason: 'Scanner unavailable',
+        userMessage: 'Video safety review is unavailable right now.',
+      };
     }
 
     try {
-      const response = await this.client.send(new GetContentModerationCommand({ JobId: jobId }));
+      const response = await this.client.send(
+        new GetContentModerationCommand({ JobId: jobId }),
+      );
 
       if (response.JobStatus === 'IN_PROGRESS') {
         return { status: 'IN_PROGRESS' };
@@ -369,8 +464,13 @@ export class MediaSafetyService {
       if (response.JobStatus !== 'SUCCEEDED') {
         return {
           status: 'FAILED',
-          failureReason: response.StatusMessage ?? response.JobStatus ?? 'Video moderation failed',
-          userMessage: this.toUserFacingVideoError(response.StatusMessage ?? response.JobStatus),
+          failureReason:
+            response.StatusMessage ??
+            response.JobStatus ??
+            'Video moderation failed',
+          userMessage: this.toUserFacingVideoError(
+            response.StatusMessage ?? response.JobStatus,
+          ),
         };
       }
 
@@ -396,7 +496,9 @@ export class MediaSafetyService {
    * Determine post status from a scan result.
    * Returns 'PUBLISHED' | 'UNDER_REVIEW' | 'REJECTED'
    */
-  statusFromScan(result: MediaScanResult): 'PUBLISHED' | 'UNDER_REVIEW' | 'REJECTED' {
+  statusFromScan(
+    result: MediaScanResult,
+  ): 'PUBLISHED' | 'UNDER_REVIEW' | 'REJECTED' {
     if (result.safe) return 'PUBLISHED';
 
     const hardBlock = result.labels.some(
@@ -424,7 +526,9 @@ export class MediaSafetyService {
     }));
 
     const maxConfidence = Math.max(...mapped.map((l) => l.confidence));
-    const topLabel = mapped.reduce((a, b) => (a.confidence > b.confidence ? a : b));
+    const topLabel = mapped.reduce((a, b) =>
+      a.confidence > b.confidence ? a : b,
+    );
 
     return {
       safe: false,
@@ -437,7 +541,14 @@ export class MediaSafetyService {
 
   private toUserFacingVideoError(message?: string): string {
     const text = (message ?? '').toLowerCase();
-    if (text.includes('codec') || text.includes('h.264') || text.includes('h264') || text.includes('hevc') || text.includes('format') || text.includes('quicktime')) {
+    if (
+      text.includes('codec') ||
+      text.includes('h.264') ||
+      text.includes('h264') ||
+      text.includes('hevc') ||
+      text.includes('format') ||
+      text.includes('quicktime')
+    ) {
       return 'This video format could not be processed. Please upload MP4/H.264.';
     }
     return 'Video processing failed. Please try again with a smaller MP4 video.';

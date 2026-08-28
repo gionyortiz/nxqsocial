@@ -19,12 +19,9 @@ const validEnvironment = () => ({
   AWS_ACCESS_KEY_ID: 'r2_access_key_123456789',
   AWS_SECRET_ACCESS_KEY: 'r2_secret_key_1234567890123456789',
   AWS_REGION: 'auto',
-  REKOGNITION_REGION: 'us-east-1',
-  REKOGNITION_ACCESS_KEY_ID: 'AKIASTAGINGMODERATION1',
-  REKOGNITION_SECRET_ACCESS_KEY: 'aws_moderation_secret_12345678901234567890',
-  REKOGNITION_S3_BUCKET: NXQ_SOCIAL_STAGING_TARGET.resources.moderationBucket,
+  MEDIA_MODERATION_PROVIDER: 'staging-mock',
   RESEND_API_KEY: 're_staging_1234567890',
-  EMAIL_FROM: 'NXQ Social Staging <noreply@staging.nxqsocial.com>',
+  EMAIL_FROM: 'NXQ Social Staging <staging@mail.nxqsocial.com>',
   SIGNUP_HARDENING_ENABLED: 'true',
   TURNSTILE_SECRET_KEY: 'turnstile_secret_1234567890',
   TURNSTILE_ALLOWED_HOSTNAMES: 'staging.nxqsocial.com',
@@ -54,7 +51,7 @@ describe('validateFullStagingReleaseProviders', () => {
 
   it('reports the complete missing-field inventory without values', () => {
     expect(() => validateFullStagingReleaseProviders({})).toThrow(
-      /S3_ENDPOINT is required[\s\S]*REKOGNITION_REGION is required[\s\S]*RESEND_API_KEY is required[\s\S]*TURNSTILE_SECRET_KEY is required[\s\S]*STRIPE_SECRET_KEY is required[\s\S]*LIVEKIT_URL is required/,
+      /S3_ENDPOINT is required[\s\S]*MEDIA_MODERATION_PROVIDER must equal staging-mock[\s\S]*RESEND_API_KEY is required[\s\S]*TURNSTILE_SECRET_KEY is required[\s\S]*STRIPE_SECRET_KEY is required[\s\S]*LIVEKIT_URL is required/,
     );
   });
 
@@ -96,13 +93,12 @@ describe('validateFullStagingReleaseProviders', () => {
     );
   });
 
-  it('requires distinct public, quarantine, and moderation buckets', () => {
+  it('requires distinct public and quarantine buckets', () => {
     const environment = validEnvironment();
     environment.S3_QUARANTINE_BUCKET = environment.S3_BUCKET;
-    environment.REKOGNITION_S3_BUCKET = environment.S3_BUCKET;
 
     expect(() => validateFullStagingReleaseProviders(environment)).toThrow(
-      /S3_QUARANTINE_BUCKET must differ[\s\S]*public, quarantine, and moderation buckets must all differ/,
+      /S3_QUARANTINE_BUCKET must differ/,
     );
   });
 
@@ -131,15 +127,13 @@ describe('validateFullStagingReleaseProviders', () => {
     );
   });
 
-  it('rejects placeholder values and shared provider credentials', () => {
+  it('rejects placeholder values and a non-staging moderation provider', () => {
     const environment = validEnvironment();
     environment.RESEND_API_KEY = '__REQUIRED__';
-    environment.REKOGNITION_ACCESS_KEY_ID = environment.AWS_ACCESS_KEY_ID;
-    environment.REKOGNITION_SECRET_ACCESS_KEY =
-      environment.AWS_SECRET_ACCESS_KEY;
+    environment.MEDIA_MODERATION_PROVIDER = 'rekognition';
 
     expect(() => validateFullStagingReleaseProviders(environment)).toThrow(
-      /RESEND_API_KEY must not contain a placeholder[\s\S]*R2 and Rekognition must use separate access keys[\s\S]*R2 and Rekognition must use separate secret keys/,
+      /MEDIA_MODERATION_PROVIDER must equal staging-mock[\s\S]*RESEND_API_KEY must not contain a placeholder/,
     );
   });
 
@@ -149,7 +143,6 @@ describe('validateFullStagingReleaseProviders', () => {
       S3_BUCKET: 'nxqsocial-production-public',
       S3_QUARANTINE_BUCKET: 'nxqsocial-production-quarantine',
       S3_PUBLIC_BASE_URL: 'https://media.nxqsocial.com',
-      REKOGNITION_S3_BUCKET: 'nxqsocial-production-moderation-private',
       EMAIL_FROM: 'NXQ Social <noreply@nxqsocial.com>',
       TURNSTILE_ALLOWED_HOSTNAMES: 'nxqsocial.com,www.nxqsocial.com',
       LIVEKIT_URL: 'wss://nxq-production.livekit.cloud',
@@ -160,7 +153,7 @@ describe('validateFullStagingReleaseProviders', () => {
     };
 
     expect(() => validateFullStagingReleaseProviders(environment)).toThrow(
-      /APP_BASE_URL must equal the approved NXQ Social staging frontend origin[\s\S]*FRONTEND_URL must equal the approved NXQ Social staging frontend origin only[\s\S]*API_BASE_URL must equal the approved NXQ Social staging API URL ending in \/api[\s\S]*public media bucket must match the approved staging identity[\s\S]*S3_QUARANTINE_BUCKET must match the approved staging identity[\s\S]*S3_PUBLIC_BASE_URL must match the approved staging media origin[\s\S]*REKOGNITION_S3_BUCKET must match the approved staging identity[\s\S]*EMAIL_FROM must use the approved staging\.nxqsocial\.com domain[\s\S]*TURNSTILE_ALLOWED_HOSTNAMES must equal staging\.nxqsocial\.com only[\s\S]*LIVEKIT_URL hostname must identify staging/,
+      /APP_BASE_URL must equal the approved NXQ Social staging frontend origin[\s\S]*FRONTEND_URL must equal the approved NXQ Social staging frontend origin only[\s\S]*API_BASE_URL must equal the approved NXQ Social staging API URL ending in \/api[\s\S]*public media bucket must match the approved staging identity[\s\S]*S3_QUARANTINE_BUCKET must match the approved staging identity[\s\S]*S3_PUBLIC_BASE_URL must match the approved staging media origin[\s\S]*EMAIL_FROM must use the approved mail\.nxqsocial\.com domain[\s\S]*TURNSTILE_ALLOWED_HOSTNAMES must equal staging\.nxqsocial\.com only[\s\S]*LIVEKIT_URL hostname must identify staging/,
     );
   });
 
@@ -184,14 +177,12 @@ describe('validateFullStagingReleaseProviders', () => {
   it('never includes credential values in failure output', () => {
     const secretValues = {
       r2: 'never-print-r2-secret-value',
-      moderation: 'never-print-moderation-secret-value',
       stripe: 'never-print-live-stripe-secret',
       liveKit: 'never-print-livekit-secret-value',
     };
     const environment = {
       ...validEnvironment(),
       AWS_SECRET_ACCESS_KEY: secretValues.r2,
-      REKOGNITION_SECRET_ACCESS_KEY: secretValues.moderation,
       STRIPE_SECRET_KEY: secretValues.stripe,
       LIVEKIT_API_SECRET: secretValues.liveKit,
     };

@@ -92,9 +92,6 @@ for (const name of [
   "TURNSTILE_SECRET_KEY",
   "AWS_ACCESS_KEY_ID",
   "AWS_SECRET_ACCESS_KEY",
-  "REKOGNITION_REGION",
-  "REKOGNITION_ACCESS_KEY_ID",
-  "REKOGNITION_SECRET_ACCESS_KEY",
   "RESEND_API_KEY",
   "EMAIL_FROM",
   "STRIPE_SECRET_KEY",
@@ -131,10 +128,7 @@ assert.equal(
   backend.variables.S3_QUARANTINE_BUCKET?.value,
   "nxqsocial-staging-quarantine",
 );
-assert.equal(
-  backend.variables.REKOGNITION_S3_BUCKET?.value,
-  "nxqsocial-staging-moderation-private",
-);
+assert.equal(backend.variables.MEDIA_MODERATION_PROVIDER?.value, "staging-mock");
 assert.equal(frontend.variables.NXQ_RELEASE_TARGET?.value, "staging");
 assert.equal(
   frontend.variables.NEXT_PUBLIC_APP_URL?.value,

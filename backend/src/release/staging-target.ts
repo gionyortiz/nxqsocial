@@ -13,9 +13,9 @@ export const NXQ_SOCIAL_STAGING_TARGET = {
       'https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com',
     publicBucket: 'nxqsocial-staging-public',
     quarantineBucket: 'nxqsocial-staging-quarantine',
-    moderationBucket: 'nxqsocial-staging-moderation-private',
+    moderationProvider: 'staging-mock',
     publicMediaOrigin: 'https://media-staging.nxqsocial.com',
     turnstileHostname: 'staging.nxqsocial.com',
-    emailDomain: 'staging.nxqsocial.com',
+    emailDomain: 'mail.nxqsocial.com',
   },
 } as const;

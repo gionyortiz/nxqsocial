@@ -4,7 +4,7 @@ type ReleaseEnvironment = Record<string, string | undefined>;
 
 export const FULL_STAGING_PROVIDER_GROUPS = [
   'R2 public/quarantine storage',
-  'AWS Rekognition moderation',
+  'Staging moderation mock',
   'Resend email',
   'Turnstile bot protection',
   'Stripe test mode',
@@ -49,12 +49,11 @@ export function validateFullStagingReleaseProviders(
   validateRailwayTarget(environment, issues);
   validateApplicationOrigins(environment, issues);
   validateR2(environment, issues);
-  validateRekognition(environment, issues);
+  validateStagingModeration(environment, issues);
   validateResend(environment, issues);
   validateTurnstile(environment, issues);
   validateStripeTestMode(environment, issues);
   validateLiveKit(environment, issues);
-  validateProviderSeparation(environment, issues);
 
   if (issues.length > 0) {
     throw new ReleaseProviderPreflightError(issues);
@@ -221,45 +220,17 @@ function validateR2(environment: ReleaseEnvironment, issues: string[]) {
   }
 }
 
-function validateRekognition(
+function validateStagingModeration(
   environment: ReleaseEnvironment,
   issues: string[],
 ) {
-  const group = 'Rekognition';
-  const region = requireValue(environment, 'REKOGNITION_REGION', group, issues);
-  if (region && !/^[a-z]{2}(?:-gov)?-[a-z]+-\d$/.test(region)) {
+  if (
+    value(environment, 'MEDIA_MODERATION_PROVIDER') !==
+    NXQ_SOCIAL_STAGING_TARGET.resources.moderationProvider
+  ) {
     issues.push(
-      '[Rekognition] REKOGNITION_REGION must be an explicit AWS region',
+      '[Moderation] MEDIA_MODERATION_PROVIDER must equal staging-mock for the approved staging target',
     );
-  }
-  requireSecret(environment, 'REKOGNITION_ACCESS_KEY_ID', group, 12, issues);
-  requireSecret(
-    environment,
-    'REKOGNITION_SECRET_ACCESS_KEY',
-    group,
-    24,
-    issues,
-  );
-  const moderationBucket = requireValue(
-    environment,
-    'REKOGNITION_S3_BUCKET',
-    group,
-    issues,
-  );
-  if (moderationBucket) {
-    validateBucketName(
-      moderationBucket,
-      'REKOGNITION_S3_BUCKET',
-      group,
-      issues,
-    );
-    if (
-      moderationBucket !== NXQ_SOCIAL_STAGING_TARGET.resources.moderationBucket
-    ) {
-      issues.push(
-        '[Rekognition] REKOGNITION_S3_BUCKET must match the approved staging identity',
-      );
-    }
   }
 }
 
@@ -277,7 +248,7 @@ function validateResend(environment: ReleaseEnvironment, issues: string[]) {
     senderDomain(from) !== NXQ_SOCIAL_STAGING_TARGET.resources.emailDomain
   ) {
     issues.push(
-      '[Resend] EMAIL_FROM must use the approved staging.nxqsocial.com domain',
+      '[Resend] EMAIL_FROM must use the approved mail.nxqsocial.com domain',
     );
   }
 }
@@ -394,43 +365,6 @@ function validateLiveKit(environment: ReleaseEnvironment, issues: string[]) {
   }
   requireSecret(environment, 'LIVEKIT_API_KEY', group, 6, issues);
   requireSecret(environment, 'LIVEKIT_API_SECRET', group, 16, issues);
-}
-
-function validateProviderSeparation(
-  environment: ReleaseEnvironment,
-  issues: string[],
-) {
-  const buckets = [
-    value(environment, 'S3_BUCKET_NAME') || value(environment, 'S3_BUCKET'),
-    value(environment, 'S3_QUARANTINE_BUCKET'),
-    value(environment, 'REKOGNITION_S3_BUCKET'),
-  ]
-    .filter(Boolean)
-    .map((item) => item.toLowerCase());
-  if (new Set(buckets).size !== buckets.length) {
-    issues.push(
-      '[Provider separation] public, quarantine, and moderation buckets must all differ',
-    );
-  }
-
-  if (
-    value(environment, 'AWS_ACCESS_KEY_ID') &&
-    value(environment, 'AWS_ACCESS_KEY_ID') ===
-      value(environment, 'REKOGNITION_ACCESS_KEY_ID')
-  ) {
-    issues.push(
-      '[Provider separation] R2 and Rekognition must use separate access keys',
-    );
-  }
-  if (
-    value(environment, 'AWS_SECRET_ACCESS_KEY') &&
-    value(environment, 'AWS_SECRET_ACCESS_KEY') ===
-      value(environment, 'REKOGNITION_SECRET_ACCESS_KEY')
-  ) {
-    issues.push(
-      '[Provider separation] R2 and Rekognition must use separate secret keys',
-    );
-  }
 }
 
 function requireValue(

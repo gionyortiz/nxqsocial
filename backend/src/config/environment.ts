@@ -4,15 +4,16 @@ type Environment = Record<string, unknown>;
 
 const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
 const FALSE_VALUES = new Set(['0', 'false', 'no', 'off']);
-const PLACEHOLDER_VALUE = /(change[-_ ]?me|replace[-_ ]?with|placeholder|your[-_ ])/i;
+const PLACEHOLDER_VALUE =
+  /(change[-_ ]?me|replace[-_ ]?with|placeholder|your[-_ ])/i;
 
 export function validateEnvironment(environment: Environment): Environment {
   const errors: string[] = [];
   const nodeEnv = readString(environment, 'NODE_ENV') || 'development';
   const railwayRuntime = Boolean(
     readString(environment, 'RAILWAY_ENVIRONMENT_ID') ||
-      readString(environment, 'RAILWAY_PROJECT_ID') ||
-      readString(environment, 'RAILWAY_SERVICE_ID'),
+    readString(environment, 'RAILWAY_PROJECT_ID') ||
+    readString(environment, 'RAILWAY_SERVICE_ID'),
   );
 
   if (!['development', 'test', 'production'].includes(nodeEnv)) {
@@ -253,7 +254,9 @@ function requireHostnames(
         parsed.username ||
         parsed.password
       ) {
-        errors.push(`${name} entries must be hostnames without schemes or paths`);
+        errors.push(
+          `${name} entries must be hostnames without schemes or paths`,
+        );
         return;
       }
     } catch {
@@ -288,7 +291,9 @@ function requireCompleteGroup(
     return;
   }
   const missing = names.filter((name) => !configured.includes(name));
-  errors.push(`${names.join('/')} must be configured together; missing ${missing.join(', ')}`);
+  errors.push(
+    `${names.join('/')} must be configured together; missing ${missing.join(', ')}`,
+  );
 }
 
 function requireObjectStorage(environment: Environment, errors: string[]) {
@@ -299,7 +304,9 @@ function requireObjectStorage(environment: Environment, errors: string[]) {
   if (!publicBucket) errors.push('S3_BUCKET or S3_BUCKET_NAME is required');
   if (!quarantineBucket) errors.push('S3_QUARANTINE_BUCKET is required');
   if (publicBucket && quarantineBucket && publicBucket === quarantineBucket) {
-    errors.push('S3_QUARANTINE_BUCKET must differ from the public media bucket');
+    errors.push(
+      'S3_QUARANTINE_BUCKET must differ from the public media bucket',
+    );
   }
   requireCanonicalHttpsUrl(environment, 'S3_PUBLIC_BASE_URL', '/', errors);
   requireSecret(environment, 'AWS_ACCESS_KEY_ID', 1, errors);
@@ -310,6 +317,25 @@ function requireObjectStorage(environment: Environment, errors: string[]) {
 }
 
 function requireMediaModeration(environment: Environment, errors: string[]) {
+  const provider =
+    readString(environment, 'MEDIA_MODERATION_PROVIDER') || 'rekognition';
+  if (provider === 'staging-mock') {
+    if (
+      readString(environment, 'NXQ_RELEASE_TARGET') !== 'staging' ||
+      readString(environment, 'RAILWAY_ENVIRONMENT_NAME') !== 'staging'
+    ) {
+      errors.push(
+        'MEDIA_MODERATION_PROVIDER=staging-mock is allowed only for the staging release target',
+      );
+    }
+    return;
+  }
+  if (provider !== 'rekognition') {
+    errors.push(
+      'MEDIA_MODERATION_PROVIDER must be rekognition or staging-mock',
+    );
+    return;
+  }
   requireSecret(environment, 'REKOGNITION_ACCESS_KEY_ID', 1, errors);
   requireSecret(environment, 'REKOGNITION_SECRET_ACCESS_KEY', 1, errors);
   requireSecret(environment, 'REKOGNITION_S3_BUCKET', 1, errors);
@@ -346,7 +372,9 @@ function validateIpList(
         isIP(value.startsWith('::ffff:') ? value.slice(7) : value) === 0,
     )
   ) {
-    errors.push(`${name} must be a comma-separated list of literal IP addresses`);
+    errors.push(
+      `${name} must be a comma-separated list of literal IP addresses`,
+    );
   }
 }
 
