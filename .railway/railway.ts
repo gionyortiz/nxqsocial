@@ -67,7 +67,6 @@ export default defineRailway((ctx) => {
   const backend = service("backend", {
     source: github(SOURCE_REPOSITORY, {
       branch: STAGING_BRANCH,
-      checkSuites: true,
       rootDirectory: "backend",
     }),
     build: {
@@ -121,7 +120,6 @@ export default defineRailway((ctx) => {
   const frontend = service("frontend", {
     source: github(SOURCE_REPOSITORY, {
       branch: STAGING_BRANCH,
-      checkSuites: true,
       rootDirectory: "frontend",
     }),
     build: {

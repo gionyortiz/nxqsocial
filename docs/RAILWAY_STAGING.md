@@ -106,8 +106,9 @@ Before any apply:
    only the `backend` and `frontend` services added. Any database, Redis,
    volume, domain, image, production resource, change, or deletion stops the
    rollout.
-5. Keep GitHub check-suite waiting enabled. A pushed revision is not eligible
-   for Railway deployment until CI passes on that exact commit.
+5. Keep Railway auto-deploy disabled while staging is stopped. A revision is
+   not eligible for a separately authorized manual deployment until CI passes
+   on that exact commit.
 
 Planning is read-only. `railway config apply`, service creation, variable
 injection, domains, and deployment remain separate operational actions.

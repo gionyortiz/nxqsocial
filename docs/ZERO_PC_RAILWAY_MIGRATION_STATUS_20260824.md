@@ -20,15 +20,14 @@ days.
 - Its `staging` environment contains only preserved PostgreSQL 16 and Redis
   8.2 service definitions and 5 GB volumes. Both deployments are removed and
   offline. There are no application services or public/custom domains.
-- The project-level `.railway/railway.ts` plan is exactly two additions
-  (`backend`, `frontend`), zero changes, and zero destroys. It preserves the
-  database, Redis, images, volumes, and regions and defines no domain or
-  provider secret.
+- The project-level `.railway/railway.ts` state is reconciled with the existing
+  stopped `backend` and `frontend` staging services. Its plan is zero additions,
+  zero changes, and zero destroys; it defines no domain or provider secret.
 - The plan wrapper fails closed unless it proves the exact Railway project and
   staging environment. It does not apply changes.
 - GitHub CI covers backend build/unit/E2E, frontend test/build, operational
-  script safety, and offline IaC structure. Railway sources are configured to
-  wait for check suites.
+  script safety, and offline IaC structure. Railway auto-deploy remains
+  disabled; an authorized manual deployment must verify CI on the exact commit.
 - Provider preflight runs before migrations and requires exact staging
   resource identities. Synthetic fixture seeding requires exact Railway IDs
   and an approved database URL SHA-256. Restore evidence uses one read-only

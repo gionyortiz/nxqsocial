@@ -68,8 +68,8 @@ const backend = resources.find((resource) => resource.name === "backend");
 const frontend = resources.find((resource) => resource.name === "frontend");
 assert.ok(backend);
 assert.ok(frontend);
-assert.equal(backend.source.checkSuites, true);
-assert.equal(frontend.source.checkSuites, true);
+assert.equal(backend.source.checkSuites, undefined);
+assert.equal(frontend.source.checkSuites, undefined);
 assert.deepEqual(backend.deploy.preDeployCommand, [
   "node dist/scripts/release-provider-preflight.js && npm run db:migrate:deploy",
 ]);
