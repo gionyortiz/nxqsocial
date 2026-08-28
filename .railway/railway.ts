@@ -75,10 +75,8 @@ export default defineRailway((ctx) => {
       dockerfilePath: "Dockerfile",
     },
     deploy: {
-      preDeployCommand: [
-        "node dist/scripts/release-provider-preflight.js",
-        "npm run db:migrate:deploy",
-      ],
+      preDeployCommand:
+        "node dist/scripts/release-provider-preflight.js && npm run db:migrate:deploy",
       healthcheckPath: "/api/health/ready",
       healthcheckTimeout: 300,
       restartPolicyType: "ON_FAILURE",

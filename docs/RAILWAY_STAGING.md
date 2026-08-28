@@ -120,8 +120,9 @@ injection, domains, and deployment remain separate operational actions.
   graph requires Node 22; keep the build and runtime major aligned and do not
   downgrade to Node 20 without a clean install, migration, and startup smoke
   test.
-- Pre-deploy sequence: `node dist/scripts/release-provider-preflight.js`
-  **first**, then `npm run db:migrate:deploy` only if preflight succeeds
+- Pre-deploy command: `node dist/scripts/release-provider-preflight.js && npm run db:migrate:deploy`.
+  Railway accepts one pre-deploy command; `&&` keeps provider preflight first
+  and prevents migrations from starting if it fails.
 - Start command: leave unset (`npm run start:prod` is the image command)
 - Healthcheck path: `/api/health/ready`
 - Healthcheck timeout: 300 seconds
