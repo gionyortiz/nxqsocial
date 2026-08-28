@@ -2,8 +2,8 @@ import { pathToFileURL } from 'node:url';
 
 export const RELEASE_TARGETS = Object.freeze({
   staging: Object.freeze({
-    appUrl: 'https://staging.nxqsocial.com',
-    apiUrl: 'https://api-staging.nxqsocial.com/api',
+    appUrl: 'https://frontend-staging-f129.up.railway.app',
+    apiUrl: 'https://backend-staging-4ceb.up.railway.app/api',
   }),
   production: Object.freeze({
     appUrl: 'https://nxqsocial.com',
