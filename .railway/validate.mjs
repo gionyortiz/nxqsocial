@@ -75,15 +75,15 @@ assert.deepEqual(backend.deploy.preDeployCommand, [
 ]);
 assert.equal(
   backend.variables.APP_BASE_URL?.value,
-  "https://staging.nxqsocial.com",
+  "https://frontend-staging-f129.up.railway.app",
 );
 assert.equal(
   backend.variables.FRONTEND_URL?.value,
-  "https://staging.nxqsocial.com",
+  "https://frontend-staging-f129.up.railway.app",
 );
 assert.equal(
   backend.variables.API_BASE_URL?.value,
-  "https://api-staging.nxqsocial.com/api",
+  "https://backend-staging-4ceb.up.railway.app/api",
 );
 for (const name of [
   "JWT_SECRET",
@@ -110,7 +110,7 @@ assert.deepEqual(backend.variables.LIVEKIT_EXPECTED_STAGING_URL, {
 });
 assert.equal(
   backend.variables.TURNSTILE_ALLOWED_HOSTNAMES?.value,
-  "staging.nxqsocial.com",
+  "frontend-staging-f129.up.railway.app",
 );
 assert.equal(backend.variables.SIGNUP_HARDENING_ENABLED?.value, "true");
 assert.equal(backend.variables.JWT_EXPIRES_IN?.value, "7d");
@@ -131,11 +131,11 @@ assert.equal(backend.variables.MEDIA_MODERATION_PROVIDER?.value, "staging-mock")
 assert.equal(frontend.variables.NXQ_RELEASE_TARGET?.value, "staging");
 assert.equal(
   frontend.variables.NEXT_PUBLIC_APP_URL?.value,
-  "https://staging.nxqsocial.com",
+  "https://frontend-staging-f129.up.railway.app",
 );
 assert.equal(
   frontend.variables.NEXT_PUBLIC_API_URL?.value,
-  "https://api-staging.nxqsocial.com/api",
+  "https://backend-staging-4ceb.up.railway.app/api",
 );
 assert.deepEqual(frontend.variables.NEXT_PUBLIC_TURNSTILE_SITE_KEY, {
   type: "sharedReference",

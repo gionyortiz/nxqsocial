@@ -85,9 +85,9 @@ export default defineRailway((ctx) => {
     env: {
       NODE_ENV: "production",
       NXQ_RELEASE_TARGET: "staging",
-      APP_BASE_URL: "https://staging.nxqsocial.com",
-      FRONTEND_URL: "https://staging.nxqsocial.com",
-      API_BASE_URL: "https://api-staging.nxqsocial.com/api",
+      APP_BASE_URL: "https://frontend-staging-f129.up.railway.app",
+      FRONTEND_URL: "https://frontend-staging-f129.up.railway.app",
+      API_BASE_URL: "https://backend-staging-4ceb.up.railway.app/api",
       DATABASE_URL: Postgres.env.DATABASE_URL,
       REDIS_URL: Redis.env.REDIS_URL,
       JWT_SECRET: shared.JWT_SECRET,
@@ -96,7 +96,7 @@ export default defineRailway((ctx) => {
       SIGNUP_HARDENING_ENABLED: "true",
       TURNSTILE_TEST_BYPASS: "false",
       TURNSTILE_SECRET_KEY: shared.TURNSTILE_SECRET_KEY,
-      TURNSTILE_ALLOWED_HOSTNAMES: "staging.nxqsocial.com",
+      TURNSTILE_ALLOWED_HOSTNAMES: "frontend-staging-f129.up.railway.app",
       S3_ENDPOINT:
         "https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com",
       S3_BUCKET_NAME: "nxqsocial-staging-public",
@@ -136,8 +136,8 @@ export default defineRailway((ctx) => {
     env: {
       NODE_ENV: "production",
       NXQ_RELEASE_TARGET: "staging",
-      NEXT_PUBLIC_APP_URL: "https://staging.nxqsocial.com",
-      NEXT_PUBLIC_API_URL: "https://api-staging.nxqsocial.com/api",
+      NEXT_PUBLIC_APP_URL: "https://frontend-staging-f129.up.railway.app",
+      NEXT_PUBLIC_API_URL: "https://backend-staging-4ceb.up.railway.app/api",
       NEXT_PUBLIC_CALLS_ENABLED: "true",
       NEXT_PUBLIC_LIVE_ENABLED: "true",
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: shared.NEXT_PUBLIC_TURNSTILE_SITE_KEY,
