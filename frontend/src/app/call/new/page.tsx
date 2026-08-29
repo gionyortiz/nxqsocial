@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { isAxiosError } from 'axios';
 import { Video, Phone, Check, Search as SearchIcon, X } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { Avatar } from '@/components/ui/Avatar';
@@ -84,10 +85,14 @@ export default function NewCallPage() {
         },
       });
       router.push('/feed');
-    } catch (err: any) {
+    } catch (err: unknown) {
+      const responseMessage = isAxiosError<{ message?: string }>(err)
+        ? err.response?.data?.message
+        : undefined;
+      const errorMessage = err instanceof Error ? err.message : undefined;
       setStartError(
-        err?.response?.data?.message
-        || err?.message
+        responseMessage
+        || errorMessage
         || 'Calling is not available right now.',
       );
     } finally {

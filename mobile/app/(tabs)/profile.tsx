@@ -1,5 +1,6 @@
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
+import { useEffect, useState } from 'react';
 import { Alert, Image, Platform, Pressable, SafeAreaView, ScrollView, Share, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
@@ -7,6 +8,35 @@ import { WEB_BASE_URL } from '@/lib/config';
 
 export default function ProfileScreen() {
   const { user, logout, token } = useAuth();
+  const [stats, setStats] = useState<{ posts: number; followers: number; following: number } | null>(null);
+
+  useEffect(() => {
+    if (!token || !user?.username) {
+      setStats(null);
+      return;
+    }
+
+    let active = true;
+    apiRequest<{ _count?: { posts?: number; followers?: number; following?: number } }>(
+      `/users/${encodeURIComponent(user.username)}`,
+      { token },
+    )
+      .then((profile) => {
+        if (!active) return;
+        setStats({
+          posts: profile._count?.posts ?? 0,
+          followers: profile._count?.followers ?? 0,
+          following: profile._count?.following ?? 0,
+        });
+      })
+      .catch(() => {
+        if (active) setStats(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [token, user?.username]);
 
   const handleDeleteAccount = () => {
     Alert.alert(
@@ -137,15 +167,15 @@ export default function ProfileScreen() {
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
             <View style={{ flex: 1, backgroundColor: '#111827', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1f2937' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>52</Text>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{stats?.posts ?? '—'}</Text>
               <Text style={{ color: '#93a1bd', fontSize: 12 }}>posts</Text>
             </View>
             <View style={{ flex: 1, backgroundColor: '#111827', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1f2937' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>365</Text>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{stats?.followers ?? '—'}</Text>
               <Text style={{ color: '#93a1bd', fontSize: 12 }}>followers</Text>
             </View>
             <View style={{ flex: 1, backgroundColor: '#111827', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1f2937' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>1.5K</Text>
+              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{stats?.following ?? '—'}</Text>
               <Text style={{ color: '#93a1bd', fontSize: 12 }}>following</Text>
             </View>
           </View>

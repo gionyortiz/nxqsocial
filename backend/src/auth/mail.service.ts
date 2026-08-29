@@ -46,8 +46,14 @@ export class MailService {
     `;
 
     if (!this.resend) {
-      this.logger.log(`[DEV] Password reset link for ${to}: ${resetUrl}`);
-      return true;
+      if (process.env.NODE_ENV === 'production') {
+        this.logger.error(
+          'Password reset email was not sent because RESEND_API_KEY is not configured.',
+        );
+      } else {
+        this.logger.log(`[DEV] Password reset link for ${to}: ${resetUrl}`);
+      }
+      return false;
     }
 
     try {

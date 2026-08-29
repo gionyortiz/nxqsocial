@@ -37,6 +37,7 @@ export function PasswordField({
           autoComplete={Platform.OS === 'ios' ? undefined : (newPassword ? 'new-password' : 'current-password')}
           textContentType={Platform.OS === 'ios' ? (newPassword ? 'newPassword' : 'password') : undefined}
           passwordRules={Platform.OS === 'ios' && newPassword ? PASSWORD_RULES : undefined}
+          importantForAutofill="yes"
           style={styles.input}
           onFocus={(event) => {
             setFocused(true);

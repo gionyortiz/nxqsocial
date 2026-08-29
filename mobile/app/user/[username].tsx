@@ -309,12 +309,6 @@ export default function UserProfileScreen() {
                     >
                       <Text style={{ color: '#e2e8f0', fontWeight: '900', textAlign: 'center' }}>Message</Text>
                     </Pressable>
-                    <Pressable
-                      onPress={() => Alert.alert('Subscribe', 'Subscribe flow is coming soon.')}
-                      style={{ flex: 1, backgroundColor: '#1f2937', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#334155' }}
-                    >
-                      <Text style={{ color: '#e2e8f0', fontWeight: '900', textAlign: 'center' }}>Subscribe</Text>
-                    </Pressable>
                   </View>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable

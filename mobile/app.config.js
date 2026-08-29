@@ -114,6 +114,7 @@ module.exports = ({ config }) => {
     ios: {
       ...config.ios,
       bundleIdentifier: 'com.gionyortiz.nxqsocial.staging',
+      associatedDomains: [],
       infoPlist: stagingInfoPlist,
     },
     android: {

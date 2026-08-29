@@ -110,6 +110,12 @@ const NATIVE_NETWORK_RETRY_ATTEMPTS = 3;
 const NATIVE_NETWORK_RETRY_DELAY_MS = 500;
 const REQUEST_TIMEOUT_MS = 12000;
 
+let unauthorizedHandler: (() => void) | null = null;
+
+export function setUnauthorizedHandler(handler: (() => void) | null) {
+  unauthorizedHandler = handler;
+}
+
 function sleep(ms: number) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -221,6 +227,9 @@ export async function apiRequest<T>(
       : undefined;
     const retryAfterSeconds = retryAfterFromHeader ?? retryAfterFromBody;
     const message = apiErrorMessage(payload, res.status);
+    if (res.status === 401 && token) {
+      unauthorizedHandler?.();
+    }
     mobileProof('apiRequest failed', {
       path,
       method,

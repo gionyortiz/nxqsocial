@@ -1,6 +1,6 @@
 import 'react-native-reanimated';
 import { useFonts } from 'expo-font';
-import { DarkTheme, DefaultTheme, Stack, ThemeProvider, useRouter } from 'expo-router';
+import { DarkTheme, DefaultTheme, Stack, ThemeProvider, usePathname, useRouter } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { useEffect, useRef } from 'react';
 import { Alert } from 'react-native';
@@ -87,10 +87,25 @@ function RootLayoutNav() {
   );
 }
 
+const PUBLIC_AUTH_PATHS = new Set([
+  '/',
+  '/login',
+  '/register',
+  '/verify-email',
+  '/forgot-password',
+  '/reset-password',
+]);
+
 function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefined }) {
-  const { token } = useAuth();
+  const { token, pendingVerification, loading } = useAuth();
   const router = useRouter();
+  const pathname = usePathname();
   const lastInviteKey = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (loading || token || PUBLIC_AUTH_PATHS.has(pathname)) return;
+    router.replace(pendingVerification ? '/verify-email' : '/login');
+  }, [loading, pathname, pendingVerification, router, token]);
 
   const openIncomingCallPrompt = (payload: { room?: string; from?: string; video?: boolean }) => {
     const room = payload.room || '';
@@ -187,6 +202,8 @@ function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefin
       <Stack>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
+        <Stack.Screen name="forgot-password" options={{ headerShown: false }} />
+        <Stack.Screen name="reset-password" options={{ headerShown: false }} />
         <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen name="verify-email" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />

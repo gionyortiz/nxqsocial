@@ -61,6 +61,37 @@ function timeAgo(iso: string): string {
   return `${days}d`;
 }
 
+function ConversationAvatar({ uri, name, size }: { uri?: string; name: string; size: number }) {
+  const initials = name.trim().slice(0, 2).toUpperCase() || 'NX';
+  if (uri) {
+    return (
+      <Image
+        accessibilityLabel={`${name} profile photo`}
+        source={{ uri }}
+        style={{ width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: '#1f2937' }}
+      />
+    );
+  }
+
+  return (
+    <View
+      accessibilityLabel={`${name} profile initials`}
+      style={{
+        alignItems: 'center',
+        backgroundColor: '#312e81',
+        borderRadius: Math.round(size * 0.3),
+        height: size,
+        justifyContent: 'center',
+        width: size,
+      }}
+    >
+      <Text style={{ color: '#ddd6fe', fontSize: Math.max(14, Math.round(size * 0.3)), fontWeight: '900' }}>
+        {initials}
+      </Text>
+    </View>
+  );
+}
+
 export default function MessagesScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
@@ -342,7 +373,11 @@ export default function MessagesScreen() {
                 onPress={() => createConversationForUser(candidate)}
                 style={{ flexDirection: 'row', alignItems: 'center', gap: 10, borderRadius: 12, borderWidth: 1, borderColor: '#2a4368', backgroundColor: '#0d1a30', padding: 8 }}
               >
-                <Image source={{ uri: resolveMediaUrl(candidate.avatarUrl || '') || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=256&q=80' }} style={{ width: 42, height: 42, borderRadius: 12, backgroundColor: '#1f2937' }} />
+                <ConversationAvatar
+                  uri={resolveMediaUrl(candidate.avatarUrl || '')}
+                  name={candidate.displayName || candidate.username}
+                  size={42}
+                />
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: PALETTE.ink, fontWeight: '800' }}>{candidate.displayName || candidate.username}</Text>
                   <Text style={{ color: PALETTE.subInk, fontSize: 12 }}>@{candidate.username}</Text>
@@ -394,7 +429,7 @@ export default function MessagesScreen() {
                 }}
               >
                 <View>
-                  <Image source={{ uri: item.avatar || 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=256&q=80' }} style={{ width: 56, height: 56, borderRadius: 18, backgroundColor: '#1f2937' }} />
+                  <ConversationAvatar uri={item.avatar} name={item.name} size={56} />
                   {item.online ? <View style={{ position: 'absolute', right: -2, bottom: -2, width: 14, height: 14, borderRadius: 7, backgroundColor: '#22c55e', borderWidth: 2, borderColor: PALETTE.bg }} /> : null}
                 </View>
                 <View style={{ flex: 1 }}>

@@ -261,13 +261,27 @@ export class AuthService {
       await this.prisma.passwordResetToken.deleteMany({
         where: { userId: user.id, usedAt: null },
       });
-      await this.prisma.passwordResetToken.create({
+      const resetToken = await this.prisma.passwordResetToken.create({
         data: { userId: user.id, tokenHash, expiresAt },
       });
 
       const appUrl = process.env.APP_BASE_URL ?? 'https://nxqsocial.com';
       const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
-      await this.mailService.sendPasswordReset(user.email, resetUrl);
+      const accepted = await this.mailService.sendPasswordReset(
+        user.email,
+        resetUrl,
+      );
+      if (!accepted) {
+        await this.prisma.passwordResetToken.delete({
+          where: { id: resetToken.id },
+        });
+        // Keep the public response generic to prevent account enumeration, but
+        // do not retain a token that the user never received. Leave a
+        // production-visible signal when the provider rejects delivery.
+        this.logger.error(
+          `Password reset email delivery was not accepted for user ${user.id}`,
+        );
+      }
     }
     return {
       message: 'If that email is registered, a reset link has been sent.',

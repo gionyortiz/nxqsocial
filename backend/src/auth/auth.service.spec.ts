@@ -83,3 +83,55 @@ describe('AuthService registration commit semantics', () => {
     });
   });
 });
+
+describe('AuthService password reset delivery', () => {
+  function buildService({ userExists = true, accepted = true } = {}) {
+    const user = userExists
+      ? { id: 'user-1', email: 'user@example.test' }
+      : null;
+    const prisma = {
+      user: { findUnique: jest.fn().mockResolvedValue(user) },
+      passwordResetToken: {
+        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+        create: jest.fn().mockResolvedValue({ id: 'reset-1' }),
+        delete: jest.fn().mockResolvedValue({ id: 'reset-1' }),
+      },
+    };
+    const mail = {
+      sendPasswordReset: jest.fn().mockResolvedValue(accepted),
+    };
+    const service = new AuthService(
+      prisma as any,
+      {} as any,
+      mail as any,
+      {} as any,
+      {} as any,
+    );
+    return { service, prisma, mail };
+  }
+
+  it('returns the same public response for an unknown email', async () => {
+    const { service, prisma, mail } = buildService({ userExists: false });
+
+    await expect(
+      service.forgotPassword({ email: 'missing@example.test' }),
+    ).resolves.toEqual({
+      message: 'If that email is registered, a reset link has been sent.',
+    });
+    expect(prisma.passwordResetToken.create).not.toHaveBeenCalled();
+    expect(mail.sendPasswordReset).not.toHaveBeenCalled();
+  });
+
+  it('removes an undelivered reset token without changing the public response', async () => {
+    const { service, prisma } = buildService({ accepted: false });
+
+    await expect(
+      service.forgotPassword({ email: 'user@example.test' }),
+    ).resolves.toEqual({
+      message: 'If that email is registered, a reset link has been sent.',
+    });
+    expect(prisma.passwordResetToken.delete).toHaveBeenCalledWith({
+      where: { id: 'reset-1' },
+    });
+  });
+});

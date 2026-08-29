@@ -1,6 +1,6 @@
 import { Link, router, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
 import { API_BASE_URL, SHOW_LOGIN_DEBUG, WEB_BASE_URL } from '@/lib/config';
 import { ApiError, pingApiHealth } from '@/lib/api';
@@ -117,17 +117,35 @@ export default function LoginScreen() {
         ) : null}
 
         <TextInput
+          accessibilityLabel="Email address"
+          testID="login-email"
           placeholder="Email"
           placeholderTextColor="#8790ab"
           autoCapitalize="none"
           autoCorrect={false}
           spellCheck={false}
           keyboardType="email-address"
+          autoComplete={Platform.OS === 'ios' ? undefined : 'email'}
+          textContentType={Platform.OS === 'ios' ? 'username' : undefined}
           value={email}
           onChangeText={setEmail}
           style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }}
         />
-        <PasswordField value={password} onChangeText={setPassword} returnKeyType="go" onSubmitEditing={onSubmit} />
+        <PasswordField
+          accessibilityLabel="Password"
+          testID="login-password"
+          value={password}
+          onChangeText={setPassword}
+          returnKeyType="go"
+          onSubmitEditing={onSubmit}
+        />
+        <Link href={'/forgot-password' as never} asChild>
+          <Pressable accessibilityRole="link" accessibilityLabel="Forgot password">
+            <Text style={{ color: '#a78bfa', fontWeight: '700', textAlign: 'right', marginTop: -6 }}>
+              Forgot password?
+            </Text>
+          </Pressable>
+        </Link>
         {SHOW_LOGIN_DEBUG ? (
           <Text style={{ color: '#64748b', fontSize: 11, fontFamily: 'monospace', marginTop: -8 }}>
             Password length: {password.length} character{password.length === 1 ? '' : 's'}

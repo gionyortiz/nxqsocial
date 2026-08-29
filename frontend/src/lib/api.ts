@@ -24,7 +24,7 @@ api.interceptors.response.use(
       // Only bounce to login from protected pages, and never loop on public pages.
       const publicPaths = ['/login', '/register', '/verify-email', '/', '/terms', '/privacy', '/community-guidelines', '/forgot-password', '/reset-password'];
       if (!publicPaths.includes(path)) {
-        window.location.href = '/login';
+        window.location.replace(new URL('/login', window.location.origin).toString());
       }
     }
     return Promise.reject(err);

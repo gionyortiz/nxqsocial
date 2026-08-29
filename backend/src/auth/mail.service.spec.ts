@@ -69,6 +69,18 @@ describe('MailService', () => {
     ).resolves.toBe(true);
   });
 
+  it('returns false when no email provider is configured', async () => {
+    delete process.env.RESEND_API_KEY;
+    const service = new MailService();
+
+    await expect(
+      service.sendPasswordReset(
+        'user@example.test',
+        'https://app.example.test/reset-password?token=test',
+      ),
+    ).resolves.toBe(false);
+  });
+
   it('derives the verification link from APP_BASE_URL and escapes the username', async () => {
     process.env.APP_BASE_URL = 'https://railway-staging.nxqsocial.com';
     const { service, send } = buildService();

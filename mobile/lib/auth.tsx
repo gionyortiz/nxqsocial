@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
-import { apiRequest, User } from './api';
+import { apiRequest, setUnauthorizedHandler, User } from './api';
 import { unregisterPushToken } from './push';
 
 const TOKEN_KEY = 'nxq.mobile.token';
@@ -87,6 +87,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [pendingVerification, setPendingVerification] = useState<PendingEmailVerification | null>(null);
   const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    setUnauthorizedHandler(() => {
+      setPendingVerification(null);
+      setToken(null);
+      setUser(null);
+      void Promise.all([AsyncStorage.removeItem(TOKEN_KEY), AsyncStorage.removeItem(USER_KEY)]);
+    });
+
+    return () => setUnauthorizedHandler(null);
+  }, []);
 
   useEffect(() => {
     const bootstrap = async () => {
