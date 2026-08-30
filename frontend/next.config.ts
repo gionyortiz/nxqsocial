@@ -1,5 +1,8 @@
 import type { NextConfig } from "next";
 
+const configuredApiUrl = process.env.NEXT_PUBLIC_API_URL?.trim();
+const localApiOrigin = process.env.NXQ_LOCAL_API_ORIGIN?.trim() || 'http://127.0.0.1:3000';
+
 const mobileTurnstileCsp = [
   "default-src 'self'",
   "base-uri 'none'",
@@ -31,6 +34,20 @@ const nextConfig: NextConfig = {
           { key: 'Referrer-Policy', value: 'no-referrer' },
           { key: 'X-Content-Type-Options', value: 'nosniff' },
         ],
+      },
+    ];
+  },
+  async rewrites() {
+    if (process.env.NODE_ENV !== 'development' || configuredApiUrl) return [];
+
+    return [
+      {
+        source: '/api/:path*',
+        destination: `${localApiOrigin}/api/:path*`,
+      },
+      {
+        source: '/uploads/:path*',
+        destination: `${localApiOrigin}/uploads/:path*`,
       },
     ];
   },

@@ -14,7 +14,7 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en" className={`${geist.variable} h-full antialiased dark`}>
+    <html lang="en" data-scroll-behavior="smooth" className={`${geist.variable} h-full antialiased dark`}>
       <body className="min-h-full font-[var(--font-geist)]" style={{ background: 'var(--background)', color: 'var(--foreground)' }}>
         <I18nProvider>
           {children}

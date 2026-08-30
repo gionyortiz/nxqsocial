@@ -11,14 +11,14 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Avatar } from '@/components/ui/Avatar';
 import Link from 'next/link';
-import { Camera, Clapperboard, PenSquare } from 'lucide-react';
+import { BookOpen, Camera, Clapperboard, PenSquare, ShieldCheck, Users } from 'lucide-react';
 
 const FEED_MODES = [
-  { key: 'FOR_YOU',         label: 'For You' },
-  { key: 'FOLLOWING',       label: 'Following' },
-  { key: 'VERIFIED_HUMANS', label: '✓ Verified' },
-  { key: 'FAMILY_SAFE',     label: '🏠 Safe' },
-  { key: 'LEARNING',        label: '📚 Learn' },
+  { key: 'FOR_YOU',         label: 'For You', icon: null },
+  { key: 'FOLLOWING',       label: 'Following', icon: Users },
+  { key: 'VERIFIED_HUMANS', label: 'Verified', icon: ShieldCheck },
+  { key: 'FAMILY_SAFE',     label: 'Safe', icon: ShieldCheck },
+  { key: 'LEARNING',        label: 'Learn', icon: BookOpen },
 ];
 
 interface MediaAsset { id: string; url: string; thumbnailUrl?: string; mimeType: string; }
@@ -85,27 +85,27 @@ export default function FeedPage() {
 
   return (
     <AppShell aside={<RightSidebar />}>
-      <div className="px-3 sm:px-4 py-4 flex flex-col gap-3.5">
+      <div className="px-2 sm:px-0 py-5 flex flex-col gap-4">
         {/* Create post */}
-        <div className="bg-white dark:bg-[#111827] rounded-3xl border border-[var(--border)] shadow-[var(--shadow-card)] p-3">
+        <div className="nxq-panel p-4">
           <div className="flex items-center gap-2.5">
             <Avatar src={user?.avatarUrl} alt={user?.username ?? 'You'} size="md" />
             <Link
               href="/upload"
-              className="flex-1 h-11 rounded-full border border-gray-200 dark:border-white/10 bg-gray-50 dark:bg-white/5 hover:bg-gray-100 dark:hover:bg-white/10 transition-colors px-4 flex items-center text-sm text-gray-500 dark:text-gray-400"
+              className="flex-1 h-11 rounded-xl border border-white/10 bg-[#090e17] hover:border-fuchsia-500/30 hover:bg-[#0c121d] transition-colors px-4 flex items-center text-sm text-slate-500"
             >
               What&apos;s on your mind?
             </Link>
           </div>
           <div className="mt-3 pt-3 border-t border-[var(--border)] grid grid-cols-3 gap-2">
-            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300">
-              <PenSquare size={16} className="text-purple-600" /> Post
+            <Link href="/upload" className="h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white">
+              <PenSquare size={16} className="text-fuchsia-400" /> Post
             </Link>
-            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300">
-              <Camera size={16} className="text-purple-600" /> Photo
+            <Link href="/upload" className="h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white">
+              <Camera size={16} className="text-fuchsia-400" /> Photo
             </Link>
-            <Link href="/upload" className="h-9 rounded-xl hover:bg-purple-50 dark:hover:bg-purple-900/20 flex items-center justify-center gap-1.5 text-sm font-semibold text-gray-700 dark:text-gray-300">
-              <Clapperboard size={16} className="text-purple-600" /> Reel
+            <Link href="/upload" className="h-9 rounded-lg hover:bg-white/[0.05] flex items-center justify-center gap-1.5 text-sm font-semibold text-slate-400 hover:text-white">
+              <Clapperboard size={16} className="text-fuchsia-400" /> Reel
             </Link>
           </div>
         </div>
@@ -118,25 +118,28 @@ export default function FeedPage() {
 
         {/* Feed mode tabs */}
         <div className="flex gap-1.5 overflow-x-auto scrollbar-hide pb-1">
-          {FEED_MODES.map((m) => (
+          {FEED_MODES.map((m) => {
+            const ModeIcon = m.icon;
+            return (
             <button
               key={m.key}
               onClick={() => setMode(m.key)}
-              className={`flex-shrink-0 px-4 py-2 rounded-full text-sm font-semibold transition-colors ${
+              className={`flex-shrink-0 inline-flex items-center gap-1.5 px-4 py-2 rounded-lg text-sm font-semibold transition-colors ${
                 mode === m.key
-                  ? 'btn-gradient'
-                  : 'bg-white dark:bg-white/5 text-gray-600 dark:text-gray-400 border border-gray-200 dark:border-white/10 hover:bg-gray-100 dark:hover:bg-white/10'
+                  ? 'bg-white/[0.09] text-white border border-white/10'
+                  : 'bg-transparent text-slate-500 border border-transparent hover:bg-white/[0.04] hover:text-slate-300'
               }`}
             >
+              {ModeIcon && <ModeIcon size={14} />}
               {m.label}
             </button>
-          ))}
+          )})}
         </div>
 
         {posts.length === 0 && loading && (
           <div className="flex flex-col gap-3">
             {Array.from({ length: 3 }).map((_, idx) => (
-              <div key={idx} className="bg-white dark:bg-[#111827] rounded-3xl border border-[var(--border)] shadow-[var(--shadow-card)] p-4">
+              <div key={idx} className="nxq-panel p-4">
                 <div className="flex items-center gap-3 mb-3">
                   <div className="w-10 h-10 skeleton" style={{ borderRadius: '9999px' }} />
                   <div className="flex-1">
@@ -152,8 +155,8 @@ export default function FeedPage() {
         )}
 
         {posts.length === 0 && !loading && (
-          <div className="text-center py-14 text-gray-400 dark:text-gray-500 bg-white dark:bg-[#111827] rounded-3xl border border-dashed border-gray-300 dark:border-white/10">
-            <p className="text-lg font-semibold text-gray-700 dark:text-gray-200">Your feed is warming up</p>
+          <div className="text-center py-14 text-slate-500 nxq-panel border-dashed">
+            <p className="text-lg font-semibold text-slate-200">Your feed is warming up</p>
             <p className="text-sm mt-1">Follow more people or share your first post to increase feed density.</p>
             <div className="mt-4">
               <Link href="/upload" className="inline-flex items-center px-4 h-10 btn-gradient text-sm">

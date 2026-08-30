@@ -25,7 +25,7 @@ function ReelItem({ reel, active }: { reel: Reel; active: boolean }) {
   const [liked, setLiked] = useState(reel.isLiked);
   const [likeCount, setLikeCount] = useState(reel._count.likes);
   const [muted, setMuted] = useState(true);
-  const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
+  const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? '';
   const firstMedia = reel.media?.[0];
   const src = firstMedia ? (firstMedia.url.startsWith('http') ? firstMedia.url : `${mediaBase}${firstMedia.url}`) : '';
 

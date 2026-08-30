@@ -14,7 +14,7 @@ export function cn(...inputs: ClassValue[]) {
 export function resolveMediaUrl(url?: string | null): string {
   if (!url) return '';
   if (/^(https?:|blob:|data:)/.test(url)) return url;
-  const apiOrigin = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(/\/api\/?$/, '');
+  const apiOrigin = (process.env.NEXT_PUBLIC_API_URL ?? '/api').replace(/\/api\/?$/, '');
   return `${apiOrigin}${url.startsWith('/') ? '' : '/'}${url}`;
 }
 

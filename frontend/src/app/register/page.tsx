@@ -11,7 +11,7 @@ import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
-import Logo from '@/components/Logo';
+import { AuthShell } from '@/components/auth/AuthShell';
 import { trackEvent } from '@/lib/analytics';
 import {
   PENDING_EMAIL_VERIFICATION_KEY,
@@ -115,19 +115,7 @@ export default function RegisterPage() {
   }, [retryInSec]);
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 px-4 py-12">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <Logo size={72} />
-          </div>
-          <h1 className="text-4xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent">
-            NXQ Social
-          </h1>
-          <p className="text-gray-500 mt-2 text-sm">Create your account</p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <AuthShell title="Create your account" subtitle="Join a safer, human-centered social network.">
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <Input label="Display Name" placeholder="Your Name" error={errors.displayName?.message} {...register('displayName')} />
             <Input
@@ -143,18 +131,18 @@ export default function RegisterPage() {
             <Input label="Confirm Password" type="password" placeholder="Re-enter your password" error={errors.confirmPassword?.message} {...register('confirmPassword')} />
 
             {/* EULA — required by Apple Guideline 1.2 */}
-            <div className="flex items-start gap-3 p-3 rounded-xl bg-gray-50 border border-gray-100">
+            <div className="flex items-start gap-3 p-3 rounded-xl bg-white/[0.03] border border-white/10">
               <input
                 type="checkbox"
                 id="agreeToTerms"
                 className="mt-0.5 h-4 w-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500 flex-shrink-0"
                 {...register('agreeToTerms')}
               />
-              <label htmlFor="agreeToTerms" className="text-xs text-gray-600 leading-relaxed cursor-pointer">
+              <label htmlFor="agreeToTerms" className="text-xs text-slate-400 leading-relaxed cursor-pointer">
                 I agree to the{' '}
-                <a href="/terms" target="_blank" className="text-purple-600 font-semibold hover:underline">Terms of Service</a>
+                <a href="/terms" target="_blank" className="text-fuchsia-400 font-semibold hover:text-fuchsia-300">Terms of Service</a>
                 {' '}and{' '}
-                <a href="/community-guidelines" target="_blank" className="text-purple-600 font-semibold hover:underline">Community Guidelines</a>.
+                <a href="/community-guidelines" target="_blank" className="text-fuchsia-400 font-semibold hover:text-fuchsia-300">Community Guidelines</a>.
                 {' '}I understand that objectionable content and abusive behavior are not tolerated and may result in account removal.
               </label>
             </div>
@@ -169,7 +157,7 @@ export default function RegisterPage() {
             />
 
             {serverError && (
-              <p className="text-sm text-red-500 bg-red-50 px-4 py-2 rounded-xl">{serverError}</p>
+              <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl">{serverError}</p>
             )}
 
             <Button
@@ -183,14 +171,12 @@ export default function RegisterPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
+          <p className="text-center text-sm text-slate-500 mt-6">
             Already have an account?{' '}
-            <Link href="/login" className="text-purple-600 font-semibold hover:underline">
+            <Link href="/login" className="text-fuchsia-400 font-semibold hover:text-fuchsia-300">
               Sign in
             </Link>
           </p>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

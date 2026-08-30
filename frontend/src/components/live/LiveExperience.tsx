@@ -317,7 +317,7 @@ export function LiveExperience({
 
     // Safety net: if the tab is closed without clicking End, send a beacon
     // to mark the session ended. navigator.sendBeacon works during unload.
-    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api').replace(/\/+$/, '');
+    const apiBase = (process.env.NEXT_PUBLIC_API_URL ?? '/api').replace(/\/+$/, '');
     const endUrl = `${apiBase}/live/${encodeURIComponent(room)}/end`;
     const handleUnload = () => {
       try {
