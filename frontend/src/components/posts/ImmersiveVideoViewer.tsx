@@ -19,7 +19,7 @@ interface VideoPost {
   _count: { likes: number; comments: number };
 }
 
-const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
+const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? '';
 function resolveSrc(url?: string) {
   if (!url) return '';
   return url.startsWith('http') ? url : `${mediaBase}${url}`;

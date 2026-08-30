@@ -164,7 +164,7 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
     }
   }, [liked, post.id, triggerLikeAnim]);
 
-  const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? 'http://localhost:3000';
+  const mediaBase = process.env.NEXT_PUBLIC_API_URL?.replace('/api', '') ?? '';
   const firstMedia = post.media?.[0];
   const mediaSrc = firstMedia
     ? (firstMedia.url.startsWith('http') ? firstMedia.url : `${mediaBase}${firstMedia.url}`)

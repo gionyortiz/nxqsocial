@@ -1,7 +1,10 @@
 import axios from 'axios';
 
 export const api = axios.create({
-  baseURL: process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:3000/api',
+  // Keep local browser traffic same-origin. next.config.ts proxies /api to the
+  // local Nest backend in development, avoiding CORS and localhost/IPv6
+  // collisions with unrelated services.
+  baseURL: process.env.NEXT_PUBLIC_API_URL ?? '/api',
   withCredentials: true,
 });
 
