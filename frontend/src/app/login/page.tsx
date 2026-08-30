@@ -10,7 +10,7 @@ import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import Logo from '@/components/Logo';
+import { AuthShell } from '@/components/auth/AuthShell';
 import {
   PENDING_EMAIL_VERIFICATION_KEY,
   RegisterResponse,
@@ -66,19 +66,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <Logo size={72} />
-          </div>
-          <h1 className="text-4xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent">
-            NXQ Social
-          </h1>
-          <p className="text-gray-500 mt-2 text-sm">Sign in to your account</p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <AuthShell title="Welcome back" subtitle="Sign in to continue to your trusted community.">
           <form onSubmit={handleSubmit(onSubmit)} className="flex flex-col gap-4">
             <Input
               label="Email"
@@ -96,13 +84,13 @@ export default function LoginPage() {
             />
 
             <div className="text-right -mt-2">
-              <Link href="/forgot-password" className="text-xs text-purple-600 font-medium hover:underline">
+              <Link href="/forgot-password" className="text-xs text-fuchsia-400 font-semibold hover:text-fuchsia-300">
                 Forgot password?
               </Link>
             </div>
 
             {serverError && (
-              <p className="text-sm text-red-500 bg-red-50 px-4 py-2 rounded-xl">{serverError}</p>
+              <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl">{serverError}</p>
             )}
 
             <Button type="submit" loading={isSubmitting} size="lg" className="w-full mt-2">
@@ -110,14 +98,12 @@ export default function LoginPage() {
             </Button>
           </form>
 
-          <p className="text-center text-sm text-gray-500 mt-6">
+          <p className="text-center text-sm text-slate-500 mt-6">
             Don&apos;t have an account?{' '}
-            <Link href="/register" className="text-purple-600 font-semibold hover:underline">
+            <Link href="/register" className="text-fuchsia-400 font-semibold hover:text-fuchsia-300">
               Sign up
             </Link>
           </p>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

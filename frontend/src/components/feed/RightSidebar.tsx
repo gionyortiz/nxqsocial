@@ -76,19 +76,19 @@ export function RightSidebar() {
     <div className="flex flex-col gap-4 sticky top-4">
       {/* Profile mini-card */}
       {user && (
-        <div className="bg-white dark:bg-[#111827] rounded-3xl shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+        <div className="nxq-panel p-4">
           <Link
             href={`/profile/${user.username}`}
             className="flex items-center gap-3 hover:bg-gray-50 dark:hover:bg-white/5 transition-colors rounded-2xl p-1.5"
           >
             <span className="ring-verified flex-shrink-0">
-              <span className="block rounded-full overflow-hidden bg-white dark:bg-[#111827] p-[2px]">
+              <span className="block rounded-full overflow-hidden bg-[#0d1420] p-[2px]">
                 <Avatar src={user.avatarUrl} alt={user.username} size="lg" />
               </span>
             </span>
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-1.5">
-                <span className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate">{user.displayName}</span>
+                <span className="font-bold text-sm text-slate-100 truncate">{user.displayName}</span>
                 <TrustBadge status={user.verificationStatus} />
               </div>
               <p className="text-xs text-gray-400 dark:text-gray-500 truncate">@{user.username}</p>
@@ -102,11 +102,11 @@ export function RightSidebar() {
             </div>
             <div className="rounded-2xl bg-gray-50 dark:bg-white/[0.04] px-2 py-2.5 text-center">
               <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Followers</p>
-              <p className="text-sm font-black text-gray-900 dark:text-gray-100">{formatCount(profileStats?.followers ?? 0)}</p>
+              <p className="text-sm font-black text-slate-100">{formatCount(profileStats?.followers ?? 0)}</p>
             </div>
             <div className="rounded-2xl bg-gray-50 dark:bg-white/[0.04] px-2 py-2.5 text-center">
               <p className="text-[10px] font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wide">Posts</p>
-              <p className="text-sm font-black text-gray-900 dark:text-gray-100">{formatCount(profileStats?.posts ?? 0)}</p>
+              <p className="text-sm font-black text-slate-100">{formatCount(profileStats?.posts ?? 0)}</p>
             </div>
           </div>
 
@@ -122,11 +122,11 @@ export function RightSidebar() {
 
       {/* Suggested for you */}
       {suggested.length > 0 && (
-        <div className="bg-white dark:bg-[#111827] rounded-3xl shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+        <div className="nxq-panel p-4">
           <div className="flex items-center justify-between mb-3">
             <div className="flex items-center gap-2">
               <Users size={15} className="text-purple-500" />
-              <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Suggested for you</h3>
+              <h3 className="text-sm font-bold text-slate-100">Suggested for you</h3>
             </div>
             <Link href="/search" className="text-xs font-bold text-purple-600 hover:text-purple-700 transition-colors">
               See all
@@ -140,7 +140,7 @@ export function RightSidebar() {
                 </Link>
                 <Link href={`/profile/${s.username}`} className="flex-1 min-w-0">
                   <div className="flex items-center gap-1">
-                    <span className="font-bold text-sm text-gray-900 dark:text-gray-100 truncate group-hover/sug:text-purple-700 dark:group-hover/sug:text-purple-400 transition-colors">{s.username}</span>
+                    <span className="font-bold text-sm text-slate-100 truncate group-hover/sug:text-fuchsia-300 transition-colors">{s.username}</span>
                     <TrustBadge status={s.verificationStatus} />
                   </div>
                   <p className="text-xs text-gray-400 dark:text-gray-500 truncate">{s.displayName}</p>
@@ -159,10 +159,10 @@ export function RightSidebar() {
       )}
 
       {/* Trending */}
-      <div className="bg-white dark:bg-[#111827] rounded-3xl shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
+      <div className="nxq-panel p-4">
         <div className="flex items-center gap-2 mb-3">
           <TrendingUp size={15} className="text-fuchsia-500" />
-          <h3 className="text-sm font-bold text-gray-900 dark:text-gray-100">Trending on NXQ</h3>
+          <h3 className="text-sm font-bold text-slate-100">Trending on NXQ</h3>
         </div>
         <div className="flex flex-col gap-1">
           {TRENDING.map((item, i) => (

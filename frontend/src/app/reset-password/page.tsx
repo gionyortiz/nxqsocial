@@ -10,7 +10,7 @@ import { CheckCircle2 } from 'lucide-react';
 import { api } from '@/lib/api';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
-import Logo from '@/components/Logo';
+import { AuthShell } from '@/components/auth/AuthShell';
 
 const schema = z.object({
   password: z.string()
@@ -52,9 +52,9 @@ function ResetForm() {
   if (!token) {
     return (
       <div className="text-center">
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Invalid link</h2>
-        <p className="text-sm text-gray-500">This reset link is missing or broken.</p>
-        <Link href="/forgot-password" className="inline-block mt-6 text-sm text-purple-600 font-semibold hover:underline">
+        <h2 className="text-lg font-bold text-slate-100 mb-1">Invalid link</h2>
+        <p className="text-sm text-slate-400">This reset link is missing or broken.</p>
+        <Link href="/forgot-password" className="inline-block mt-6 text-sm text-fuchsia-400 font-semibold hover:text-fuchsia-300">
           Request a new link
         </Link>
       </div>
@@ -67,8 +67,8 @@ function ResetForm() {
         <div className="w-14 h-14 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
           <CheckCircle2 size={28} className="text-green-500" />
         </div>
-        <h2 className="text-lg font-bold text-gray-900 mb-1">Password changed</h2>
-        <p className="text-sm text-gray-500">Redirecting you to login…</p>
+        <h2 className="text-lg font-bold text-slate-100 mb-1">Password changed</h2>
+        <p className="text-sm text-slate-400">Redirecting you to login…</p>
       </div>
     );
   }
@@ -92,7 +92,7 @@ function ResetForm() {
         />
 
         {serverError && (
-          <p className="text-sm text-red-500 bg-red-50 px-4 py-2 rounded-xl">{serverError}</p>
+          <p className="text-sm text-red-300 bg-red-500/10 border border-red-500/20 px-4 py-3 rounded-xl">{serverError}</p>
         )}
 
         <Button type="submit" loading={isSubmitting} size="lg" className="w-full mt-2">
@@ -100,8 +100,8 @@ function ResetForm() {
         </Button>
       </form>
 
-      <p className="text-center text-sm text-gray-500 mt-6">
-        <Link href="/login" className="text-purple-600 font-semibold hover:underline">
+      <p className="text-center text-sm text-slate-500 mt-6">
+        <Link href="/login" className="text-fuchsia-400 font-semibold hover:text-fuchsia-300">
           Back to login
         </Link>
       </p>
@@ -111,24 +111,10 @@ function ResetForm() {
 
 export default function ResetPasswordPage() {
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 px-4">
-      <div className="w-full max-w-sm">
-        <div className="text-center mb-8">
-          <div className="flex justify-center mb-4">
-            <Logo size={72} />
-          </div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent">
-            New password
-          </h1>
-          <p className="text-gray-500 mt-2 text-sm">Choose a new password for your account</p>
-        </div>
-
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+    <AuthShell title="Choose a new password" subtitle="Use at least 12 characters with mixed case, a number, and a symbol.">
           <Suspense fallback={<div className="text-center text-sm text-gray-400">Loading…</div>}>
             <ResetForm />
           </Suspense>
-        </div>
-      </div>
-    </div>
+    </AuthShell>
   );
 }

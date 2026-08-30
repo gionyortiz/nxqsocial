@@ -309,7 +309,7 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
   };
 
   return (
-    <article className="group bg-white dark:bg-[#111827] rounded-3xl overflow-hidden shadow-[var(--shadow-card)] border border-[var(--border)] transition-all duration-200 hover:shadow-[0_4px_28px_rgba(15,23,42,0.12)] animate-fade-in-up">
+    <article className="group nxq-panel overflow-hidden transition-all duration-200 hover:border-fuchsia-500/20 animate-fade-in-up">
 
       {/* ── AI label ─────────────────────────────────────────────── */}
       {post.aiLabel && AI_LABEL_CONFIG[post.aiLabel] && (() => {
@@ -328,7 +328,7 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
         <Link href={`/profile/${post.author.username}`}>
           {isVerified ? (
             <span className="ring-verified">
-              <span className="block rounded-full overflow-hidden bg-white dark:bg-[#111827] p-[2px]">
+              <span className="block rounded-full overflow-hidden bg-[#0d1420] p-[2px]">
                 <Avatar src={post.author.avatarUrl} alt={post.author.username} size="md" />
               </span>
             </span>
@@ -338,12 +338,12 @@ export function PostCard({ post, onCommentClick, onDelete, onOpenVideo }: PostCa
         </Link>
         <div className="flex-1 min-w-0">
           <Link href={`/profile/${post.author.username}`} className="flex items-center gap-1.5 group/author">
-            <span className="font-bold text-[15px] text-gray-900 dark:text-gray-100 truncate group-hover/author:text-purple-700 dark:group-hover/author:text-purple-400 transition-colors">
+            <span className="font-bold text-[15px] text-slate-100 truncate group-hover/author:text-fuchsia-300 transition-colors">
               {post.author.displayName}
             </span>
             <TrustBadge status={post.author.verificationStatus} />
           </Link>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">
+          <p className="text-xs text-slate-500 mt-0.5">
             @{post.author.username}
             <span className="mx-1.5 opacity-40">·</span>
             {timeAgo(post.createdAt)}

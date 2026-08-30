@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Plus, ChevronDown, ChevronUp } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { Avatar } from '@/components/ui/Avatar';
 import { useAuthStore } from '@/store/auth';
 import { api } from '@/lib/api';
@@ -30,7 +30,6 @@ export function StoriesBar() {
   const { user } = useAuthStore();
   const [people, setPeople] = useState<StoryUser[]>([]);
   const [suggested, setSuggested] = useState<Array<Pick<StoryUser, 'id' | 'username' | 'displayName' | 'avatarUrl'>>>([]);
-  const [activeIndex, setActiveIndex] = useState(0);
 
   useEffect(() => {
     if (!user?.username) {
@@ -60,22 +59,6 @@ export function StoriesBar() {
     return [yourItem, ...people];
   }, [people, user?.avatarUrl, user?.id, user?.username]);
 
-  const boundedActiveIndex = Math.min(activeIndex, Math.max(0, items.length - 1));
-
-  const move = (dir: 1 | -1) => {
-    setActiveIndex((prev) => {
-      const clamped = Math.min(prev, Math.max(0, items.length - 1));
-      const next = clamped + dir;
-      if (next < 0) return 0;
-      if (next > items.length - 1) return items.length - 1;
-      return next;
-    });
-  };
-
-  const desktopVisible = [boundedActiveIndex - 1, boundedActiveIndex, boundedActiveIndex + 1]
-    .filter((idx) => idx >= 0 && idx < items.length)
-    .map((idx) => ({ idx, item: items[idx], pos: idx - boundedActiveIndex }));
-
   const renderBubble = (p: StoryUser, labelOverride?: string) => {
     const isYou = p.id.startsWith('you:');
     return (
@@ -85,18 +68,18 @@ export function StoriesBar() {
             <Avatar src={p.avatarUrl} alt={p.username} size="lg" />
           ) : (
             <div className={`p-[2px] rounded-full ${p.isLive ? 'bg-gradient-to-tr from-rose-500 via-fuchsia-500 to-amber-400' : 'bg-gradient-to-tr from-purple-500 via-fuchsia-500 to-amber-400'}`}>
-              <div className="p-[2px] bg-white dark:bg-[#111827] rounded-full">
+              <div className="p-[2px] bg-[#0d1420] rounded-full">
                 <Avatar src={p.avatarUrl} alt={p.username} size="lg" />
               </div>
             </div>
           )}
           {isYou && (
-            <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-purple-600 border-2 border-white dark:border-[#111827] flex items-center justify-center">
+            <span className="absolute -bottom-0.5 -right-0.5 w-5 h-5 rounded-full bg-fuchsia-600 border-2 border-[#0d1420] flex items-center justify-center">
               <Plus size={12} className="text-white" />
             </span>
           )}
         </div>
-        <span className="text-[11px] text-gray-600 dark:text-gray-400 truncate w-full text-center">{labelOverride ?? p.username}</span>
+        <span className="text-[11px] text-slate-400 truncate w-full text-center">{labelOverride ?? p.username}</span>
         {!isYou && (
           <span className={`-mt-1 text-[10px] font-semibold ${p.isLive ? 'text-rose-500' : 'text-purple-600'}`}>
             {p.isLive ? 'LIVE' : 'NEW'}
@@ -107,8 +90,12 @@ export function StoriesBar() {
   };
 
   return (
-    <div className="relative bg-white dark:bg-[#111827] rounded-3xl shadow-[var(--shadow-card)] border border-[var(--border)] p-4">
-      <div className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth sm:hidden">
+    <div className="nxq-panel p-4">
+      <div className="mb-3 flex items-center justify-between">
+        <div><p className="nxq-kicker">Stories</p><h2 className="mt-1 text-sm font-semibold text-slate-100">From your circle</h2></div>
+        <Link href="/search" className="text-xs font-semibold text-fuchsia-400 hover:text-fuchsia-300">Discover people</Link>
+      </div>
+      <div className="flex gap-4 overflow-x-auto scrollbar-hide scroll-smooth pb-1">
         {/* Your story */}
         <Link href="/upload" className="flex flex-col items-center gap-1.5 flex-shrink-0 w-16">
           {renderBubble(items[0], 'Your story')}
@@ -130,48 +117,6 @@ export function StoriesBar() {
             Follow more people to see live sessions and new posts here.
           </div>
         )}
-      </div>
-
-      {/* Desktop: vertical stack with center-focused story */}
-      <div className="hidden sm:flex flex-col items-center gap-3 py-1">
-        <button
-          type="button"
-          onClick={() => move(-1)}
-          disabled={boundedActiveIndex <= 0}
-          aria-label="Previous story"
-          className="w-8 h-8 rounded-full bg-white dark:bg-white/5 shadow-sm border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronUp size={16} />
-        </button>
-
-        <div className="w-full max-w-[220px] mx-auto min-h-[220px] flex flex-col items-center justify-center gap-2">
-          {desktopVisible.map(({ idx, item, pos }) => {
-            const isCenter = pos === 0;
-            const href = idx === 0 ? '/upload' : `/profile/${item.username}`;
-            return (
-              <Link
-                key={item.id}
-                href={href}
-                onMouseEnter={() => setActiveIndex(idx)}
-                className={`flex flex-col items-center gap-1.5 transition-all duration-200 ${
-                  isCenter ? 'scale-100 opacity-100' : 'scale-90 opacity-60'
-                }`}
-              >
-                {renderBubble(item, idx === 0 ? 'Your story' : undefined)}
-              </Link>
-            );
-          })}
-        </div>
-
-        <button
-          type="button"
-          onClick={() => move(1)}
-          disabled={boundedActiveIndex >= items.length - 1}
-          aria-label="Next story"
-          className="w-8 h-8 rounded-full bg-white dark:bg-white/5 shadow-sm border border-gray-200 dark:border-white/10 flex items-center justify-center text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-white/10 disabled:opacity-40 disabled:cursor-not-allowed"
-        >
-          <ChevronDown size={16} />
-        </button>
       </div>
 
       {people.length === 0 && suggested.length > 0 && (

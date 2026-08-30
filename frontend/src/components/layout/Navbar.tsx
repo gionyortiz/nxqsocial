@@ -25,6 +25,7 @@ const NAV = [
   { href: '/notifications', icon: Bell, tkey: 'nav.notifications' },
   { href: '/search',   icon: Compass,     tkey: 'nav.explore' },
   { href: '/reels',    icon: Play,        tkey: 'nav.reels' },
+  { href: '/messages', icon: MessageSquare, tkey: 'nav.messages' },
   { href: '/upload',   icon: PlusSquare,  tkey: 'nav.create' },
   { href: '/verify',   icon: ShieldCheck, tkey: 'nav.verify' },
 ];
@@ -95,23 +96,21 @@ export function Navbar() {
   return (
     <>
       {/* ── Desktop sidebar ──────────────────────────────────────────────── */}
-      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-white/80 dark:bg-[#111827]/80 backdrop-blur-xl border-r border-white/60 dark:border-white/[0.06] px-3 py-6 gap-1 z-40 shadow-[var(--shadow-sm)]">
+      <nav className="hidden md:flex flex-col fixed left-0 top-0 h-full w-64 bg-[#080c13]/95 backdrop-blur-xl border-r border-white/[0.08] px-4 py-6 gap-1 z-40">
 
         {/* Logo */}
         <div className="mb-5 px-2.5 flex items-center justify-between">
           <Link href="/feed" className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-2xl bg-gradient-to-br from-purple-600 to-fuchsia-500 flex items-center justify-center shadow-[var(--shadow-brand)] flex-shrink-0">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-700 to-fuchsia-500 flex items-center justify-center shadow-[var(--shadow-brand)] flex-shrink-0">
               <Logo size={22} className="text-white" />
             </div>
             {!compact && (
-              <span className="text-[22px] font-black gradient-text tracking-tight truncate">
-                NXQ Social
-              </span>
+              <span className="text-[19px] font-extrabold tracking-tight text-white truncate">NXQ <span className="text-fuchsia-400">Social</span></span>
             )}
           </Link>
           <button
             onClick={toggleCompact}
-            className="hidden xl:flex items-center justify-center w-8 h-8 rounded-xl text-gray-400 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-900/20 transition-colors"
+            className="hidden xl:flex items-center justify-center w-8 h-8 rounded-lg text-slate-600 hover:text-slate-200 hover:bg-white/[0.05] transition-colors"
             title={compact ? 'Expand sidebar' : 'Compact sidebar'}
           >
             <ChevronsLeftRight size={15} />
@@ -128,16 +127,16 @@ export function Navbar() {
                 key={href}
                 href={href}
                 className={cn(
-                  'group flex items-center gap-3 px-3 py-2.5 rounded-2xl text-[15px] font-semibold transition-all duration-150',
+                  'group flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] font-semibold transition-all duration-150',
                   active
-                    ? 'bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white shadow-[var(--shadow-brand)]'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-purple-50 dark:hover:bg-white/[0.05] hover:text-purple-700 dark:hover:text-purple-300',
+                    ? 'bg-white/[0.08] text-white border border-white/[0.07]'
+                    : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200',
                 )}
                 title={compact ? label : undefined}
               >
                 <span className={cn(
-                  'flex items-center justify-center w-9 h-9 rounded-xl transition-all flex-shrink-0',
-                  active ? 'bg-white/20' : 'bg-gray-100/80 dark:bg-white/[0.06] group-hover:bg-white/80 dark:group-hover:bg-white/10',
+                  'flex items-center justify-center w-8 h-8 rounded-lg transition-all flex-shrink-0',
+                  active ? 'bg-fuchsia-500/15 text-fuchsia-300' : 'bg-white/[0.03] group-hover:bg-white/[0.06]',
                 )}>
                   <Icon size={19} strokeWidth={active ? 2.5 : 2} />
                 </span>
@@ -174,17 +173,17 @@ export function Navbar() {
           <Link
             href={`/feedback?from=${encodeURIComponent(pathname)}`}
             className={cn(
-              'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
+              'group flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] font-semibold transition-all',
               isActive('/feedback')
                 ? 'bg-gradient-to-r from-purple-600 to-fuchsia-600 text-white shadow-md shadow-purple-200 ring-1 ring-purple-300/60'
-                : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
+                : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200',
             )}
             title={compact ? t('nav.feedback') : undefined}
           >
             <span
               className={cn(
                 'flex items-center justify-center w-9 h-9 rounded-xl transition-colors',
-                isActive('/feedback') ? 'bg-white/20' : 'bg-gray-50 group-hover:bg-white',
+                isActive('/feedback') ? 'bg-white/20' : 'bg-white/[0.03] group-hover:bg-white/[0.06]',
               )}
             >
               <MessageSquare size={20} strokeWidth={isActive('/feedback') ? 2.6 : 2} />
@@ -195,9 +194,9 @@ export function Navbar() {
           {/* Menu button — opens the full panel */}
           <button
             onClick={() => setMenuOpen(true)}
-            className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold text-gray-600 hover:bg-purple-50 hover:text-purple-700 transition-all"
+            className="group flex items-center gap-3 px-3 py-2 rounded-xl text-[14px] font-semibold text-slate-500 hover:bg-white/[0.04] hover:text-slate-200 transition-all"
           >
-            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white transition-colors">
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/[0.03] group-hover:bg-white/[0.06] transition-colors">
               <MenuIcon size={20} strokeWidth={2} />
             </span>
             {!compact && t('nav.menu')}
@@ -235,10 +234,10 @@ export function Navbar() {
               'group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold transition-all',
               pathname === '/settings'
                 ? 'bg-purple-50 text-purple-700 ring-1 ring-purple-100'
-                : 'text-gray-600 hover:bg-purple-50 hover:text-purple-700',
+                : 'text-slate-500 hover:bg-white/[0.04] hover:text-slate-200',
             )}
           >
-            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white">
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/[0.03] group-hover:bg-white/[0.06]">
               <Settings size={20} />
             </span>
             {!compact && t('nav.settings')}
@@ -247,9 +246,9 @@ export function Navbar() {
           {/* Log out */}
           <button
             onClick={logout}
-            className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold text-gray-500 hover:bg-red-50 hover:text-red-600 transition-all"
+            className="group flex items-center gap-3 px-3 py-2.5 rounded-xl text-[15px] font-semibold text-slate-600 hover:bg-rose-500/10 hover:text-rose-300 transition-all"
           >
-            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-gray-50 group-hover:bg-white">
+            <span className="flex items-center justify-center w-9 h-9 rounded-xl bg-white/[0.03] group-hover:bg-white/[0.06]">
               <LogOut size={20} />
             </span>
             {!compact && t('nav.logout')}
@@ -258,23 +257,23 @@ export function Navbar() {
           {/* Profile card */}
           {user && !compact && (
             <>
-              <div className="h-px bg-gray-100 mx-2 my-1" />
+              <div className="h-px bg-white/[0.08] mx-2 my-1" />
               <Link
                 href={`/profile/${user.username}`}
                 className={cn(
                   'flex items-center gap-3 px-3 py-2.5 rounded-2xl transition-all',
                   pathname.startsWith('/profile')
                     ? 'bg-gradient-to-r from-purple-50 to-fuchsia-50 ring-1 ring-purple-100'
-                    : 'hover:bg-gray-50',
+                    : 'hover:bg-white/[0.04]',
                 )}
               >
                 <Avatar src={user.avatarUrl} alt={user.username} size="sm" />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-1.5">
-                    <span className="text-sm font-bold text-gray-900 truncate">{user.displayName}</span>
+                    <span className="text-sm font-bold text-slate-100 truncate">{user.displayName}</span>
                     <TrustBadge status={user.verificationStatus} size="sm" />
                   </div>
-                  <span className="text-xs text-gray-400 truncate block">@{user.username}</span>
+                  <span className="text-xs text-slate-600 truncate block">@{user.username}</span>
                 </div>
               </Link>
             </>
@@ -284,7 +283,7 @@ export function Navbar() {
 
       {/* ── Mobile bottom bar ────────────────────────────────────────────── */}
       <nav className="md:hidden fixed bottom-4 left-4 right-4 z-40 pb-[env(safe-area-inset-bottom)]">
-        <div className="bg-white/85 dark:bg-[#111827]/90 backdrop-blur-2xl rounded-[28px] shadow-[var(--shadow-float)] border border-white/70 dark:border-white/10 flex items-stretch px-1 py-1">
+        <div className="bg-[#0d1420]/94 backdrop-blur-2xl rounded-2xl shadow-[var(--shadow-float)] border border-white/10 flex items-stretch px-1 py-1">
         {MOBILE_NAV.map(({ href, icon: Icon, tkey }) => {
           const active = isActive(href);
           const label = t(tkey);

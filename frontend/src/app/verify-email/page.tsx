@@ -3,7 +3,7 @@
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { FormEvent, useEffect, useState } from 'react';
-import Logo from '@/components/Logo';
+import { AuthShell } from '@/components/auth/AuthShell';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { api } from '@/lib/api';
@@ -170,33 +170,24 @@ export default function VerifyEmailPage() {
 
   if (!loaded) {
     return (
-      <main className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-pink-50" aria-busy="true" />
+      <main className="min-h-screen bg-[#070a10]" aria-busy="true" />
     );
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-purple-50 via-white to-pink-50 px-4 py-12">
-      <div className="w-full max-w-sm">
-        <div className="mb-8 text-center">
-          <div className="mb-4 flex justify-center"><Logo size={72} /></div>
-          <h1 className="text-3xl font-black bg-gradient-to-r from-purple-500 via-fuchsia-500 to-cyan-400 bg-clip-text text-transparent">
-            Verify your email
-          </h1>
-        </div>
-
-        <div className="rounded-2xl border border-gray-100 bg-white p-8 shadow-sm">
+    <AuthShell title="Verify your email" subtitle="Enter the secure code we sent to continue.">
           {!pending ? (
             <div className="flex flex-col gap-4 text-center">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-400">
                 {sessionError || 'This verification session is missing or expired. Create an account again, or sign in to resume verification.'}
               </p>
               <Button type="button" size="lg" onClick={restart}>Create account</Button>
-              <Link href="/login" className="text-sm font-semibold text-purple-600 hover:underline">Sign in</Link>
+              <Link href="/login" className="text-sm font-semibold text-fuchsia-400 hover:text-fuchsia-300">Sign in</Link>
             </div>
           ) : (
             <>
-              <p className="text-center text-sm text-gray-600">
-                Enter the 6-digit code sent to <span className="font-semibold text-gray-900">{maskEmail(pending.email)}</span>.
+              <p className="text-center text-sm text-slate-400">
+                Enter the 6-digit code sent to <span className="font-semibold text-slate-100">{maskEmail(pending.email)}</span>.
               </p>
 
               <form onSubmit={verify} className="mt-6 flex flex-col gap-4">
@@ -213,8 +204,8 @@ export default function VerifyEmailPage() {
                   autoFocus
                 />
 
-                {error && <p role="alert" className="rounded-xl bg-red-50 px-4 py-2 text-sm text-red-600">{error}</p>}
-                {notice && <p role="status" className="rounded-xl bg-green-50 px-4 py-2 text-sm text-green-700">{notice}</p>}
+                {error && <p role="alert" className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-300">{error}</p>}
+                {notice && <p role="status" className="rounded-xl border border-emerald-500/20 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-300">{notice}</p>}
 
                 <Button
                   type="submit"
@@ -235,18 +226,16 @@ export default function VerifyEmailPage() {
                   type="button"
                   onClick={resend}
                   disabled={resending || resendInSec > 0}
-                  className="font-semibold text-purple-600 hover:underline disabled:cursor-not-allowed disabled:text-gray-400 disabled:no-underline"
+                  className="font-semibold text-fuchsia-400 hover:text-fuchsia-300 disabled:cursor-not-allowed disabled:text-slate-600"
                 >
                   {resending ? 'Sending…' : resendInSec > 0 ? `Resend code in ${resendInSec}s` : 'Resend code'}
                 </button>
-                <button type="button" onClick={restart} className="text-gray-500 hover:text-gray-700 hover:underline">
+                <button type="button" onClick={restart} className="text-slate-500 hover:text-slate-300">
                   Use a different email
                 </button>
               </div>
             </>
           )}
-        </div>
-      </div>
-    </main>
+    </AuthShell>
   );
 }
