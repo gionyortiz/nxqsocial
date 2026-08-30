@@ -131,6 +131,27 @@ describe('validateEnvironment', () => {
     );
   });
 
+  it('keeps paid gifts fail-closed unless dedicated payment secrets are complete', () => {
+    expect(() =>
+      validateEnvironment({
+        ...validProductionEnvironment(),
+        GIFTS_ENABLED: 'true',
+      }),
+    ).toThrow(
+      /STRIPE_GIFTS_RESTRICTED_KEY is required[\s\S]*STRIPE_GIFTS_WEBHOOK_SECRET is required/,
+    );
+
+    const enabled = {
+      ...validProductionEnvironment(),
+      GIFTS_ENABLED: 'true',
+      STRIPE_GIFTS_RESTRICTED_KEY: 'rk_test_dedicated_gifts_key',
+      STRIPE_GIFTS_WEBHOOK_SECRET: 'whsec_dedicated_gifts_endpoint',
+      CREATOR_GIFT_SHARE_BPS: '5000',
+      GIFT_CURRENCY: 'usd',
+    };
+    expect(validateEnvironment(enabled)).toBe(enabled);
+  });
+
   it('accepts explicit proxy IP and CIDR lists', () => {
     const environment = {
       ...validProductionEnvironment(),

@@ -7,5 +7,6 @@ import { RedisModule } from '../redis/redis.module';
   imports: [RedisModule],
   controllers: [LiveController],
   providers: [LiveService],
+  exports: [LiveService],
 })
 export class LiveModule {}

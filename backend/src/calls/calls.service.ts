@@ -1,10 +1,16 @@
-import { Inject, Injectable, BadRequestException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  BadRequestException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AccessToken } from 'livekit-server-sdk';
 import type Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module';
 import { PrismaService } from '../prisma/prisma.service';
 import { NotificationsService } from '../notifications/notifications.service';
+import { LiveService } from '../live/live.service';
 
 interface CallerInfo {
   username: string;
@@ -28,6 +34,7 @@ export class CallsService {
     private readonly config: ConfigService,
     private readonly prisma: PrismaService,
     private readonly notifications: NotificationsService,
+    private readonly live: LiveService,
     @Inject(REDIS_CLIENT) private readonly redis: Redis,
   ) {}
 
@@ -51,27 +58,42 @@ export class CallsService {
     room: string,
     opts: { video?: boolean; host?: boolean } = {},
   ): Promise<{ token: string; url: string; room: string; identity: string }> {
-    console.log('=== createToken called ===');
-    console.log('userId:', userId);
-    console.log('room:', room);
-    console.log('opts:', opts);
-    console.log('apiKey:', !!this.apiKey);
-    console.log('apiSecret:', !!this.apiSecret);
-    console.log('wsUrl:', this.wsUrl);
-    
     if (!this.apiKey || !this.apiSecret) {
       throw new BadRequestException(
         'Calling is not configured. Set LIVEKIT_API_KEY, LIVEKIT_API_SECRET and LIVEKIT_URL on the server.',
       );
     }
     if (!room || !/^[\w.@:-]{3,128}$/.test(room)) {
-      console.log('Invalid room name:', room, 'Regex test:', /^[\w.@:-]{3,128}$/.test(room || ''));
       throw new BadRequestException('Invalid room name.');
+    }
+
+    const liveSession = await this.prisma.liveSession.findUnique({
+      where: { room },
+      select: { id: true },
+    });
+    let canPublish = opts.host !== false;
+    if (liveSession) {
+      canPublish = await this.live.canPublish(room, userId);
+      if (opts.host === true && !canPublish) {
+        throw new ForbiddenException(
+          'The broadcaster must approve you before you can publish.',
+        );
+      }
+    } else if (/^(?:call|group)-|^dm_/.test(room)) {
+      const member = await this.redis.sismember(`call:members:${room}`, userId);
+      if (!member)
+        throw new ForbiddenException('You are not invited to this call.');
+      canPublish = true;
+    } else {
+      throw new ForbiddenException('This room has not been authorized.');
     }
 
     const profile = await this.prisma.user.findUnique({
       where: { id: userId },
-      select: { username: true, profile: { select: { displayName: true, avatarUrl: true } } },
+      select: {
+        username: true,
+        profile: { select: { displayName: true, avatarUrl: true } },
+      },
     });
 
     const at = new AccessToken(this.apiKey, this.apiSecret, {
@@ -87,7 +109,6 @@ export class CallsService {
     // Watch-only viewers (host === false) may subscribe but not publish media
     // (camera/mic). They CAN still publish data so live chat + reactions work
     // for everyone in the room.
-    const canPublish = opts.host !== false;
     at.addGrant({
       roomJoin: true,
       room,
@@ -97,20 +118,12 @@ export class CallsService {
     });
 
     const jwt = await at.toJwt();
-    const result = {
+    return {
       token: jwt,
       url: this.wsUrl,
       room,
       identity: userId,
     };
-    console.log('createToken response:', {
-      hasToken: !!result.token,
-      tokenLength: result.token?.length,
-      url: result.url,
-      room: result.room,
-      identity: result.identity,
-    });
-    return result;
   }
 
   /** Notify one or more users that they're being invited to a call. */
@@ -122,7 +135,10 @@ export class CallsService {
   ): Promise<{ invited: string[] }> {
     const caller = await this.prisma.user.findUnique({
       where: { id: callerId },
-      select: { username: true, profile: { select: { displayName: true, avatarUrl: true } } },
+      select: {
+        username: true,
+        profile: { select: { displayName: true, avatarUrl: true } },
+      },
     });
     if (!caller) throw new BadRequestException('Caller not found.');
 
@@ -155,6 +171,12 @@ export class CallsService {
       );
       invited.push(t.username);
       invitedIds.push(t.id);
+    }
+
+    if (invitedIds.length > 0) {
+      const membershipKey = `call:members:${room}`;
+      await this.redis.sadd(membershipKey, callerId, ...invitedIds);
+      await this.redis.expire(membershipKey, 2 * 60 * 60);
     }
 
     void this.notifications.sendPushToUsers(invitedIds, {
