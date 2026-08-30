@@ -134,18 +134,22 @@ export default function LoginScreen() {
         <PasswordField
           accessibilityLabel="Password"
           testID="login-password"
+          disableAutofill
           value={password}
           onChangeText={setPassword}
           returnKeyType="go"
           onSubmitEditing={onSubmit}
         />
-        <Link href={'/forgot-password' as never} asChild>
-          <Pressable accessibilityRole="link" accessibilityLabel="Forgot password">
-            <Text style={{ color: '#a78bfa', fontWeight: '700', textAlign: 'right', marginTop: -6 }}>
-              Forgot password?
-            </Text>
-          </Pressable>
-        </Link>
+        <Pressable
+          accessibilityRole="link"
+          accessibilityLabel="Forgot password"
+          testID="forgot-password-link"
+          onPress={() => router.push('/forgot-password' as never)}
+          hitSlop={8}
+          style={{ alignSelf: 'flex-end', marginTop: -6, paddingVertical: 4 }}
+        >
+          <Text style={{ color: '#a78bfa', fontWeight: '700' }}>Forgot password?</Text>
+        </Pressable>
         {SHOW_LOGIN_DEBUG ? (
           <Text style={{ color: '#64748b', fontSize: 11, fontFamily: 'monospace', marginTop: -8 }}>
             Password length: {password.length} character{password.length === 1 ? '' : 's'}
