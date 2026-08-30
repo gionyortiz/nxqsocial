@@ -15,10 +15,8 @@ export function AuthShell({
     <main className="nxq-auth-shell">
       <section className="nxq-auth-hero" aria-label="NXQ Social introduction">
         <Link href="/" className="flex items-center gap-3 w-fit">
-          <span className="flex h-11 w-11 items-center justify-center rounded-xl bg-gradient-to-br from-purple-700 to-fuchsia-500 shadow-[var(--shadow-brand)]">
-            <Logo size={27} className="text-white" />
-          </span>
-          <span className="text-xl font-extrabold tracking-tight text-white">NXQ <span className="text-fuchsia-400">Social</span></span>
+          <Logo size={56} className="rounded-[18px] shadow-[var(--shadow-brand)]" />
+          <span className="text-2xl font-extrabold tracking-tight text-white">NXQ <span className="text-fuchsia-400">Social</span></span>
         </Link>
 
         <div className="max-w-xl py-16">
@@ -54,8 +52,8 @@ export function AuthShell({
         <div className="nxq-auth-card">
           <div className="mb-7">
             <div className="mb-5 flex items-center gap-2 md:hidden">
-              <Logo size={34} />
-              <span className="font-extrabold text-white">NXQ Social</span>
+              <Logo size={48} className="rounded-2xl shadow-[var(--shadow-brand)]" />
+              <span className="text-lg font-extrabold text-white">NXQ Social</span>
             </div>
             <p className="nxq-kicker">Welcome to NXQ</p>
             <h1 className="mt-2 text-3xl font-extrabold tracking-tight text-white">{title}</h1>

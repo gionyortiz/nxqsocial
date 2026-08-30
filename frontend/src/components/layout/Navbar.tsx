@@ -101,9 +101,7 @@ export function Navbar() {
         {/* Logo */}
         <div className="mb-5 px-2.5 flex items-center justify-between">
           <Link href="/feed" className="flex items-center gap-2.5 min-w-0">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-700 to-fuchsia-500 flex items-center justify-center shadow-[var(--shadow-brand)] flex-shrink-0">
-              <Logo size={22} className="text-white" />
-            </div>
+            <Logo size={42} className="rounded-[14px] shadow-[var(--shadow-brand)] flex-shrink-0" />
             {!compact && (
               <span className="text-[19px] font-extrabold tracking-tight text-white truncate">NXQ <span className="text-fuchsia-400">Social</span></span>
             )}
