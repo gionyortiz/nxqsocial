@@ -91,6 +91,7 @@ export default function ResetPasswordScreen() {
                 label="New password"
                 placeholder="Enter a new password"
                 newPassword
+                disableAutofill
                 value={password}
                 onChangeText={setPassword}
               />
@@ -100,6 +101,7 @@ export default function ResetPasswordScreen() {
                 label="Confirm new password"
                 placeholder="Re-enter your new password"
                 newPassword
+                disableAutofill
                 value={confirmPassword}
                 onChangeText={setConfirmPassword}
                 onSubmitEditing={onSubmit}

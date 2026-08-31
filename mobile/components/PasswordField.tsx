@@ -9,8 +9,9 @@ type PasswordFieldProps = Omit<TextInputProps, 'secureTextEntry'> & {
 };
 
 // Mirrors the backend's StrongPassword rule (min 12, upper, lower, digit, special).
-// iOS needs this on textContentType="newPassword" fields or its Automatic Strong
-// Password AutoFill UI can take over the field and swallow keystrokes.
+// Screens that opt into iOS Password AutoFill use these rules. Screens that have
+// shown the iOS strong-password input lockout use disableAutofill instead so the
+// native TextInput always accepts manual keyboard entry.
 const PASSWORD_RULES = 'minlength: 12; required: lower; required: upper; required: digit; required: special; allowed: ascii-printable;';
 
 export function PasswordField({

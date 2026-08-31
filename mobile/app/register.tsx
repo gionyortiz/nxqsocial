@@ -98,8 +98,26 @@ export default function RegisterScreen() {
         <TextInput placeholder="Email" placeholderTextColor="#8790ab" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }} />
         <TextInput placeholder="Username" placeholderTextColor="#8790ab" autoCapitalize="none" value={username} onChangeText={setUsername} style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }} />
         <TextInput placeholder="Display name" placeholderTextColor="#8790ab" value={displayName} onChangeText={setDisplayName} style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }} />
-        <PasswordField label="Create password" placeholder="At least 12 characters" newPassword value={password} onChangeText={setPassword} />
-        <PasswordField label="Confirm password" placeholder="Re-enter your password" newPassword value={confirmPassword} onChangeText={setConfirmPassword} />
+        <PasswordField
+          accessibilityLabel="Create password"
+          testID="register-password"
+          label="Create password"
+          placeholder="At least 12 characters"
+          newPassword
+          disableAutofill
+          value={password}
+          onChangeText={setPassword}
+        />
+        <PasswordField
+          accessibilityLabel="Confirm password"
+          testID="register-confirm-password"
+          label="Confirm password"
+          placeholder="Re-enter your password"
+          newPassword
+          disableAutofill
+          value={confirmPassword}
+          onChangeText={setConfirmPassword}
+        />
 
         <View style={{ gap: 8 }}>
           <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>Security check</Text>

@@ -55,6 +55,7 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "typecheck": "tsc --noEmit",
+    "test:password-entry": "node scripts/verify-password-entry.mjs",
     "build:android": "eas build --platform android --profile staging-native",
     "build:ios": "eas build --platform ios --profile staging-native",
     "build:prod:android": "eas build --platform android --profile production",
