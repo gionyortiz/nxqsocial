@@ -33,6 +33,7 @@ import { FeedModule } from './feed/feed.module';
 import { NotificationFeedModule } from './notification-feed/notification-feed.module';
 import { AiModule } from './ai/ai.module';
 import { MessagesModule } from './messages/messages.module';
+import { GiftsModule } from './gifts/gifts.module';
 import { getClientIpFromRequest } from './common/network/client-ip';
 import { validateEnvironment } from './config/environment';
 
@@ -106,6 +107,7 @@ import { validateEnvironment } from './config/environment';
     FeedModule,
     NotificationFeedModule,
     MessagesModule,
+    GiftsModule,
   ],
 })
 export class AppModule {}

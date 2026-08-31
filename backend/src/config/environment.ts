@@ -64,6 +64,7 @@ export function validateEnvironment(environment: Environment): Environment {
     ['STRIPE_SECRET_KEY', 'STRIPE_WEBHOOK_SECRET'],
     errors,
   );
+  validatePaidGifts(environment, errors);
   requireCompleteGroup(
     environment,
     ['LIVEKIT_URL', 'LIVEKIT_API_KEY', 'LIVEKIT_API_SECRET'],
@@ -78,6 +79,27 @@ export function validateEnvironment(environment: Environment): Environment {
   throwIfInvalid(errors);
 
   return environment;
+}
+
+function validatePaidGifts(environment: Environment, errors: string[]) {
+  const enabled = readBoolean(environment, 'GIFTS_ENABLED', errors);
+  if (enabled !== true) return;
+  requireSecret(environment, 'STRIPE_GIFTS_RESTRICTED_KEY', 12, errors);
+  requireSecret(environment, 'STRIPE_GIFTS_WEBHOOK_SECRET', 12, errors);
+
+  const share = readString(environment, 'CREATOR_GIFT_SHARE_BPS');
+  if (
+    share &&
+    (!/^\d+$/.test(share) || Number(share) < 0 || Number(share) > 10_000)
+  ) {
+    errors.push(
+      'CREATOR_GIFT_SHARE_BPS must be an integer between 0 and 10000',
+    );
+  }
+  const currency = readString(environment, 'GIFT_CURRENCY') || 'usd';
+  if (!/^[a-zA-Z]{3}$/.test(currency)) {
+    errors.push('GIFT_CURRENCY must be a three-letter currency code');
+  }
 }
 
 function throwIfInvalid(errors: string[]) {

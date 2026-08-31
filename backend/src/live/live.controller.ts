@@ -3,7 +3,9 @@ import { JwtAuthGuard } from '../auth/jwt-auth.guard';
 import { CurrentUser } from '../auth/current-user.decorator';
 import { LiveService } from './live.service';
 import { StartLiveDto, HeartbeatDto } from './live.dto';
-import { IsString } from 'class-validator';
+import { IsInt, IsOptional, IsString, Max, Min } from 'class-validator';
+
+type AuthenticatedUser = { id: string };
 
 class GuestRequestDto {
   @IsString()
@@ -13,6 +15,17 @@ class GuestRequestDto {
 class ApproveGuestDto {
   @IsString()
   userId!: string;
+}
+
+class StartBattleDto {
+  @IsString()
+  opponentUserId!: string;
+
+  @IsOptional()
+  @IsInt()
+  @Min(30)
+  @Max(300)
+  durationSec?: number;
 }
 
 @Controller('live')
@@ -32,16 +45,21 @@ export class LiveController {
     return this.live.forUser(username);
   }
 
+  @Get(':room/context')
+  context(@Param('room') room: string) {
+    return this.live.context(room);
+  }
+
   /** Host starts broadcasting. */
   @Post('start')
-  start(@CurrentUser() user: any, @Body() dto: StartLiveDto) {
+  start(@CurrentUser() user: AuthenticatedUser, @Body() dto: StartLiveDto) {
     return this.live.start(user.id, dto.room, dto.title);
   }
 
   /** Host keepalive + viewer count. */
   @Post(':room/heartbeat')
   heartbeat(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('room') room: string,
     @Body() dto: HeartbeatDto,
   ) {
@@ -50,14 +68,14 @@ export class LiveController {
 
   /** Host ends the broadcast. */
   @Post(':room/end')
-  end(@CurrentUser() user: any, @Param('room') room: string) {
+  end(@CurrentUser() user: AuthenticatedUser, @Param('room') room: string) {
     return this.live.end(user.id, room);
   }
 
   /** Viewer requests to join as guest. */
   @Post(':room/guest-request')
   guestRequest(
-    @CurrentUser() user: any,
+    @CurrentUser() user: AuthenticatedUser,
     @Param('room') room: string,
     @Body() dto: GuestRequestDto,
   ) {
@@ -66,40 +84,84 @@ export class LiveController {
 
   /** Host fetches pending guest requests. */
   @Get(':room/guest-requests')
-  getGuestRequests(@Param('room') room: string) {
-    return this.live.getGuestRequests(room);
+  getGuestRequests(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('room') room: string,
+  ) {
+    return this.live.getGuestRequests(room, user.id);
   }
 
   /** Host approves a guest. */
   @Post(':room/guest-approve')
   approveGuest(
+    @CurrentUser() user: AuthenticatedUser,
     @Param('room') room: string,
     @Body() dto: ApproveGuestDto,
   ) {
-    return this.live.approveGuest(room, dto.userId);
+    return this.live.approveGuest(room, dto.userId, user.id);
   }
 
   /** Guest polls to check if they've been approved. */
   @Get(':room/guest-check')
-  checkApproval(@CurrentUser() user: any, @Param('room') room: string) {
+  checkApproval(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('room') room: string,
+  ) {
     return this.live.checkApproval(room, user.id);
   }
 
   /** Guest checks current join request state without consuming approval. */
   @Get(':room/guest-status')
-  guestStatus(@CurrentUser() user: any, @Param('room') room: string) {
+  guestStatus(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('room') room: string,
+  ) {
     return this.live.guestStatus(room, user.id);
   }
 
   /** Guest leaves/cancels stage request so they can request again later. */
   @Post(':room/guest-leave')
-  guestLeave(@CurrentUser() user: any, @Param('room') room: string) {
-    return this.live.clearGuestState(room, user.id);
+  guestLeave(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('room') room: string,
+  ) {
+    return this.live.clearGuestState(room, user.id, user.id);
   }
 
   /** Host clears a viewer's stale/rejected guest request. */
   @Post(':room/guest-clear')
-  guestClear(@Param('room') room: string, @Body() dto: ApproveGuestDto) {
-    return this.live.clearGuestState(room, dto.userId);
+  guestClear(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('room') room: string,
+    @Body() dto: ApproveGuestDto,
+  ) {
+    return this.live.clearGuestState(room, dto.userId, user.id);
+  }
+
+  @Post(':room/battle/start')
+  startBattle(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('room') room: string,
+    @Body() dto: StartBattleDto,
+  ) {
+    return this.live.startBattle(
+      user.id,
+      room,
+      dto.opponentUserId,
+      dto.durationSec,
+    );
+  }
+
+  @Get(':room/battle')
+  battle(@Param('room') room: string) {
+    return this.live.activeBattle(room);
+  }
+
+  @Post(':room/battle/end')
+  endBattle(
+    @CurrentUser() user: AuthenticatedUser,
+    @Param('room') room: string,
+  ) {
+    return this.live.endBattle(user.id, room);
   }
 }

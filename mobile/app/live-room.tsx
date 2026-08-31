@@ -41,10 +41,17 @@ export default function LiveRoomScreen() {
       setLoading(true);
       setError(null);
       try {
+        if (isHost) {
+          await apiRequest('/live/start', {
+            method: 'POST',
+            token: authToken,
+            body: { room, title: 'Live on NXQ Social' },
+          });
+        }
         const data = await apiRequest<LiveTokenResponse>('/calls/token', {
           method: 'POST',
           token: authToken,
-          body: { room, video: isHost, host: true },
+          body: { room, video: isHost, host: isHost },
         });
         if (!data?.token || !data?.url) {
           throw new Error('Live video is not configured yet.');

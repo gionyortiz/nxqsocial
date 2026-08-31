@@ -12,6 +12,7 @@ import {
   useDataChannel,
 } from '@livekit/components-react';
 import { Track } from 'livekit-client';
+import { isAxiosError } from 'axios';
 import {
   Radio,
   Users,
@@ -37,8 +38,6 @@ import { trackEvent } from '@/lib/analytics';
 
 /** Quick reactions a viewer can tap. */
 const QUICK_EMOJIS = ['❤️', '😂', '😮', '👏', '🔥', '🎉'];
-/** Gift "stickers" — bigger center-screen bursts. */
-const GIFTS = ['🎁', '🌹', '💎', '👑', '🚀', '🦄'];
 
 /** Royalty-free background music — SoundHelix (free for any use, no CORS issues). */
 const MUSIC_TRACKS = [
@@ -60,13 +59,47 @@ type LiveEvent =
       text: string;
       ts: number;
     }
-  | { kind: 'reaction'; id: string; emoji: string; ts: number }
-  | { kind: 'gift'; id: string; emoji: string; name: string; ts: number }
-  | { kind: 'guest-request'; id: string; userId: string; name: string; ts: number }
-  | { kind: 'guest-approve'; id: string; userId: string; ts: number }
-  | { kind: 'battle-start'; id: string; durationSec: number; ts: number }
-  | { kind: 'battle-vote'; id: string; side: 0 | 1; name: string; emoji: string; ts: number }
-  | { kind: 'battle-end'; id: string; ts: number };
+  | { kind: 'reaction'; id: string; emoji: string; ts: number };
+
+interface GiftCatalogItem {
+  code: string;
+  emoji: string;
+  coins: number;
+  label: string;
+}
+
+interface CoinPack {
+  code: string;
+  coins: number;
+  amountCents: number;
+  label: string;
+}
+
+interface GiftCatalog {
+  enabled: boolean;
+  currency: string;
+  packs: CoinPack[];
+  gifts: GiftCatalogItem[];
+  cashOutEnabled: boolean;
+}
+
+interface LiveBattle {
+  id: string;
+  hostId: string;
+  opponentId: string;
+  hostScoreCoins: number;
+  opponentScoreCoins: number;
+  status: 'ACTIVE' | 'ENDED' | 'CANCELED';
+  endsAt: string;
+}
+
+interface RecentGift {
+  id: string;
+  senderName: string;
+  emoji: string;
+  coins: number;
+  createdAt: string;
+}
 
 interface ChatMessage {
   id: string;
@@ -112,6 +145,12 @@ function randomId() {
   return `${nowMs().toString(36)}-${Math.random().toString(36).slice(2, 7)}`;
 }
 
+function requestErrorMessage(error: unknown, fallback: string) {
+  return isAxiosError<{ message?: string }>(error)
+    ? (error.response?.data?.message ?? fallback)
+    : fallback;
+}
+
 export function LiveExperience({
   host,
   isOwner,
@@ -149,12 +188,22 @@ export function LiveExperience({
   const [musicVolume, setMusicVolume] = useState(0.4);
   const musicAudioRef = useRef<HTMLAudioElement | null>(null);
   const [showInvitePanel, setShowInvitePanel] = useState(false);
+  const [roomHostId, setRoomHostId] = useState<string | null>(null);
+
+  // ---- Paid gifts (server-authoritative; disabled until configured) -------
+  const [giftCatalog, setGiftCatalog] = useState<GiftCatalog | null>(null);
+  const [walletCoins, setWalletCoins] = useState(0);
+  const [giftError, setGiftError] = useState<string | null>(null);
+  const [giftBusy, setGiftBusy] = useState(false);
+  const [selectedBattleSide, setSelectedBattleSide] = useState<0 | 1>(0);
+  const giftCursorRef = useRef('');
+  const seenGiftIdsRef = useRef(new Set<string>());
 
   // ---- Battle state -------------------------------------------------------
   const [battleActive, setBattleActive] = useState(false);
   const [battleTimeLeft, setBattleTimeLeft] = useState(0);
   const [battleScores, setBattleScores] = useState<[number, number]>([0, 0]);
-  const battleTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [battle, setBattle] = useState<LiveBattle | null>(null);
 
   const chatScrollRef = useRef<HTMLDivElement | null>(null);
   const liveStartedAtRef = useRef<number>(0);
@@ -174,9 +223,6 @@ export function LiveExperience({
   // Viewers = everyone except the broadcaster(s) (camera publishers).
   const publishers = new Set(cameraTracks.map((t) => t.participant?.identity));
   const viewers = Math.max(0, participants.length - Math.max(1, publishers.size));
-
-  // The owner's identity = the participant publishing the primary camera.
-  const hostIdentity = cameraTracks[0]?.participant?.identity ?? null;
 
   // ---- Reaction / gift visuals -------------------------------------------
   const addFloatingReaction = useCallback((emoji: string) => {
@@ -216,69 +262,9 @@ export function LiveExperience({
         case 'reaction':
           addFloatingReaction(evt.emoji);
           break;
-        case 'gift':
-          addGiftBurst(evt.emoji, evt.name);
-          setMessages((prev) =>
-            [
-              ...prev,
-              {
-                id: evt.id,
-                name: evt.name,
-                username: '',
-                text: `sent a ${evt.emoji}`,
-                ts: evt.ts,
-                gift: evt.emoji,
-              },
-            ].slice(-MAX_CHAT),
-          );
-          break;
-        case 'guest-request':
-          if (isOwner) {
-            setGuestRequests((prev) =>
-              prev.some((r) => r.userId === evt.userId)
-                ? prev
-                : [...prev, { userId: evt.userId, name: evt.name }],
-            );
-          }
-          break;
-        case 'guest-approve':
-          // Use ref to avoid stale closure on user?.id
-          if (!host && evt.userId === userIdRef.current) {
-            router.push(buildGuestJoinHref());
-          }
-          break;
-        case 'battle-start':
-          setBattleActive(true);
-          setBattleScores([0, 0]);
-          setBattleTimeLeft(evt.durationSec);
-          if (battleTimerRef.current) clearInterval(battleTimerRef.current);
-          battleTimerRef.current = setInterval(() => {
-            setBattleTimeLeft(t => {
-              if (t <= 1) {
-                clearInterval(battleTimerRef.current!);
-                setBattleActive(false);
-                return 0;
-              }
-              return t - 1;
-            });
-          }, 1000);
-          break;
-        case 'battle-vote':
-          setBattleScores(prev => {
-            const next: [number, number] = [...prev] as [number, number];
-            next[evt.side] += 1;
-            return next;
-          });
-          addGiftBurst(evt.emoji, evt.name);
-          break;
-        case 'battle-end':
-          setBattleActive(false);
-          setBattleTimeLeft(0);
-          if (battleTimerRef.current) clearInterval(battleTimerRef.current);
-          break;
       }
     },
-    [addFloatingReaction, addGiftBurst, isOwner, host, router, buildGuestJoinHref],
+    [addFloatingReaction],
   );
 
   const { send } = useDataChannel(handleData);
@@ -351,6 +337,18 @@ export function LiveExperience({
     };
   }, [isOwner, room]);
 
+  useEffect(() => {
+    let cancelled = false;
+    api.get(`/live/${encodeURIComponent(room)}/context`)
+      .then(({ data }) => {
+        if (!cancelled) setRoomHostId(typeof data?.hostId === 'string' ? data.hostId : null);
+      })
+      .catch(() => {
+        if (!cancelled) setRoomHostId(null);
+      });
+    return () => { cancelled = true; };
+  }, [room]);
+
   // ---- Actions -----------------------------------------------------------
   const sendReaction = (emoji: string) => {
     addFloatingReaction(emoji);
@@ -406,11 +404,155 @@ export function LiveExperience({
     };
   }, []);
 
-  const sendGift = (emoji: string) => {
+  const refreshWallet = useCallback(async () => {
+    try {
+      const { data } = await api.get('/gifts/wallet');
+      setWalletCoins(Number(data?.balanceCoins ?? 0));
+    } catch {
+      // The catalog remains visibly unavailable if the backend is not ready.
+    }
+  }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([api.get('/gifts/catalog'), api.get('/gifts/wallet')])
+      .then(([catalogResponse, walletResponse]) => {
+        if (cancelled) return;
+        setGiftCatalog(catalogResponse.data as GiftCatalog);
+        setWalletCoins(Number(walletResponse.data?.balanceCoins ?? 0));
+      })
+      .catch(() => {
+        if (!cancelled) setGiftCatalog(null);
+      });
+    return () => { cancelled = true; };
+  }, []);
+
+  // Gift visuals and battle points come back from the durable server ledger,
+  // not from participant-authored data-channel messages.
+  useEffect(() => {
+    if (!giftCatalog?.enabled) return;
+    if (!giftCursorRef.current) {
+      giftCursorRef.current = new Date(Date.now() - 15_000).toISOString();
+    }
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/gifts/live/${encodeURIComponent(room)}/recent`, {
+          params: { after: giftCursorRef.current },
+        });
+        if (cancelled || !Array.isArray(data)) return;
+        let newest = giftCursorRef.current;
+        for (const receipt of data as RecentGift[]) {
+          if (!seenGiftIdsRef.current.has(receipt.id)) {
+            seenGiftIdsRef.current.add(receipt.id);
+            addGiftBurst(receipt.emoji, receipt.senderName);
+            setMessages((prev) => [
+              ...prev,
+              {
+                id: receipt.id,
+                name: receipt.senderName,
+                username: '',
+                text: `sent ${receipt.emoji} (${receipt.coins} coins)`,
+                ts: new Date(receipt.createdAt).getTime(),
+                gift: receipt.emoji,
+              },
+            ].slice(-MAX_CHAT));
+          }
+          if (new Date(receipt.createdAt).getTime() > new Date(newest).getTime()) {
+            newest = receipt.createdAt;
+          }
+        }
+        giftCursorRef.current = new Date(new Date(newest).getTime() - 1000).toISOString();
+      } catch {
+        // A temporary poll failure must not invent or lose wallet state.
+      }
+    };
+    void poll();
+    const id = setInterval(poll, 2000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [giftCatalog?.enabled, room, addGiftBurst]);
+
+  useEffect(() => {
+    let cancelled = false;
+    const poll = async () => {
+      try {
+        const { data } = await api.get(`/live/${encodeURIComponent(room)}/battle`);
+        if (cancelled) return;
+        if (!data || data.status !== 'ACTIVE') {
+          setBattle(null);
+          setBattleActive(false);
+          setBattleScores([0, 0]);
+          setBattleTimeLeft(0);
+          return;
+        }
+        const active = data as LiveBattle;
+        setBattle(active);
+        setBattleActive(true);
+        setBattleScores([active.hostScoreCoins, active.opponentScoreCoins]);
+        setBattleTimeLeft(Math.max(0, Math.ceil((new Date(active.endsAt).getTime() - Date.now()) / 1000)));
+      } catch {
+        // Keep the last known battle display during a temporary network error.
+      }
+    };
+    void poll();
+    const id = setInterval(poll, 2000);
+    return () => { cancelled = true; clearInterval(id); };
+  }, [room]);
+
+  const sendGift = async (gift: GiftCatalogItem) => {
+    if (!giftCatalog?.enabled || giftBusy) return;
+    const battleSide = battleActive && battle ? selectedBattleSide : undefined;
+    const recipientId = battleSide === 1
+      ? battle?.opponentId
+      : battleSide === 0 && battle
+        ? battle.hostId
+        : undefined;
+    if (battle && !recipientId) {
+      setGiftError('Wait for both battle participants before sending a gift.');
+      return;
+    }
+    if (walletCoins < gift.coins) {
+      setGiftError('You need more NXQ Coins for this gift.');
+      return;
+    }
+    setGiftBusy(true);
+    setGiftError(null);
     const name = user?.displayName ?? user?.username ?? 'Someone';
-    addGiftBurst(emoji, name);
-    broadcast({ kind: 'gift', id: randomId(), emoji, name, ts: nowMs() }, true);
-    setShowGifts(false);
+    try {
+      const clientRequestId = globalThis.crypto?.randomUUID?.() ?? `${randomId()}-${randomId()}`;
+      const { data } = await api.post(`/gifts/live/${encodeURIComponent(room)}/send`, {
+        giftCode: gift.code,
+        recipientId,
+        battleSide,
+        clientRequestId,
+      });
+      setWalletCoins(Number(data?.balanceCoins ?? walletCoins - gift.coins));
+      if (data?.battle) {
+        setBattleScores([data.battle.hostScoreCoins, data.battle.opponentScoreCoins]);
+      }
+      if (data?.transactionId) seenGiftIdsRef.current.add(data.transactionId);
+      addGiftBurst(gift.emoji, name);
+      setShowGifts(false);
+    } catch (error: unknown) {
+      setGiftError(requestErrorMessage(error, 'Gift could not be sent.'));
+      await refreshWallet();
+    } finally {
+      setGiftBusy(false);
+    }
+  };
+
+  const buyCoins = async (packCode: string) => {
+    if (giftBusy) return;
+    setGiftBusy(true);
+    setGiftError(null);
+    try {
+      const { data } = await api.post('/gifts/checkout', { packCode, room });
+      if (!data?.url) throw new Error('Checkout URL missing');
+      window.location.assign(data.url);
+    } catch (error: unknown) {
+      setGiftError(requestErrorMessage(error, 'Coin checkout is not available.'));
+      setGiftBusy(false);
+    }
   };
 
   const sendChat = () => {
@@ -463,38 +605,18 @@ export function LiveExperience({
         displayName: user.displayName ?? user.username,
       });
     } catch {
-      // Fallback: data channel
-      broadcast(
-        {
-          kind: 'guest-request',
-          id: randomId(),
-          userId: user.id,
-          name: user.displayName ?? user.username,
-          ts: nowMs(),
-        },
-        true,
-      );
+      sessionStorage.removeItem(ssRequestKey);
+      setRequestedToJoin(false);
     }
-    // Also send via data channel as a backup
-    broadcast(
-      {
-        kind: 'guest-request',
-        id: randomId(),
-        userId: user.id,
-        name: user.displayName ?? user.username,
-        ts: nowMs(),
-      },
-      true,
-    );
   };
 
   const approveGuest = async (g: GuestRequest) => {
     try {
       // Write to backend — guest is polling this
       await api.post(`/live/${encodeURIComponent(room)}/guest-approve`, { userId: g.userId });
-    } catch { /* ignore */ }
-    // Also send via data channel as backup
-    broadcast({ kind: 'guest-approve', id: randomId(), userId: g.userId, ts: nowMs() }, true);
+    } catch {
+      return;
+    }
     setGuestRequests((prev) => prev.filter((r) => r.userId !== g.userId));
   };
 
@@ -507,37 +629,38 @@ export function LiveExperience({
     }
   };
 
-  const startBattle = (durationSec = 60) => {
-    const evt = { kind: 'battle-start' as const, id: randomId(), durationSec, ts: nowMs() };
-    setBattleActive(true);
-    setBattleScores([0, 0]);
-    setBattleTimeLeft(durationSec);
-    broadcast(evt, true);
-    if (battleTimerRef.current) clearInterval(battleTimerRef.current);
-    battleTimerRef.current = setInterval(() => {
-      setBattleTimeLeft(t => {
-        if (t <= 1) { clearInterval(battleTimerRef.current!); setBattleActive(false); return 0; }
-        return t - 1;
+  const startBattle = async (durationSec = 60) => {
+    const opponent = cameraTracks.find((track) => track.participant?.identity !== user?.id)?.participant?.identity;
+    if (!opponent) {
+      setGiftError('Add an approved co-host before starting a battle.');
+      return;
+    }
+    try {
+      const { data } = await api.post(`/live/${encodeURIComponent(room)}/battle/start`, {
+        opponentUserId: opponent,
+        durationSec,
       });
-    }, 1000);
+      const active = data as LiveBattle;
+      setBattle(active);
+      setBattleActive(true);
+      setBattleScores([0, 0]);
+      setBattleTimeLeft(durationSec);
+      setSelectedBattleSide(0);
+    } catch (error: unknown) {
+      setGiftError(requestErrorMessage(error, 'Battle could not start.'));
+    }
   };
 
-  const endBattle = () => {
-    setBattleActive(false);
-    setBattleTimeLeft(0);
-    if (battleTimerRef.current) clearInterval(battleTimerRef.current);
-    broadcast({ kind: 'battle-end', id: randomId(), ts: nowMs() }, true);
+  const endBattle = async () => {
+    try {
+      await api.post(`/live/${encodeURIComponent(room)}/battle/end`);
+      setBattle(null);
+      setBattleActive(false);
+      setBattleTimeLeft(0);
+    } catch (error: unknown) {
+      setGiftError(requestErrorMessage(error, 'Battle could not end.'));
+    }
   };
-
-  const sendBattleVote = (side: 0 | 1, emoji: string) => {
-    const name = user?.displayName ?? user?.username ?? 'Someone';
-    broadcast({ kind: 'battle-vote', id: randomId(), side, name, emoji, ts: nowMs() }, true);
-    setBattleScores(prev => { const n: [number, number] = [...prev] as [number, number]; n[side] += 1; return n; });
-    addGiftBurst(emoji, name);
-  };
-
-  // Cleanup battle timer on unmount
-  useEffect(() => () => { if (battleTimerRef.current) clearInterval(battleTimerRef.current); }, []);
 
   // Host: poll backend for guest requests every 3s (more reliable than data channel)
   useEffect(() => {
@@ -618,13 +741,13 @@ export function LiveExperience({
   useEffect(() => () => { void clearMyGuestState(false); }, [clearMyGuestState]);
 
   const reportLive = async () => {
-    if (!hostIdentity || hostIdentity === user?.id) return;
+    if (!roomHostId || roomHostId === user?.id) return;
     setReporting(true);
     try {
       await api.post('/reports', {
         reason: 'OTHER',
         description: `Reported live broadcast in room ${room}`,
-        reportedUserId: hostIdentity,
+        reportedUserId: roomHostId,
       });
       setReported(true);
     } catch {
@@ -652,6 +775,12 @@ export function LiveExperience({
   };
 
   const hasVideo = cameraTracks.length > 0;
+  const battleTracks = battle
+    ? [
+        cameraTracks.find((track) => track.participant?.identity === battle.hostId),
+        cameraTracks.find((track) => track.participant?.identity === battle.opponentId),
+      ].filter((track): track is (typeof cameraTracks)[number] => Boolean(track))
+    : cameraTracks.slice(0, 2);
 
   const keyframes = useMemo(
     () => `
@@ -696,33 +825,9 @@ export function LiveExperience({
             <GridLayout tracks={cameraTracks} style={{ height: '100%' }}>
               <ParticipantTile />
             </GridLayout>
-          ) : (
-            <>
-              {/* MOBILE co-host (non-battle): main video full-screen + floating PiP */}
-              {!battleActive && (
-                <div className="md:hidden relative h-full w-full">
-                  {/* Main video fills the screen */}
-                  <GridLayout tracks={[cameraTracks[0]]} style={{ height: '100%', width: '100%' }}>
-                    <ParticipantTile />
-                  </GridLayout>
-                  <div className="absolute bottom-2 left-2 px-2 py-0.5 rounded-full bg-black/60 text-white text-[11px] font-semibold z-10">
-                    {host ? 'You' : 'Host'}
-                  </div>
-                  {/* Floating picture-in-picture for the second participant */}
-                  <div className="absolute top-16 right-3 w-24 h-36 rounded-2xl overflow-hidden border-2 border-white/25 shadow-2xl z-20 bg-black">
-                    <GridLayout tracks={[cameraTracks[1]]} style={{ height: '100%', width: '100%' }}>
-                      <ParticipantTile />
-                    </GridLayout>
-                    <div className="absolute bottom-1 left-1 px-1.5 py-0.5 rounded-full bg-black/60 text-white text-[10px] font-semibold">
-                      Guest
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* DESKTOP split (and MOBILE battle VS): side-by-side columns */}
-              <div className={`${battleActive ? 'flex' : 'hidden md:flex'} h-full w-full`}>
-                {cameraTracks.slice(0, 2).map((track, i) => (
+          ) : battleActive ? (
+            <div className="flex h-full w-full">
+                {battleTracks.map((track, i) => (
                   <div key={track.participant?.identity ?? i} className="flex-1 relative overflow-hidden border-r border-white/10 last:border-r-0">
                     <GridLayout tracks={[track]} style={{ height: '100%', width: '100%' }}>
                       <ParticipantTile />
@@ -737,13 +842,13 @@ export function LiveExperience({
                         {battleScores[i]}
                       </div>
                     )}
-                    {/* Viewer vote buttons during battle */}
-                    {battleActive && !host && (
+                    {/* Battle support is paid and server-ledgered; there are no free client votes. */}
+                    {!host && giftCatalog?.enabled && (
                       <button
-                        onClick={() => sendBattleVote(i as 0 | 1, i === 0 ? '🔥' : '⚡')}
+                        onClick={() => { setSelectedBattleSide(i as 0 | 1); setShowGifts(true); }}
                         className="absolute bottom-8 left-1/2 -translate-x-1/2 px-4 py-2 rounded-full bg-gradient-to-r from-purple-600 to-fuchsia-500 text-white text-sm font-bold shadow-lg hover:opacity-90 transition"
                       >
-                        Vote {i === 0 ? '🔥' : '⚡'}
+                        Send gift {i === 0 ? '🔥' : '⚡'}
                       </button>
                     )}
                   </div>
@@ -765,8 +870,11 @@ export function LiveExperience({
                     </div>
                   </div>
                 )}
-              </div>
-            </>
+            </div>
+          ) : (
+            <GridLayout tracks={cameraTracks} style={{ height: '100%', width: '100%' }}>
+              <ParticipantTile />
+            </GridLayout>
           )
         ) : (
           <div className="absolute inset-0 flex flex-col items-center justify-center text-center text-white px-6">
@@ -909,16 +1017,55 @@ export function LiveExperience({
       {/* Gift tray */}
       {showGifts && (
         <div className="absolute bottom-20 left-0 right-0 z-30 px-3">
-          <div className="mx-auto max-w-sm bg-black/70 backdrop-blur rounded-2xl p-3 grid grid-cols-6 gap-2">
-            {GIFTS.map((g) => (
-              <button
-                key={g}
-                onClick={() => sendGift(g)}
-                className="aspect-square rounded-xl bg-white/10 hover:bg-white/20 active:scale-90 transition text-2xl flex items-center justify-center"
-              >
-                {g}
-              </button>
-            ))}
+          <div className="mx-auto max-w-md bg-black/85 backdrop-blur-xl rounded-2xl p-4 space-y-3 border border-white/10">
+            <div className="flex items-center justify-between">
+              <div>
+                <p className="text-sm font-bold text-white">NXQ Live Gifts</p>
+                <p className="text-[11px] text-gray-400">
+                  {battleActive ? `Supporting battle side ${selectedBattleSide + 1}` : 'Durable wallet and creator credit'}
+                </p>
+              </div>
+              <span className="px-3 py-1.5 rounded-full bg-amber-400/20 text-amber-300 text-xs font-bold">
+                {walletCoins} coins
+              </span>
+            </div>
+            {!giftCatalog?.enabled ? (
+              <p className="rounded-xl bg-white/10 px-3 py-3 text-xs text-gray-300">
+                Paid gifts are not enabled yet. Live video, chat, reactions and co-hosting still work normally.
+              </p>
+            ) : (
+              <>
+                <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
+                  {giftCatalog.gifts.map((gift) => (
+                    <button
+                      key={gift.code}
+                      onClick={() => void sendGift(gift)}
+                      disabled={giftBusy || walletCoins < gift.coins}
+                      title={`${gift.label}: ${gift.coins} coins`}
+                      className="rounded-xl bg-white/10 hover:bg-white/20 disabled:opacity-40 active:scale-95 transition px-2 py-2 flex flex-col items-center justify-center"
+                    >
+                      <span className="text-2xl">{gift.emoji}</span>
+                      <span className="text-[10px] text-amber-300 font-semibold mt-1">{gift.coins}</span>
+                    </button>
+                  ))}
+                </div>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1">
+                  {giftCatalog.packs.map((pack) => (
+                    <button
+                      key={pack.code}
+                      onClick={() => void buyCoins(pack.code)}
+                      disabled={giftBusy}
+                      className="rounded-xl border border-amber-400/25 bg-amber-400/10 px-2 py-2 text-left hover:bg-amber-400/20 disabled:opacity-50"
+                    >
+                      <span className="block text-xs font-bold text-white">{pack.coins} coins</span>
+                      <span className="block text-[10px] text-amber-300">${(pack.amountCents / 100).toFixed(2)}</span>
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+            {giftError && <p className="text-xs text-rose-300 bg-rose-500/15 rounded-xl px-3 py-2">{giftError}</p>}
+            <p className="text-[10px] text-gray-500">Purchases use secure Stripe Checkout. Creator cash-out is not enabled.</p>
           </div>
         </div>
       )}
@@ -1088,19 +1235,23 @@ export function LiveExperience({
                 className="shrink-0 hidden sm:flex items-center justify-center w-12 h-12 rounded-2xl bg-white/15 hover:bg-white/25 text-white">
                 <MonitorUp size={20} />
               </TrackToggle>
-              <button onClick={() => setShowMusic(s => !s)}
-                className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl transition-colors ${playingTrackId ? 'bg-purple-500 text-white' : 'bg-white/15 text-white'}`}>
-                <Music size={20} />
-              </button>
-              <button onClick={() => setShowInvitePanel(s => !s)}
-                className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl transition-colors ${showInvitePanel ? 'bg-green-500 text-white' : 'bg-white/15 text-white'}`}>
-                <UserPlus size={20} />
-              </button>
-              {cameraTracks.length >= 2 && (
-                <button onClick={() => battleActive ? endBattle() : startBattle(60)}
-                  className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-lg transition-colors ${battleActive ? 'bg-red-500 animate-pulse text-white' : 'bg-gradient-to-br from-rose-500 to-orange-500 text-white'}`}>
-                  ⚔️
-                </button>
+              {isOwner && (
+                <>
+                  <button onClick={() => setShowMusic(s => !s)}
+                    className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl transition-colors ${playingTrackId ? 'bg-purple-500 text-white' : 'bg-white/15 text-white'}`}>
+                    <Music size={20} />
+                  </button>
+                  <button onClick={() => setShowInvitePanel(s => !s)}
+                    className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl transition-colors ${showInvitePanel ? 'bg-green-500 text-white' : 'bg-white/15 text-white'}`}>
+                    <UserPlus size={20} />
+                  </button>
+                  {cameraTracks.length >= 2 && (
+                    <button onClick={() => { void (battleActive ? endBattle() : startBattle(60)); }}
+                      className={`shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl text-lg transition-colors ${battleActive ? 'bg-red-500 animate-pulse text-white' : 'bg-gradient-to-br from-rose-500 to-orange-500 text-white'}`}>
+                      ⚔️
+                    </button>
+                  )}
+                </>
               )}
             </>
           ) : (
@@ -1131,11 +1282,13 @@ export function LiveExperience({
             </>
           )}
 
-          {/* Gift button — everyone */}
-          <button onClick={() => setShowGifts(s => !s)}
-            className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-90 transition text-black shadow-lg">
-            <Gift size={20} />
-          </button>
+          {/* The owner cannot gift themselves; viewers and co-hosts may support active creators. */}
+          {!isOwner && (
+            <button onClick={() => setShowGifts(s => !s)}
+              className="shrink-0 flex items-center justify-center w-11 h-11 sm:w-12 sm:h-12 rounded-2xl bg-amber-400 hover:bg-amber-500 active:scale-90 transition text-black shadow-lg">
+              <Gift size={20} />
+            </button>
+          )}
 
           {/* Heart — everyone */}
           <button onClick={() => sendReaction('❤️')}

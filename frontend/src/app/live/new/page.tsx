@@ -33,7 +33,7 @@ export default function NewLivePage() {
           <div>
             <h1 className="text-2xl font-black text-gray-900">Go Live</h1>
             <p className="text-sm text-gray-500">
-              Start a live broadcast with video, audio, viewer count and chat.
+              Host a live room with video, chat, approved co-hosts and creator gifts.
             </p>
           </div>
         </div>
@@ -44,7 +44,7 @@ export default function NewLivePage() {
             <Feature icon={Video} title="Live video & audio" desc="Broadcast straight from your camera and mic." />
             <Feature icon={Users} title="Viewer count" desc="See how many people are watching in real time." />
             <Feature icon={MessageSquare} title="Live chat & reactions" desc="Viewers comment and send hearts ❤️ live." />
-            <Feature icon={Mic} title="One broadcaster" desc="You present; viewers join watch-only." />
+            <Feature icon={Mic} title="Up to five co-hosts" desc="Approve guests into a conference-style live room." />
           </ul>
 
           <button

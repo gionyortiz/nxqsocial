@@ -56,8 +56,17 @@ export default function LiveRoomPage() {
     if (!room) return;
     if (mobileToken && mobileServerUrl) return;
     let cancelled = false;
-    api
-      .post('/calls/token', { room, video: host, host })
+    const prepareRoom = async () => {
+      // The owner establishes server-side room ownership before requesting a
+      // publisher token. Approved co-hosts are already recorded by the host.
+      if (isOwner) await api.post('/live/start', { room });
+      return api.post('/calls/token', {
+        room,
+        video: publishOnJoin,
+        host: publishOnJoin,
+      });
+    };
+    prepareRoom()
       .then(({ data }) => {
         if (cancelled) return;
         if (!data.url) {
@@ -83,7 +92,7 @@ export default function LiveRoomPage() {
     return () => {
       cancelled = true;
     };
-  }, [room, host, mobileToken, mobileServerUrl]);
+  }, [room, host, isOwner, publishOnJoin, mobileToken, mobileServerUrl]);
 
   const leave = () => router.push('/feed');
 

@@ -49,6 +49,13 @@ model User {
   blocking        Block[]        @relation("blocker")
   blockedBy       Block[]        @relation("blocked")
   liveSessions    LiveSession[]  @relation("liveHost")
+  liveParticipations LiveParticipant[]
+  hostedBattles      LiveBattle[] @relation("battleHost")
+  battleOpponents    LiveBattle[] @relation("battleOpponent")
+  coinWallet         CoinWallet?
+  coinPurchases      CoinPurchase[]
+  giftsSent          GiftTransaction[] @relation("giftSender")
+  giftsReceived      GiftTransaction[] @relation("giftRecipient")
   analyticsEvents AnalyticsEvent[]
   betaFeedbacks   BetaFeedback[]
   notifications      Notification[] @relation("notificationRecipient")
@@ -528,9 +535,114 @@ model LiveSession {
   updatedAt   DateTime   @updatedAt
 
   host User @relation("liveHost", fields: [hostId], references: [id], onDelete: Cascade)
+  participants LiveParticipant[]
+  battles LiveBattle[]
+  gifts GiftTransaction[]
 
   @@index([status])
   @@index([hostId])
+}
+
+model LiveParticipant {
+  id        String                @id @default(cuid())
+  sessionId String
+  userId    String
+  role      LiveParticipantRole
+  status    LiveParticipantStatus @default(APPROVED)
+  joinedAt  DateTime              @default(now())
+  leftAt    DateTime?
+  updatedAt DateTime              @updatedAt
+
+  session LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  user    User        @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([sessionId, userId])
+  @@index([sessionId, role, status])
+  @@index([userId, status])
+}
+
+model LiveBattle {
+  id                 String           @id @default(cuid())
+  sessionId          String
+  hostId             String
+  opponentId         String
+  status             LiveBattleStatus @default(ACTIVE)
+  hostScoreCoins     Int              @default(0)
+  opponentScoreCoins Int              @default(0)
+  startedAt          DateTime         @default(now())
+  endsAt             DateTime
+  endedAt            DateTime?
+
+  session  LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  host     User        @relation("battleHost", fields: [hostId], references: [id], onDelete: Cascade)
+  opponent User        @relation("battleOpponent", fields: [opponentId], references: [id], onDelete: Cascade)
+  gifts    GiftTransaction[]
+
+  @@index([sessionId, status])
+  @@index([hostId, startedAt])
+  @@index([opponentId, startedAt])
+}
+
+model CoinWallet {
+  id                   String   @id @default(cuid())
+  userId               String   @unique
+  balanceCoins         Int      @default(0)
+  lifetimePurchased    Int      @default(0)
+  lifetimeSpent        Int      @default(0)
+  creatorEarningsCoins Int      @default(0)
+  createdAt            DateTime @default(now())
+  updatedAt            DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CoinPurchase {
+  id                    String             @id @default(cuid())
+  userId                String
+  packCode              String
+  coins                 Int
+  amountCents           Int
+  currency              String             @default("usd")
+  stripeSessionId       String?             @unique
+  stripePaymentIntentId String?             @unique
+  status                CoinPurchaseStatus  @default(PENDING)
+  createdAt             DateTime            @default(now())
+  paidAt                DateTime?
+  reversedAt            DateTime?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId, createdAt])
+  @@index([status, createdAt])
+}
+
+model GiftTransaction {
+  id                  String   @id @default(cuid())
+  clientRequestId     String   @unique
+  sessionId           String
+  battleId            String?
+  senderId            String
+  recipientId         String
+  giftCode             String
+  coins                Int
+  creatorEarningsCoins Int
+  createdAt            DateTime @default(now())
+
+  session   LiveSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  battle    LiveBattle? @relation(fields: [battleId], references: [id], onDelete: SetNull)
+  sender    User        @relation("giftSender", fields: [senderId], references: [id], onDelete: Cascade)
+  recipient User        @relation("giftRecipient", fields: [recipientId], references: [id], onDelete: Cascade)
+
+  @@index([sessionId, createdAt])
+  @@index([battleId, createdAt])
+  @@index([senderId, createdAt])
+  @@index([recipientId, createdAt])
+}
+
+model GiftWebhookEvent {
+  id          String   @id
+  type        String
+  processedAt DateTime @default(now())
 }
 
 model AnalyticsEvent {
@@ -573,6 +685,30 @@ model BetaFeedback {
 enum LiveStatus {
   LIVE
   ENDED
+}
+
+enum LiveParticipantRole {
+  HOST
+  COHOST
+}
+
+enum LiveParticipantStatus {
+  APPROVED
+  LEFT
+}
+
+enum LiveBattleStatus {
+  ACTIVE
+  ENDED
+  CANCELED
+}
+
+enum CoinPurchaseStatus {
+  PENDING
+  PAID
+  REFUNDED
+  DISPUTED
+  CANCELED
 }
 
 enum BetaFeedbackType {
