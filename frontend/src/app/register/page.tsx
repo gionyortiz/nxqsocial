@@ -6,13 +6,13 @@ import { useRouter } from 'next/navigation';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
-import { api } from '@/lib/api';
 import { useAuthStore } from '@/store/auth';
 import { Button } from '@/components/ui/Button';
 import { Input } from '@/components/ui/Input';
 import { TurnstileWidget } from '@/components/auth/TurnstileWidget';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { trackEvent } from '@/lib/analytics';
+import { registerWithNetworkFallback } from '@/lib/registration';
 import {
   PENDING_EMAIL_VERIFICATION_KEY,
   RegisterResponse,
@@ -63,10 +63,11 @@ export default function RegisterPage() {
     }
     void trackEvent('signup_started', { source: 'register_page' }, { isPublic: true });
     try {
-      const { data: res } = await api.post<RegisterResponse>(
-        '/auth/register',
-        buildRegisterRequest(data, turnstileToken),
-      );
+      const registration = await registerWithNetworkFallback(buildRegisterRequest(data, turnstileToken));
+      const res: RegisterResponse = registration.response.data;
+      if (registration.usedSameOriginFallback) {
+        void trackEvent('signup_network_fallback_succeeded', { source: 'register_page' }, { isPublic: true });
+      }
       void trackEvent('signup_completed', { source: 'register_page' }, { isPublic: true });
 
       if (res.requiresEmailVerification === true) {
