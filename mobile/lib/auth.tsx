@@ -2,9 +2,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 import { apiRequest, setUnauthorizedHandler, User } from './api';
 import { unregisterPushToken } from './push';
-
-const TOKEN_KEY = 'nxq.mobile.token';
-const USER_KEY = 'nxq.mobile.user';
+import {
+  clearStoredAuthSession,
+  readStoredAuthToken,
+  storeAuthToken,
+  USER_KEY,
+} from './secure-auth-storage';
 
 export type AuthOutcome = 'authenticated' | 'email_verification_required';
 
@@ -93,7 +96,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setPendingVerification(null);
       setToken(null);
       setUser(null);
-      void Promise.all([AsyncStorage.removeItem(TOKEN_KEY), AsyncStorage.removeItem(USER_KEY)]);
+      void clearStoredAuthSession();
     });
 
     return () => setUnauthorizedHandler(null);
@@ -103,11 +106,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const bootstrap = async () => {
       try {
         const [storedToken, storedUser] = await Promise.all([
-          AsyncStorage.getItem(TOKEN_KEY),
+          readStoredAuthToken(),
           AsyncStorage.getItem(USER_KEY),
         ]);
-        if (storedToken) setToken(storedToken);
-        if (storedUser) setUser(JSON.parse(storedUser));
+        if (storedToken && storedUser) {
+          setToken(storedToken);
+          setUser(JSON.parse(storedUser));
+        } else if (storedToken || storedUser) {
+          await clearStoredAuthSession();
+        }
+      } catch {
+        await clearStoredAuthSession();
       } finally {
         setLoading(false);
       }
@@ -116,13 +125,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   }, []);
 
   const persistSession = useCallback(async (nextToken: string, nextUser: User) => {
+    await Promise.all([
+      storeAuthToken(nextToken),
+      AsyncStorage.setItem(USER_KEY, JSON.stringify(nextUser)),
+    ]);
     setPendingVerification(null);
     setToken(nextToken);
     setUser(nextUser);
-    await Promise.all([
-      AsyncStorage.setItem(TOKEN_KEY, nextToken),
-      AsyncStorage.setItem(USER_KEY, JSON.stringify(nextUser)),
-    ]);
   }, []);
 
   const acceptAuthResponse = useCallback(async (
@@ -148,7 +157,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         codeExpiresAt: codeSent ? now + data.verification.expiresInMinutes * 60_000 : 0,
         resendAvailableAt: codeSent ? now + data.verification.resendAfterSeconds * 1000 : now,
       });
-      await Promise.all([AsyncStorage.removeItem(TOKEN_KEY), AsyncStorage.removeItem(USER_KEY)]);
+      await clearStoredAuthSession();
       return 'email_verification_required';
     }
 
@@ -236,7 +245,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setPendingVerification(null);
     setToken(null);
     setUser(null);
-    await Promise.all([AsyncStorage.removeItem(TOKEN_KEY), AsyncStorage.removeItem(USER_KEY)]);
+    await clearStoredAuthSession();
     await unregisterPushToken(currentToken);
   }, [token]);
 

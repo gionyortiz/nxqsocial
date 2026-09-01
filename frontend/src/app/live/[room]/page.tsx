@@ -39,22 +39,36 @@ export default function LiveRoomPage() {
   const room = decodeURIComponent(String(params.room ?? ''));
   const host = search.get('host') === '1';
   const guest = search.get('guest') === '1';
-  const mobileToken = search.get('token');
-  const mobileServerUrl = search.get('serverUrl');
   const isOwner = host && !guest;
   const publishOnJoin = host || guest;
 
+  const [mobileCredentials, setMobileCredentials] = useState<{
+    token: string | null;
+    serverUrl: string | null;
+  }>({ token: null, serverUrl: null });
+  const [fragmentChecked, setFragmentChecked] = useState(false);
   const [token, setToken] = useState<string | null>(null);
   const [serverUrl, setServerUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   // Guest pre-join: ask for camera/mic permissions before connecting
   const [guestReady, setGuestReady] = useState(!guest);
-  const effectiveToken = mobileToken ?? token;
-  const effectiveServerUrl = mobileServerUrl ?? serverUrl;
+  const effectiveToken = mobileCredentials.token ?? token;
+  const effectiveServerUrl = mobileCredentials.serverUrl ?? serverUrl;
 
   useEffect(() => {
-    if (!room) return;
-    if (mobileToken && mobileServerUrl) return;
+    const fragment = new URLSearchParams(window.location.hash.replace(/^#/, ''));
+    const fragmentToken = fragment.get('token');
+    const fragmentServerUrl = fragment.get('serverUrl');
+    if (fragmentToken && fragmentServerUrl) {
+      setMobileCredentials({ token: fragmentToken, serverUrl: fragmentServerUrl });
+      window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+    }
+    setFragmentChecked(true);
+  }, []);
+
+  useEffect(() => {
+    if (!room || !fragmentChecked) return;
+    if (mobileCredentials.token && mobileCredentials.serverUrl) return;
     let cancelled = false;
     api
       .post('/calls/token', { room, video: host, host })
@@ -83,7 +97,7 @@ export default function LiveRoomPage() {
     return () => {
       cancelled = true;
     };
-  }, [room, host, mobileToken, mobileServerUrl]);
+  }, [room, host, fragmentChecked, mobileCredentials.token, mobileCredentials.serverUrl]);
 
   const leave = () => router.push('/feed');
 

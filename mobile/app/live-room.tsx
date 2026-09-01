@@ -28,11 +28,15 @@ export default function LiveRoomScreen() {
     const search = new URLSearchParams({
       mobile: '1',
       room,
-      token: liveToken.token,
-      serverUrl: liveToken.url,
       ...(isHost ? { host: '1' } : {}),
     });
-    return `${WEB_BASE_URL}/live/${encodeURIComponent(room)}?${search.toString()}`;
+    // The fragment is never sent in HTTP requests or Referer headers. The web
+    // client consumes and removes it immediately after bootstrapping LiveKit.
+    const fragment = new URLSearchParams({
+      token: liveToken.token,
+      serverUrl: liveToken.url,
+    });
+    return `${WEB_BASE_URL}/live/${encodeURIComponent(room)}?${search.toString()}#${fragment.toString()}`;
   }, [room, liveToken, isHost]);
 
   useEffect(() => {

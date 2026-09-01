@@ -17,9 +17,24 @@ export default async function globalSetup() {
   // Override DATABASE_URL so Prisma uses the test DB for all E2E tests
   process.env.DATABASE_URL = testDbUrl;
 
+  // Use deterministic, disposable test-only secrets. Production secrets are
+  // never required or read by the local E2E suite.
+  if (!process.env.JWT_SECRET) {
+    process.env.JWT_SECRET = 'e2e-only-jwt-secret-nxqsocial-64-characters-minimum-2026';
+  }
+  if (!process.env.OTP_PEPPER) {
+    process.env.OTP_PEPPER = 'e2e-only-otp-pepper-nxqsocial-64-characters-minimum-2026';
+  }
+
   // Set a known Stripe webhook secret for E2E tests
   if (!process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET.startsWith('whsec_REPLACE')) {
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_e2e_test_secret_nexasocial';
+  }
+
+  // Stripe's SDK validates the key shape during service construction even
+  // though E2E tests mock outbound Stripe calls. Never require a real key.
+  if (!process.env.STRIPE_SECRET_KEY) {
+    process.env.STRIPE_SECRET_KEY = 'sk_test_e2e_placeholder_nxqsocial';
   }
 
   // Silence noisy env warnings during tests

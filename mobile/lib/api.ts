@@ -172,11 +172,15 @@ function isTransientNativeNetworkError(error: unknown): boolean {
 
 export async function apiRequest<T>(
   path: string,
-  { method = 'GET', token, body, headers = {}, retryNetworkErrors = true }: ApiOptions = {},
+  { method = 'GET', token, body, headers = {}, retryNetworkErrors }: ApiOptions = {},
 ): Promise<T> {
   let res: Response | null = null;
   let lastError: unknown = null;
-  const maxAttempts = retryNetworkErrors ? NATIVE_NETWORK_RETRY_ATTEMPTS : 1;
+  // Mutations are never retried implicitly: a server may commit a POST/PATCH/
+  // DELETE even when the client loses the response. Callers can opt in only
+  // when their operation is protected by an idempotency contract.
+  const shouldRetryNetworkErrors = retryNetworkErrors ?? method === 'GET';
+  const maxAttempts = shouldRetryNetworkErrors ? NATIVE_NETWORK_RETRY_ATTEMPTS : 1;
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
