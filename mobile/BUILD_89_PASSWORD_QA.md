@@ -15,10 +15,29 @@ Packaged source commit: `2c9c536056597740c75b420603c60b8eea6e4c92`.
   `F5A0A36695BC3826F1FFB54E18DD29310E3897F38F33D19AED1B41127276B797`.
 - Read-only live checks: API `/api/health` returned HTTP 200/status ok; mobile
   signup challenge page returned HTTP 200. These are not end-to-end auth tests.
-- No upload to App Store Connect/TestFlight or App Review submission performed.
+- At build completion, no upload to App Store Connect/TestFlight or App Review
+  submission had been performed. See the subsequent internal-beta action below.
 - Real-device acceptance and dependency-security review below remain outstanding.
 
 This record was added after packaging; it does not change the built source.
+
+## Internal TestFlight upload — 2026-09-02
+
+The user explicitly authorized upload of build 89 and internal testing only,
+without external testers, beta external review, or public App Store review.
+
+- [EAS upload job fdbee8f4-2af0-4485-b233-ec72ad9a1e3b](https://expo.dev/accounts/gionyortiz/projects/nxq-social-mobile/submissions/fdbee8f4-2af0-4485-b233-ec72ad9a1e3b)
+- Exact build: `92be6c6c-b09f-4279-af32-6e713db2062f`, version 1.0.8 (89),
+  App Store Connect app `6775623679`.
+- Last verified at 2026-09-02T14:52:20Z: **IN_QUEUE**, no reported error.
+  Scheduling is not proof of upload, Apple processing, or installability.
+- An earlier attempt with optional What to Test notes was rejected before
+  scheduling because EAS requires an Enterprise plan for that parameter.
+  The single scheduled job omits that parameter; add notes through Apple's UI.
+- No testing group was selected by the upload command. Internal group assignment
+  is still pending; App Store Connect's browser session requires user sign-in.
+- No public-review action, external tester invitation, or new binary build was
+  performed. Dependency findings remain open under the internal-beta boundary.
 
 ## Release boundary
 
@@ -28,7 +47,7 @@ keyboard, iCloud Passwords, native paste menus, actual email delivery, or the
 App Store binary. **Real-device acceptance is required before App Review.**
 
 No backend changes, database/account mutations, web deployments, GPU operations,
-Apple submission, or unrelated agent edits are included. EAS owns the remote
+public App Review submission, or unrelated agent edits are included. EAS owns the remote
 build number; its value was 88 before packaging. The local stale build number
 was removed. Version 1.0.8 remains the replacement candidate for unsubmitted 88.
 
