@@ -2,7 +2,23 @@
 
 Prepared 2026-09-02 on `codex/nxqsocial-password-management-89`, from build 88
 source `aa95404382d0ac6a2cbb1b129bbac1ce549169bc` in an isolated worktree.
-The final commit and EAS build record identify the packaged source.
+Packaged source commit: `2c9c536056597740c75b420603c60b8eea6e4c92`.
+
+## Completed build record
+
+- [EAS build 92be6c6c-b09f-4279-af32-6e713db2062f](https://expo.dev/accounts/gionyortiz/projects/nxq-social-mobile/builds/92be6c6c-b09f-4279-af32-6e713db2062f)
+- Status: **FINISHED**, iOS 1.0.8 (89), signed STORE artifact present, no build error.
+- Created: 2026-09-02T14:24:45.169Z; completed: 2026-09-02T14:30:38.273Z.
+- Native build log reached app linking, signing, and `Archive Succeeded`.
+- Final 69-test suite passed twice, including after a clean `npm ci` install.
+- Local Hermes export SHA-256 (not the signed IPA hash):
+  `F5A0A36695BC3826F1FFB54E18DD29310E3897F38F33D19AED1B41127276B797`.
+- Read-only live checks: API `/api/health` returned HTTP 200/status ok; mobile
+  signup challenge page returned HTTP 200. These are not end-to-end auth tests.
+- No upload to App Store Connect/TestFlight or App Review submission performed.
+- Real-device acceptance and dependency-security review below remain outstanding.
+
+This record was added after packaging; it does not change the built source.
 
 ## Release boundary
 
