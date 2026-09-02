@@ -36,7 +36,7 @@ const appJson = JSON.parse(appJsonText);
 const easJson = JSON.parse(easJsonText);
 const packageJson = JSON.parse(packageJsonText);
 
-assert.equal(appJson.expo.version, '1.0.8', 'Build 89 remains the replacement candidate for App Store version 1.0.8');
+assert.equal(appJson.expo.version, '1.0.8', 'The password hotfix remains a candidate for App Store version 1.0.8');
 assert.equal(appJson.expo.ios.bundleIdentifier, 'com.gionyortiz.nxqsocial');
 assert.equal(appJson.expo.runtimeVersion?.policy, 'appVersion');
 assert.equal(appJson.expo.ios.associatedDomains, undefined, 'Associated Domains must stay disabled for the current signing profile');
@@ -66,4 +66,4 @@ assert.match(e2eSetupSource, /sk_test_e2e_placeholder_nxqsocial/);
 assert.match(e2eSetupSource, /e2e-only-jwt-secret-nxqsocial/);
 assert.match(e2eSetupSource, /e2e-only-otp-pepper-nxqsocial/);
 
-console.log('Build 89 release-safety invariants passed (25 assertions).');
+console.log('Password hotfix release-safety invariants passed (25 assertions).');

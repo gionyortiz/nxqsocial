@@ -43,7 +43,9 @@ export function PasswordField({
   return (
     <View style={styles.fieldGroup}>
       <Text style={styles.label} onPress={() => inputRef.current?.focus()}>{label}</Text>
-      <View style={[styles.fieldShell, focused && styles.fieldShellFocused]}>
+      {/* Keep the native parent stable while focus changes. A focus-only
+          shadow can reparent a Fabric TextInput and dismiss its keyboard. */}
+      <View collapsable={false} style={[styles.fieldShell, focused && styles.fieldShellFocused]}>
         <View pointerEvents="none" accessible={false}>
           <Ionicons name="lock-closed-outline" size={20} color={focused ? '#a78bfa' : '#8790ab'} />
         </View>
@@ -117,10 +119,8 @@ const styles = StyleSheet.create({
     paddingLeft: 14,
   },
   fieldShellFocused: {
+    // Color-only focus feedback; do not add shadows/elevation/transforms here.
     borderColor: '#8b5cf6',
-    shadowColor: '#7c3aed',
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
   },
   input: {
     color: '#ffffff',

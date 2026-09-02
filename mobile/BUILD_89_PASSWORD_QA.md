@@ -124,7 +124,16 @@ submit guards, timer/listener cleanup, and keyboard/accessibility behavior.
   Do not use `npm audit fix --force`: its proposals include incompatible Expo
   and router downgrades. The remaining findings need explicit release review.
 
-## Real iPhone acceptance gate — currently NOT RUN
+## Real iPhone acceptance gate — FAILED on 2026-09-02
+
+The user supplied TestFlight installation evidence for 1.0.8 (89), then reported
+that the new registration screen still would not accept password typing. Treat
+this as a failed device acceptance gate, not a successful release. The tests and
+archive above did not validate UIKit focus/keyboard behavior. Do not submit build
+89 to public review. See `PASSWORD_FOCUS_HOTFIX_QA.md` for the isolated follow-up.
+
+The remaining checklist below is retained for the replacement's device testing;
+its unchecked items must not be interpreted as completed.
 
 Record device model, iOS version, app version/build, tester, timestamp, and results.
 Use an authorized disposable test account, not an admin/reviewer password. Do not
