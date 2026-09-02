@@ -1,220 +1,49 @@
-import { Link, router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Platform, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useRef, useState } from 'react';
+import { Platform, Pressable, Text, TextInput, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
-import { API_BASE_URL, SHOW_LOGIN_DEBUG, WEB_BASE_URL } from '@/lib/config';
-import { ApiError, pingApiHealth } from '@/lib/api';
 import { PasswordField } from '@/components/PasswordField';
-
-const TERMS_URL = `${WEB_BASE_URL}/terms`;
-const COMMUNITY_GUIDELINES_URL = `${WEB_BASE_URL}/community-guidelines`;
-const PRIVACY_URL = `${WEB_BASE_URL}/privacy`;
+import { AuthButton, AuthError, AuthForm, authStyles } from '@/components/AuthForm';
+import { AuthLegal } from '@/components/AuthLegal';
+import { emailError } from '@/lib/password-policy';
+import { useAuthSubmit } from '@/lib/use-auth-submit';
 
 export default function LoginScreen() {
   const { login } = useAuth();
   const { notice } = useLocalSearchParams<{ notice?: string }>();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [debugLog, setDebugLog] = useState<string[]>([]);
-  const [loginError, setLoginError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
-  const [checkingServer, setCheckingServer] = useState(false);
-  const [retryUntil, setRetryUntil] = useState(0);
-  const [retryInSec, setRetryInSec] = useState(0);
+  const passwordRef = useRef<TextInput>(null);
+  const form = useAuthSubmit('login');
 
-  useEffect(() => {
-    if (!retryUntil) {
-      setRetryInSec(0);
-      return;
-    }
-    const update = () => setRetryInSec(Math.max(0, Math.ceil((retryUntil - Date.now()) / 1000)));
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [retryUntil]);
-
-  const log = (msg: string) => {
-    if (!SHOW_LOGIN_DEBUG) return;
-    setDebugLog((prev) => [...prev.slice(-6), msg]);
-  };
-
-  const onCheckServer = async () => {
-    setCheckingServer(true);
-    log('Pinging ' + API_BASE_URL + '/health ...');
-    try {
-      const data = await pingApiHealth();
-      log('✅ Server OK: ' + data.status);
-    } catch (e: any) {
-      log('❌ ' + (e?.message ?? 'unknown error'));
-    } finally {
-      setCheckingServer(false);
-    }
-  };
-
-  const onSubmit = async () => {
-    if (loading || retryInSec > 0) return;
-    const trimmedEmail = email.trim().toLowerCase();
-    // Passwords are exact values; trimming can make valid App Store accounts
-    // fail only in newer TestFlight builds.
-    const submittedPassword = password;
-    log(`Attempting login for: ${trimmedEmail}`);
-    log(`API: ${API_BASE_URL}`);
-    setLoginError(null);
-    setLoading(true);
-    try {
-      const outcome = await login(trimmedEmail, submittedPassword);
-      log('✅ Login success — redirecting');
+  const onSubmit = () => {
+    const invalidEmail = emailError(email);
+    if (invalidEmail) return form.setError(invalidEmail);
+    // Existing passwords remain exact; do not apply today's strength policy.
+    if (!password) { passwordRef.current?.focus(); return form.setError('Enter your password.'); }
+    void form.run(async () => {
+      const outcome = await login(email.trim().toLowerCase(), password);
+      setPassword('');
       router.replace(outcome === 'email_verification_required' ? '/verify-email' : '/(tabs)/feed');
-    } catch (e: any) {
-      const waitSeconds = e instanceof ApiError && e.status === 429
-        ? e.retryAfterSeconds ?? 60
-        : 0;
-      if (waitSeconds > 0) setRetryUntil(Date.now() + waitSeconds * 1000);
-      const message = waitSeconds > 0
-        ? `Too many sign-in attempts. Try again in ${waitSeconds} seconds.`
-        : e?.message ?? 'Unable to sign in. Please try again.';
-      setLoginError(message);
-      log('❌ Login error: ' + message);
-    } finally {
-      setLoading(false);
-    }
+    });
   };
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
-      <ScrollView contentContainerStyle={{ padding: 20, gap: 14 }} keyboardShouldPersistTaps="handled">
-        <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900', marginTop: 40 }}>NXQ Social</Text>
-        <Text style={{ color: '#93a1bd', marginBottom: 4 }}>Trust-first social for verified humans.</Text>
-
-        {notice === 'email-already-verified' ? (
-          <View style={{ backgroundColor: '#123021', borderRadius: 12, padding: 12 }}>
-            <Text style={{ color: '#86efac' }}>Your email is already verified. Sign in to continue.</Text>
-          </View>
-        ) : null}
-
-        <View style={{ backgroundColor: '#10182b', borderRadius: 12, padding: 14, gap: 8 }}>
-          <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>Before logging in, review:</Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-            <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
-              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>Terms of Service</Text>
-            </Pressable>
-            <Pressable onPress={() => Linking.openURL(COMMUNITY_GUIDELINES_URL)}>
-              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>Community Guidelines</Text>
-            </Pressable>
-            <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
-              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>Privacy Policy</Text>
-            </Pressable>
-          </View>
-          <Text style={{ color: '#93a1bd', fontSize: 12, lineHeight: 18 }}>
-            Objectionable content and abusive users are not tolerated and may be removed.
-          </Text>
-        </View>
-
-        {SHOW_LOGIN_DEBUG ? (
-          <View style={{ backgroundColor: '#0f172a', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#1e3a5f' }}>
-            <Text style={{ color: '#38bdf8', fontSize: 11, fontFamily: 'monospace' }}>API: {API_BASE_URL}</Text>
-          </View>
-        ) : null}
-
-        <TextInput
-          accessibilityLabel="Email address"
-          testID="login-email"
-          placeholder="Email"
-          placeholderTextColor="#8790ab"
-          autoCapitalize="none"
-          autoCorrect={false}
-          spellCheck={false}
-          keyboardType="email-address"
-          autoComplete={Platform.OS === 'ios' ? undefined : 'email'}
-          textContentType={Platform.OS === 'ios' ? 'username' : undefined}
-          value={email}
-          onChangeText={setEmail}
-          style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }}
-        />
-        <PasswordField
-          accessibilityLabel="Password"
-          testID="login-password"
-          disableAutofill
-          value={password}
-          onChangeText={setPassword}
-          returnKeyType="go"
-          onSubmitEditing={onSubmit}
-        />
-        <Pressable
-          accessibilityRole="link"
-          accessibilityLabel="Forgot password"
-          testID="forgot-password-link"
-          onPress={() => router.push('/forgot-password' as never)}
-          hitSlop={8}
-          style={{ alignSelf: 'flex-end', marginTop: -6, paddingVertical: 4 }}
-        >
-          <Text style={{ color: '#a78bfa', fontWeight: '700' }}>Forgot password?</Text>
-        </Pressable>
-        {SHOW_LOGIN_DEBUG ? (
-          <Text style={{ color: '#64748b', fontSize: 11, fontFamily: 'monospace', marginTop: -8 }}>
-            Password length: {password.length} character{password.length === 1 ? '' : 's'}
-          </Text>
-        ) : null}
-
-        <Pressable
-          onPress={onSubmit}
-          disabled={loading || retryInSec > 0}
-          style={{
-            borderRadius: 12,
-            backgroundColor: '#6366f1',
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingVertical: 14,
-            opacity: loading || retryInSec > 0 ? 0.7 : 1,
-          }}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={{ color: '#fff', fontWeight: '700' }}>
-              {retryInSec > 0 ? `Try again in ${retryInSec}s` : 'Login'}
-            </Text>}
-        </Pressable>
-
-        {loginError ? (
-          <View style={{ backgroundColor: '#2a1620', borderRadius: 12, borderWidth: 1, borderColor: '#7f1d1d', padding: 12 }}>
-            <Text style={{ color: '#fca5a5', fontWeight: '700' }}>{loginError}</Text>
-          </View>
-        ) : null}
-
-        {SHOW_LOGIN_DEBUG ? (
-          <Pressable
-            onPress={onCheckServer}
-            disabled={checkingServer}
-            style={{
-              borderRadius: 12,
-              borderWidth: 1,
-              borderColor: '#374151',
-              alignItems: 'center',
-              justifyContent: 'center',
-              paddingVertical: 12,
-              opacity: checkingServer ? 0.7 : 1,
-            }}
-          >
-            {checkingServer
-              ? <ActivityIndicator color="#9ab0ff" />
-              : <Text style={{ color: '#9ab0ff', fontWeight: '700' }}>Test server connection</Text>}
-          </Pressable>
-        ) : null}
-
-        {SHOW_LOGIN_DEBUG && debugLog.length > 0 && (
-          <View style={{ backgroundColor: '#0f172a', borderRadius: 8, padding: 10, borderWidth: 1, borderColor: '#334155' }}>
-            {debugLog.map((line, i) => (
-              <Text key={i} style={{ color: '#94a3b8', fontSize: 11, fontFamily: 'monospace', lineHeight: 18 }}>{line}</Text>
-            ))}
-          </View>
-        )}
-
-        <Link href="/register" asChild>
-          <Pressable>
-            <Text style={{ color: '#9ab0ff', textAlign: 'center', marginTop: 4 }}>New here? Create an account</Text>
-          </Pressable>
-        </Link>
-      </ScrollView>
-    </SafeAreaView>
-  );
+  return <AuthForm title="Welcome back" subtitle="Sign in to NXQ Social. Your password stays private and is never saved as plain text by this app.">
+    {notice === 'email-already-verified' ? <View style={authStyles.success}><Text style={{ color: '#bbf7d0' }}>Your email is verified. Sign in to continue.</Text></View> : null}
+    <Text style={authStyles.text}>Email address</Text>
+    <TextInput accessibilityLabel="Email address" testID="login-email" placeholder="name@example.com" placeholderTextColor="#8790ab"
+      autoCapitalize="none" autoCorrect={false} spellCheck={false} keyboardType="email-address"
+      autoComplete={Platform.OS === 'ios' ? undefined : 'email'} textContentType={Platform.OS === 'ios' ? 'username' : undefined}
+      value={email} onChangeText={setEmail} editable={!form.busy} returnKeyType="next" submitBehavior="submit"
+      onSubmitEditing={() => passwordRef.current?.focus()} style={authStyles.input} />
+    <PasswordField label="Password" accessibilityLabel="Password" testID="login-password" inputRef={passwordRef} disableAutofill
+      value={password} onChangeText={setPassword} editable={!form.busy} returnKeyType="go" onSubmitEditing={onSubmit} />
+    <Pressable accessibilityRole="link" testID="forgot-password-link" accessibilityLabel="Forgot password" onPress={() => router.push('/forgot-password')}>
+      <Text style={[authStyles.link, { textAlign: 'right' }]}>Forgot password?</Text>
+    </Pressable>
+    <AuthError message={form.error} />
+    <AuthButton label="Sign in" testID="login-submit" busy={form.busy} retrySeconds={form.retrySeconds} onPress={onSubmit} />
+    <Pressable accessibilityRole="link" onPress={() => router.push('/register')}><Text style={authStyles.link}>New here? Create an account</Text></Pressable>
+    <AuthLegal />
+  </AuthForm>;
 }

@@ -36,15 +36,16 @@ const appJson = JSON.parse(appJsonText);
 const easJson = JSON.parse(easJsonText);
 const packageJson = JSON.parse(packageJsonText);
 
-assert.equal(appJson.expo.version, '1.0.8', 'Build 88 must use App Store version 1.0.8');
+assert.equal(appJson.expo.version, '1.0.8', 'Build 89 remains the replacement candidate for App Store version 1.0.8');
 assert.equal(appJson.expo.ios.bundleIdentifier, 'com.gionyortiz.nxqsocial');
 assert.equal(appJson.expo.runtimeVersion?.policy, 'appVersion');
 assert.equal(appJson.expo.ios.associatedDomains, undefined, 'Associated Domains must stay disabled for the current signing profile');
 assert.equal(easJson.cli.appVersionSource, 'remote');
+assert.equal(appJson.expo.ios.buildNumber, undefined, 'Only EAS may supply the production iOS build number');
 assert.equal(easJson.build.production.autoIncrement, true);
 assert.equal(easJson.build.production.env.EXPO_PUBLIC_LIVE_NATIVE_ENABLED, 'false');
 assert.equal(easJson.build.production.env.EXPO_PUBLIC_API_BASE_URL, 'https://api.nxqsocial.com/api');
-assert.equal(packageJson.dependencies['expo-secure-store'], '~57.0.2');
+assert.equal(packageJson.dependencies['expo-secure-store'], '~57.0.3');
 
 assert.match(apiSource, /retryNetworkErrors \?\? method === 'GET'/, 'Only GET requests may retry by default');
 assert.doesNotMatch(apiSource, /retryNetworkErrors = true/, 'Global mutation retries must stay disabled');
@@ -65,4 +66,4 @@ assert.match(e2eSetupSource, /sk_test_e2e_placeholder_nxqsocial/);
 assert.match(e2eSetupSource, /e2e-only-jwt-secret-nxqsocial/);
 assert.match(e2eSetupSource, /e2e-only-otp-pepper-nxqsocial/);
 
-console.log('Build 88 release-safety invariants passed (24 assertions).');
+console.log('Build 89 release-safety invariants passed (25 assertions).');

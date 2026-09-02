@@ -9,6 +9,9 @@ const manualEntryFields = [
   ['app/register.tsx', 'register-confirm-password'],
   ['app/reset-password.tsx', 'reset-password-new'],
   ['app/reset-password.tsx', 'reset-password-confirm'],
+  ['app/change-password.tsx', 'change-password-current'],
+  ['app/change-password.tsx', 'change-password-new'],
+  ['app/change-password.tsx', 'change-password-confirm'],
 ];
 
 const failures = [];

@@ -203,6 +203,12 @@ export default function ProfileScreen() {
           <View style={{ backgroundColor: '#111827', borderRadius: 18, borderWidth: 1, borderColor: '#1f2937', marginTop: 16, padding: 14 }}>
             <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16, marginBottom: 10 }}>Account tools</Text>
 
+            <Pressable accessibilityRole="button" accessibilityLabel="Password and security" testID="profile-password-security"
+              onPress={() => router.push('/change-password' as never)}
+              style={{ backgroundColor: '#312e81', borderRadius: 12, padding: 16, marginBottom: 10 }}>
+              <Text style={{ color: '#fff', fontWeight: '800', textAlign: 'center' }}>Password & security</Text>
+            </Pressable>
+
             <Pressable
               onPress={async () => {
                 await logout();

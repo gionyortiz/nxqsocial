@@ -10,7 +10,6 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gionyortiz.nxqsocial",
-      "buildNumber": "5",
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
         "NSCameraUsageDescription": "NXQ Social uses the camera so you can capture photos and videos for your posts, reels, stories, and profile picture.",

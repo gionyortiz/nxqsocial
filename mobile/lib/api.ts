@@ -231,16 +231,19 @@ export async function apiRequest<T>(
       : undefined;
     const retryAfterSeconds = retryAfterFromHeader ?? retryAfterFromBody;
     const message = apiErrorMessage(payload, res.status);
-    if (res.status === 401 && token) {
+    // The password-change endpoint uses 401 for a wrong current password even
+    // after its JWT guard passed. Preserve that valid session, not arbitrary 401s.
+    const incorrectCurrentPassword = path === '/auth/change-password'
+      && res.status === 401 && payload?.message === 'Your current password is incorrect.';
+    if (res.status === 401 && token && !incorrectCurrentPassword) {
       unauthorizedHandler?.();
     }
     mobileProof('apiRequest failed', {
       path,
       method,
       status: res.status,
-      code: payload?.code,
       retryAfterSeconds,
-      reason: message,
+      ...(!path.startsWith('/auth/') ? { reason: message, code: payload?.code } : {}),
     });
     throw new ApiError({
       status: res.status,

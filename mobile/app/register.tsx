@@ -1,15 +1,13 @@
-import { Link, router } from 'expo-router';
-import { useEffect, useState } from 'react';
-import { ActivityIndicator, Linking, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { router } from 'expo-router';
+import { useRef, useState } from 'react';
+import { Pressable, Text, TextInput, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
-import { ApiError } from '@/lib/api';
 import { PasswordField } from '@/components/PasswordField';
 import { TurnstileWidget, TurnstileWidgetState } from '@/components/TurnstileWidget';
-import { WEB_BASE_URL } from '@/lib/config';
-
-const TERMS_URL = `${WEB_BASE_URL}/terms`;
-const GUIDELINES_URL = `${WEB_BASE_URL}/community-guidelines`;
-const PRIVACY_URL = `${WEB_BASE_URL}/privacy`;
+import { AuthButton, AuthError, AuthForm, PasswordGuidance, authStyles } from '@/components/AuthForm';
+import { AuthLegal } from '@/components/AuthLegal';
+import { emailError, newPasswordError } from '@/lib/password-policy';
+import { useAuthSubmit } from '@/lib/use-auth-submit';
 
 export default function RegisterScreen() {
   const { register } = useAuth();
@@ -19,216 +17,62 @@ export default function RegisterScreen() {
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [agreedToTerms, setAgreedToTerms] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [loading, setLoading] = useState(false);
   const [turnstileToken, setTurnstileToken] = useState<string | null>(null);
   const [turnstileState, setTurnstileState] = useState<TurnstileWidgetState>('loading');
   const [turnstileResetKey, setTurnstileResetKey] = useState(0);
-  const [retryUntil, setRetryUntil] = useState(0);
-  const [retryInSec, setRetryInSec] = useState(0);
+  const usernameRef = useRef<TextInput>(null);
+  const nameRef = useRef<TextInput>(null);
+  const passwordRef = useRef<TextInput>(null);
+  const confirmationRef = useRef<TextInput>(null);
+  const form = useAuthSubmit('register');
 
-  useEffect(() => {
-    if (!retryUntil) {
-      setRetryInSec(0);
-      return;
-    }
-    const update = () => setRetryInSec(Math.max(0, Math.ceil((retryUntil - Date.now()) / 1000)));
-    update();
-    const timer = setInterval(update, 1000);
-    return () => clearInterval(timer);
-  }, [retryUntil]);
-
-  const onSubmit = async () => {
-    setError(null);
-    if (loading || retryInSec > 0) return;
-    if (!confirmPassword) {
-      setError('Please confirm your password.');
-      return;
-    }
-    if (password !== confirmPassword) {
-      setError('Passwords do not match.');
-      return;
-    }
-    if (!agreedToTerms) {
-      setError('You must agree to the Terms of Service and Community Guidelines to continue.');
-      return;
-    }
-    if (!turnstileToken) {
-      setError('Complete the security check before creating your account.');
-      return;
-    }
-    setLoading(true);
-    try {
-      const outcome = await register({
-        email: email.trim(),
-        username: username.trim(),
-        displayName: displayName.trim(),
-        password,
-        turnstileToken,
-        agreeToTerms: true,
-      });
-      router.replace(outcome === 'email_verification_required' ? '/verify-email' : '/(tabs)/feed');
-    } catch (e: any) {
-      if (e instanceof ApiError && e.status === 429) {
-        const waitSeconds = e.retryAfterSeconds ?? 60;
-        setRetryUntil(Date.now() + waitSeconds * 1000);
-        setError(`Too many signup attempts. Try again in ${waitSeconds} seconds.`);
-      } else if (e instanceof ApiError && e.code?.startsWith('TURNSTILE_')) {
-        setError('The security check was not accepted. Complete a new check and try again.');
-      } else {
-        setError(e?.message ?? 'Register failed');
+  const onSubmit = () => {
+    const invalidEmail = emailError(email);
+    if (invalidEmail) return form.setError(invalidEmail);
+    if (!/^[a-z0-9_.]{3,30}$/.test(username.trim().toLowerCase())) return form.setError('Use a username of 3–30 letters, numbers, underscores, or dots.');
+    if (Array.from(displayName.trim()).length < 2 || Array.from(displayName.trim()).length > 50) return form.setError('Use a display name of 2–50 characters.');
+    const invalidPassword = newPasswordError(password, confirmPassword);
+    if (invalidPassword) return form.setError(invalidPassword);
+    if (!agreedToTerms) return form.setError('Agree to the Terms of Service and Community Guidelines to continue.');
+    if (!turnstileToken || turnstileState !== 'verified') return form.setError('Complete the security check before creating your account.');
+    void form.run(async () => {
+      try {
+        const outcome = await register({ email: email.trim().toLowerCase(), username: username.trim().toLowerCase(), displayName: displayName.trim(), password, turnstileToken, agreeToTerms: true });
+        setPassword(''); setConfirmPassword('');
+        router.replace(outcome === 'email_verification_required' ? '/verify-email' : '/(tabs)/feed');
+      } finally {
+        // A challenge is single-use even if the response is lost.
+        setTurnstileToken(null); setTurnstileState('loading'); setTurnstileResetKey((value) => value + 1);
       }
-    } finally {
-      setTurnstileToken(null);
-      setTurnstileState('loading');
-      setTurnstileResetKey((value) => value + 1);
-      setLoading(false);
-    }
+    });
   };
 
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
-      <ScrollView
-        contentContainerStyle={{ padding: 20, paddingBottom: 40, gap: 12 }}
-        keyboardShouldPersistTaps="handled"
-      >
-        <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>Create account</Text>
-        <Text style={{ color: '#93a1bd', marginBottom: 6 }}>Join NXQ Social.</Text>
-
-        <TextInput placeholder="Email" placeholderTextColor="#8790ab" autoCapitalize="none" keyboardType="email-address" value={email} onChangeText={setEmail} style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }} />
-        <TextInput placeholder="Username" placeholderTextColor="#8790ab" autoCapitalize="none" value={username} onChangeText={setUsername} style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }} />
-        <TextInput placeholder="Display name" placeholderTextColor="#8790ab" value={displayName} onChangeText={setDisplayName} style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 12, padding: 14 }} />
-        <PasswordField
-          accessibilityLabel="Create password"
-          testID="register-password"
-          label="Create password"
-          placeholder="At least 12 characters"
-          newPassword
-          disableAutofill
-          value={password}
-          onChangeText={setPassword}
-        />
-        <PasswordField
-          accessibilityLabel="Confirm password"
-          testID="register-confirm-password"
-          label="Confirm password"
-          placeholder="Re-enter your password"
-          newPassword
-          disableAutofill
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-        />
-
-        <View style={{ gap: 8 }}>
-          <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>Security check</Text>
-          {retryInSec > 0 ? (
-            <View style={{ backgroundColor: '#151d33', borderRadius: 12, padding: 14 }}>
-              <Text style={{ color: '#fbbf24', fontSize: 13 }}>
-                Too many signup attempts. A new security check will be available in {retryInSec}s.
-              </Text>
-            </View>
-          ) : (
-            <TurnstileWidget
-              resetKey={turnstileResetKey}
-              onTokenChange={setTurnstileToken}
-              onStateChange={setTurnstileState}
-            />
-          )}
-          {retryInSec === 0 && turnstileState !== 'verified' ? (
-            <Text style={{ color: turnstileState === 'error' || turnstileState === 'expired' ? '#fca5a5' : '#93a1bd', fontSize: 12 }}>
-              {turnstileState === 'loading' && 'Loading the security check...'}
-              {turnstileState === 'ready' && 'Complete the security check to continue.'}
-              {turnstileState === 'expired' && 'The security check expired. Complete it again.'}
-              {turnstileState === 'error' && 'The security check could not load. Check your connection and try again.'}
-            </Text>
-          ) : null}
-          {turnstileState === 'verified' ? (
-            <Text style={{ color: '#86efac', fontSize: 12 }}>Security check complete.</Text>
-          ) : null}
-        </View>
-
-        {/* Read-before-signup links — Apple Guideline 2.1(a): must be accessible BEFORE account creation */}
-        <View style={{ backgroundColor: '#10182b', borderRadius: 12, padding: 14, gap: 8 }}>
-          <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>
-            Please review before creating your account:
-          </Text>
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
-            <Pressable onPress={() => Linking.openURL(TERMS_URL)}>
-              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>
-                Terms of Service
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => Linking.openURL(GUIDELINES_URL)}>
-              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>
-                Community Guidelines
-              </Text>
-            </Pressable>
-            <Pressable onPress={() => Linking.openURL(PRIVACY_URL)}>
-              <Text style={{ color: '#a78bfa', fontSize: 14, fontWeight: '700', textDecorationLine: 'underline' }}>
-                Privacy Policy
-              </Text>
-            </Pressable>
-          </View>
-        </View>
-
-        {/* EULA — required by Apple Guideline 1.2 */}
-        <Pressable
-          onPress={() => setAgreedToTerms((v) => !v)}
-          style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 10, backgroundColor: '#151d33', borderRadius: 12, padding: 14 }}
-        >
-          <View style={{
-            width: 20, height: 20, borderRadius: 5, borderWidth: 2,
-            borderColor: agreedToTerms ? '#7c3aed' : '#4b5563',
-            backgroundColor: agreedToTerms ? '#7c3aed' : 'transparent',
-            alignItems: 'center', justifyContent: 'center', marginTop: 2, flexShrink: 0,
-          }}>
-            {agreedToTerms && <Text style={{ color: '#fff', fontSize: 12, fontWeight: '900' }}>✓</Text>}
-          </View>
-          <Text style={{ color: '#93a1bd', fontSize: 13, flex: 1, lineHeight: 20 }}>
-            I agree to the{' '}
-            <Text
-              style={{ color: '#a78bfa', fontWeight: '700', textDecorationLine: 'underline' }}
-              onPress={() => Linking.openURL(TERMS_URL)}
-            >
-              Terms of Service
-            </Text>
-            {' '}and{' '}
-            <Text
-              style={{ color: '#a78bfa', fontWeight: '700', textDecorationLine: 'underline' }}
-              onPress={() => Linking.openURL(GUIDELINES_URL)}
-            >
-              Community Guidelines
-            </Text>
-            {'. '}I understand that objectionable content and abusive behavior are not tolerated and may result in account removal.
-          </Text>
-        </Pressable>
-
-        {error ? <Text style={{ color: '#fca5a5' }}>{error}</Text> : null}
-
-        <Pressable
-          onPress={onSubmit}
-          disabled={loading || retryInSec > 0 || !turnstileToken}
-          style={{
-            borderRadius: 12,
-            backgroundColor: '#4f46e5',
-            alignItems: 'center',
-            justifyContent: 'center',
-            paddingVertical: 14,
-            opacity: loading || retryInSec > 0 || !turnstileToken ? 0.55 : 1,
-            marginTop: 4,
-          }}
-        >
-          {loading
-            ? <ActivityIndicator color="#fff" />
-            : <Text style={{ color: '#fff', fontWeight: '700' }}>{retryInSec > 0 ? `Try again in ${retryInSec}s` : 'Create account'}</Text>}
-        </Pressable>
-
-        <Link href="/login" asChild>
-          <Pressable>
-            <Text style={{ color: '#9ab0ff', textAlign: 'center', marginTop: 6 }}>Already have an account? Login</Text>
-          </Pressable>
-        </Link>
-      </ScrollView>
-    </SafeAreaView>
-  );
+  return <AuthForm title="Create your account" subtitle="Join NXQ Social with a unique password. All password fields support manual typing and pasting.">
+    <TextInput accessibilityLabel="Email address" testID="register-email" placeholder="Email address" placeholderTextColor="#8790ab" autoCapitalize="none" autoCorrect={false} spellCheck={false}
+      keyboardType="email-address" value={email} onChangeText={setEmail} editable={!form.busy} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => usernameRef.current?.focus()} style={authStyles.input} />
+    <TextInput ref={usernameRef} accessibilityLabel="Username" testID="register-username" placeholder="Username" placeholderTextColor="#8790ab" autoCapitalize="none" autoCorrect={false} spellCheck={false}
+      value={username} onChangeText={setUsername} editable={!form.busy} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => nameRef.current?.focus()} style={authStyles.input} />
+    <TextInput ref={nameRef} accessibilityLabel="Display name" testID="register-display-name" placeholder="Display name" placeholderTextColor="#8790ab" value={displayName} onChangeText={setDisplayName} editable={!form.busy}
+      returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => passwordRef.current?.focus()} style={authStyles.input} />
+    <PasswordField inputRef={passwordRef} accessibilityLabel="Create password" testID="register-password" label="Create password" placeholder="At least 12 characters" newPassword disableAutofill
+      value={password} onChangeText={setPassword} editable={!form.busy} returnKeyType="next" submitBehavior="submit" onSubmitEditing={() => confirmationRef.current?.focus()} />
+    <PasswordField inputRef={confirmationRef} accessibilityLabel="Confirm password" testID="register-confirm-password" label="Confirm password" placeholder="Re-enter your password" newPassword disableAutofill
+      value={confirmPassword} onChangeText={setConfirmPassword} editable={!form.busy} returnKeyType="done" />
+    <PasswordGuidance password={password} confirmation={confirmPassword} />
+    <AuthLegal />
+    <Pressable accessibilityRole="checkbox" accessibilityLabel="Agree to Terms of Service and Community Guidelines" accessibilityState={{ checked: agreedToTerms, disabled: form.busy }} disabled={form.busy}
+      testID="register-terms" onPress={() => setAgreedToTerms((value) => !value)} style={{ padding: 16, backgroundColor: '#151d33', borderRadius: 14 }}>
+      <Text style={authStyles.text}>{agreedToTerms ? '☑' : '☐'} I agree to the Terms of Service and Community Guidelines. Abusive behavior and objectionable content are not tolerated.</Text>
+    </Pressable>
+    <View style={{ gap: 8 }}>
+      <Text style={{ color: '#cbd5e1', fontWeight: '700' }}>Security check</Text>
+      {form.retrySeconds > 0 ? <Text style={authStyles.text}>A new check will be available after the countdown.</Text> :
+        <TurnstileWidget resetKey={turnstileResetKey} onTokenChange={setTurnstileToken} onStateChange={setTurnstileState} />}
+      <Text style={authStyles.text}>{turnstileState === 'verified' ? 'Security check complete.' : turnstileState === 'error' || turnstileState === 'expired' ? 'The check could not complete. Retry it below.' : 'Complete the security check to continue.'}</Text>
+      {form.retrySeconds === 0 && (turnstileState === 'error' || turnstileState === 'expired') ? <Pressable accessibilityRole="button" accessibilityLabel="Retry security check" disabled={form.busy} onPress={() => { setTurnstileToken(null); setTurnstileState('loading'); setTurnstileResetKey((value) => value + 1); }}><Text style={authStyles.link}>Retry security check</Text></Pressable> : null}
+    </View>
+    <AuthError message={form.error} />
+    <AuthButton label="Create account" testID="register-submit" busy={form.busy} retrySeconds={form.retrySeconds} onPress={onSubmit} />
+    <Pressable accessibilityRole="link" onPress={() => router.push('/login')}><Text style={authStyles.link}>Already have an account? Sign in</Text></Pressable>
+  </AuthForm>;
 }

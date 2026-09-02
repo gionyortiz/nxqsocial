@@ -31,7 +31,12 @@ export async function readStoredAuthToken(): Promise<string | null> {
   if (!(await nativeSecureStoreAvailable())) return null;
 
   const secureToken = await SecureStore.getItemAsync(TOKEN_KEY, KEYCHAIN_OPTIONS);
-  if (secureToken) return secureToken;
+  if (secureToken) {
+    // A prior migration may have stored the secure copy but failed to remove
+    // the legacy copy. Retry that cleanup before restoring the session.
+    await AsyncStorage.removeItem(TOKEN_KEY);
+    return secureToken;
+  }
 
   const legacyToken = await AsyncStorage.getItem(TOKEN_KEY);
   if (!legacyToken) return null;
