@@ -1,16 +1,17 @@
 import { router } from 'expo-router';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Platform,
   Pressable,
-  SafeAreaView,
+  ScrollView,
   Text,
   TextInput,
   View,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 
-import { ApiError } from '@/lib/api';
+import { ApiError, ApiNetworkError } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
 
 function maskEmail(email: string): string {
@@ -32,6 +33,7 @@ function isAlreadyVerified(error: unknown): boolean {
 
 export default function VerifyEmailScreen() {
   const {
+    token,
     pendingVerification,
     verifyEmail,
     resendEmailVerification,
@@ -46,15 +48,21 @@ export default function VerifyEmailScreen() {
   const [verifyRetryUntil, setVerifyRetryUntil] = useState(0);
   const [resendRetryUntil, setResendRetryUntil] = useState(0);
   const [now, setNow] = useState(Date.now());
+  const inFlight = useRef(false);
+  const mounted = useRef(true);
+  const departing = useRef(false);
 
   useEffect(() => {
+    mounted.current = true;
     const timer = setInterval(() => setNow(Date.now()), 1000);
-    return () => clearInterval(timer);
+    return () => { mounted.current = false; clearInterval(timer); };
   }, []);
 
   useEffect(() => {
-    if (!pendingVerification) router.replace('/login');
-  }, [pendingVerification]);
+    if (!pendingVerification && !inFlight.current && !departing.current) {
+      router.replace(token ? '/(tabs)/feed' : '/login');
+    }
+  }, [pendingVerification, token, verifying, resending]);
 
   const resendAvailableAt = Math.max(
     pendingVerification?.resendAvailableAt ?? 0,
@@ -81,9 +89,9 @@ export default function VerifyEmailScreen() {
   }
 
   const onVerify = async () => {
+    if (verifyRetryInSec > 0 || inFlight.current) return;
     setError(null);
     setNotice(null);
-    if (verifyRetryInSec > 0 || verifying) return;
     if (!/^\d{6}$/.test(code)) {
       setError('Enter the six-digit code from your email.');
       return;
@@ -93,11 +101,15 @@ export default function VerifyEmailScreen() {
       return;
     }
 
+    inFlight.current = true;
     setVerifying(true);
     try {
       await verifyEmail(code);
+      if (!mounted.current) return;
+      departing.current = true;
       router.replace('/(tabs)/feed');
     } catch (caught: unknown) {
+      if (!mounted.current) return;
       if (
         caught instanceof ApiError
         && caught.status === 429
@@ -109,6 +121,7 @@ export default function VerifyEmailScreen() {
         markEmailVerificationCodeConsumed();
         setError('That code can no longer be used. Request a new verification code.');
       } else if (isAlreadyVerified(caught)) {
+        departing.current = true;
         clearPendingVerification();
         router.replace({ pathname: '/login', params: { notice: 'email-already-verified' } });
       } else if (caught instanceof ApiError && caught.status === 429) {
@@ -116,29 +129,40 @@ export default function VerifyEmailScreen() {
         setVerifyRetryUntil(Date.now() + waitSeconds * 1000);
         setError(`Too many verification attempts. Try again in ${waitSeconds} seconds.`);
       } else if (isInvalidVerificationSession(caught)) {
+        departing.current = true;
         clearPendingVerification();
         router.replace('/login');
+      } else if (caught instanceof ApiNetworkError) {
+        setError("We couldn't confirm verification. Your email may already be verified. Return to sign in with the same account, or try again when connected.");
+      } else if (caught instanceof ApiError && caught.code === 'EMAIL_VERIFICATION_CODE_INVALID') {
+        setError('That code is invalid or expired. Check the latest email or request a new code.');
+      } else if (caught instanceof ApiError && caught.status >= 500) {
+        setError('NXQ Social is temporarily unavailable. Please try again shortly.');
       } else {
-        setError(caught instanceof Error ? caught.message : 'Verification failed. Please try again.');
+        setError("We couldn't finish verification. Check your code, or return to sign in with the same account.");
       }
     } finally {
-      setVerifying(false);
+      inFlight.current = false;
+      if (mounted.current) setVerifying(false);
     }
   };
 
   const onResend = async () => {
+    if (resendInSec > 0 || inFlight.current) return;
     setError(null);
     setNotice(null);
-    if (resendInSec > 0 || resending) return;
-
+    inFlight.current = true;
     setResending(true);
     try {
       const result = await resendEmailVerification();
+      if (!mounted.current) return;
       setCode('');
       setResendRetryUntil(0);
       setNotice(`A new code was sent. It expires in ${result.expiresInMinutes} minutes.`);
     } catch (caught: unknown) {
+      if (!mounted.current) return;
       if (isAlreadyVerified(caught)) {
+        departing.current = true;
         clearPendingVerification();
         router.replace({ pathname: '/login', params: { notice: 'email-already-verified' } });
       } else if (caught instanceof ApiError && caught.status === 429) {
@@ -146,24 +170,34 @@ export default function VerifyEmailScreen() {
         setResendRetryUntil(Date.now() + waitSeconds * 1000);
         setError(`Please wait ${waitSeconds} seconds before requesting another code.`);
       } else if (isInvalidVerificationSession(caught)) {
+        departing.current = true;
         clearPendingVerification();
         router.replace('/login');
+      } else if (caught instanceof ApiNetworkError) {
+        // Sending may have completed. Never generate another OTP automatically,
+        // and prevent rapid manual duplicates while the customer checks email.
+        setResendRetryUntil(Date.now() + 60_000);
+        setError("We couldn't confirm whether a new code was sent. Check your email and wait before requesting another, or return to sign in.");
       } else {
-        setError(caught instanceof Error ? caught.message : 'A new code could not be sent.');
+        setError("We couldn't confirm a new code was sent. Please wait and try again.");
       }
     } finally {
-      setResending(false);
+      inFlight.current = false;
+      if (mounted.current) setResending(false);
     }
   };
 
-  const useDifferentAccount = () => {
+  const returnToSignIn = () => {
+    if (inFlight.current) return;
+    departing.current = true;
     clearPendingVerification();
     router.replace('/login');
   };
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
-      <View style={{ flex: 1, padding: 24, justifyContent: 'center', gap: 16 }}>
+      <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
+        contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: 'center', gap: 16 }}>
         <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>Verify your email</Text>
         <Text style={{ color: '#93a1bd', fontSize: 15, lineHeight: 22 }}>
           {pendingVerification.codeSent
@@ -172,6 +206,8 @@ export default function VerifyEmailScreen() {
         </Text>
 
         <TextInput
+          testID="verification-code"
+          accessibilityLabel="Email verification code"
           value={code}
           onChangeText={(value) => setCode(value.replace(/\D/g, '').slice(0, 6))}
           placeholder="000000"
@@ -182,7 +218,7 @@ export default function VerifyEmailScreen() {
           returnKeyType="done"
           onSubmitEditing={onVerify}
           maxLength={6}
-          editable={hasActiveCode}
+          editable={hasActiveCode && !verifying && !resending}
           style={{
             backgroundColor: '#151d33',
             color: '#fff',
@@ -211,20 +247,22 @@ export default function VerifyEmailScreen() {
         ) : null}
         {error ? (
           <View style={{ backgroundColor: '#2a1620', borderRadius: 12, borderWidth: 1, borderColor: '#7f1d1d', padding: 12 }}>
-            <Text style={{ color: '#fca5a5', fontWeight: '700' }}>{error}</Text>
+            <Text accessibilityRole="alert" style={{ color: '#fca5a5', fontWeight: '700' }}>{error}</Text>
           </View>
         ) : null}
 
         <Pressable
+          testID="verify-email-submit"
+          accessibilityRole="button"
           onPress={onVerify}
-          disabled={verifying || verifyRetryInSec > 0 || !hasActiveCode || code.length !== 6}
+          disabled={verifying || resending || verifyRetryInSec > 0 || !hasActiveCode || code.length !== 6}
           style={{
             borderRadius: 12,
             backgroundColor: '#4f46e5',
             alignItems: 'center',
             justifyContent: 'center',
             paddingVertical: 14,
-            opacity: verifying || verifyRetryInSec > 0 || !hasActiveCode || code.length !== 6 ? 0.55 : 1,
+            opacity: verifying || resending || verifyRetryInSec > 0 || !hasActiveCode || code.length !== 6 ? 0.55 : 1,
           }}
         >
           {verifying
@@ -235,9 +273,11 @@ export default function VerifyEmailScreen() {
         </Pressable>
 
         <Pressable
+          testID="resend-verification-submit"
+          accessibilityRole="button"
           onPress={onResend}
-          disabled={resending || resendInSec > 0}
-          style={{ alignItems: 'center', paddingVertical: 10, opacity: resending || resendInSec > 0 ? 0.55 : 1 }}
+          disabled={resending || verifying || resendInSec > 0}
+          style={{ alignItems: 'center', paddingVertical: 10, opacity: resending || verifying || resendInSec > 0 ? 0.55 : 1 }}
         >
           {resending
             ? <ActivityIndicator color="#9ab0ff" />
@@ -246,10 +286,11 @@ export default function VerifyEmailScreen() {
             </Text>}
         </Pressable>
 
-        <Pressable onPress={useDifferentAccount} style={{ alignItems: 'center', paddingVertical: 10 }}>
-          <Text style={{ color: '#93a1bd', textDecorationLine: 'underline' }}>Use a different account</Text>
+        <Pressable testID="verification-return-login" accessibilityRole="button" onPress={returnToSignIn}
+          disabled={verifying || resending} style={{ alignItems: 'center', paddingVertical: 10 }}>
+          <Text style={{ color: '#93a1bd', textDecorationLine: 'underline' }}>Return to sign in</Text>
         </Pressable>
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

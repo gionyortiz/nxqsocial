@@ -10,6 +10,7 @@ jest.mock('react-native-safe-area-context', () => {
 });
 jest.mock('@/lib/config', () => ({ API_BASE_URL: 'https://api.fixture.invalid/api', WEB_BASE_URL: 'https://fixture.invalid', SHOW_LOGIN_DEBUG: false }));
 jest.mock('@/lib/runtimeProof', () => ({ mobileProof: jest.fn() }));
+jest.mock('expo-network', () => ({ getNetworkStateAsync: jest.fn().mockResolvedValue({ type: 'WIFI' }) }));
 
 // Tests must never contact the live API, send reset mail, or mutate accounts.
 beforeEach(() => { global.fetch = jest.fn().mockRejectedValue(new Error('External requests blocked by test harness')); });

@@ -1,0 +1,40 @@
+name: Mobile reliability
+
+on:
+  pull_request:
+    paths:
+      - "mobile/**"
+      - ".github/workflows/mobile-reliability.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mobile-reliability-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    name: Mobile auth tests and iOS export
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    defaults:
+      run:
+        working-directory: mobile
+    env:
+      CI: "true"
+      EXPO_NO_TELEMETRY: "1"
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Install lockfile-pinned dependencies
+        run: npm ci
+      - name: Typecheck, release guards, and mocked auth tests
+        run: npm run check:passwords
+      - name: Export iOS JavaScript bundle (no signing or upload)
+        run: npx expo export --platform ios --output-dir "$RUNNER_TEMP/nxq-mobile-ios-export"
