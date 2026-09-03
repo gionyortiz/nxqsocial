@@ -55,7 +55,9 @@ test('Back returns to sign in during the resend countdown without sending or ver
   expect(requests('/auth/verify-email')).toHaveLength(0);
   expect(requests('/auth/resend-verification')).toHaveLength(0);
   expect(fetch).toHaveBeenCalledTimes(1); // Only the synthetic registration fixture.
-});
+  // The first render lazily transforms React Native's host components. A fresh
+  // CI cache can exceed Jest's 5s startup budget; no app/network timeout changes.
+}, 15_000);
 
 test('Back is in a fixed safe-area header, outside the scrolling verification form', async () => {
   await begin();

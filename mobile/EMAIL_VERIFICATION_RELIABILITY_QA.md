@@ -133,3 +133,9 @@ safe return during cooldown, blocked navigation during verify/resend, and restor
 navigation after completion/error. Requests are mocked; no email/account change
 was made. Actual iPhone visual/tap acceptance still requires a later internal
 build. No new dependency, signing, runtime-version or deployment change.
+
+The first clean GitHub run exceeded Jest's default 5-second budget in the first
+new render test (114 other tests passed). A no-cache local run showed that first
+case taking 2.4 seconds while subsequent cases took milliseconds. Its isolated
+test budget is now 15 seconds to accommodate cold React Native transforms;
+assertions and the application's 12-second request timeouts remain unchanged.
