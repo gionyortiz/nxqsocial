@@ -58,6 +58,8 @@ jobs:
           cache-dependency-path: backend/package-lock.json
       - name: Install lockfile-pinned dependencies
         run: npm ci
+      - name: Generate Prisma client
+        run: npx prisma generate
       - name: Compile backend
         run: npm run build
       - name: Verify password-reset token and email idempotency
