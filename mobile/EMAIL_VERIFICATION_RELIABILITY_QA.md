@@ -114,3 +114,22 @@ email, create accounts, verify real users or rent infrastructure.
   login recovery, invalid/expired code, and duplicate-tap/resend behavior.
 - No merge, deployment, OTA, native build, TestFlight upload, external testing or
   public App Review submission is authorized or performed by this change.
+
+## Back-button follow-up — September 3, 2026
+
+Added the requested visible chevron + **Back** button in a fixed safe-area header
+above the scrolling verification form. Its 48-point minimum touch height,
+screen-reader label/hint and disabled state were checked in the React review.
+It uses the existing return-to-sign-in action, clears only the pending client
+verification state, and does not delete, verify or change the server account.
+It remains enabled during cooldowns and is disabled only during an active
+verification/resend request. The existing footer sign-in link remains available.
+
+Four new component-flow tests failed against the prior candidate because the
+header/button was absent, then passed after implementation. The full mobile
+suite now passes **115/115 tests across 8 suites**, plus TypeScript, the eight
+password-field guard and 25 release assertions. New cases cover the fixed header,
+safe return during cooldown, blocked navigation during verify/resend, and restored
+navigation after completion/error. Requests are mocked; no email/account change
+was made. Actual iPhone visual/tap acceptance still requires a later internal
+build. No new dependency, signing, runtime-version or deployment change.

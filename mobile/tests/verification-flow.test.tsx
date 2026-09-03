@@ -1,6 +1,6 @@
 import React from 'react';
-import { Pressable, Text, Platform } from 'react-native';
-import { act, fireEvent, render, screen } from '@testing-library/react-native';
+import { Pressable, Text, Platform, ScrollView } from 'react-native';
+import { act, fireEvent, render, screen, within } from '@testing-library/react-native';
 import { router } from 'expo-router';
 import VerifyEmail from '../app/verify-email';
 import { AuthProvider, useAuth } from '../lib/auth';
@@ -41,6 +41,52 @@ function submit() {
 }
 const advance = async (ms = 1000) => { await act(async () => { await jest.advanceTimersByTimeAsync(ms); }); };
 const requests = (route: string) => (fetch as jest.Mock).mock.calls.filter(([url]) => url.endsWith(route));
+
+test('Back returns to sign in during the resend countdown without sending or verifying', async () => {
+  await begin();
+  const back = screen.getByRole('button', { name: 'Back to sign in' });
+  expect(back).toBeEnabled();
+  expect(screen.getByTestId('resend-verification-submit')).toBeDisabled();
+  fireEvent.press(back);
+  expect(auth.pendingVerification).toBeNull(); expect(auth.token).toBeNull();
+  expect(router.replace).toHaveBeenCalledTimes(1);
+  expect(router.replace).toHaveBeenCalledWith('/login');
+  expect(storeAuthToken).not.toHaveBeenCalled();
+  expect(requests('/auth/verify-email')).toHaveLength(0);
+  expect(requests('/auth/resend-verification')).toHaveLength(0);
+  expect(fetch).toHaveBeenCalledTimes(1); // Only the synthetic registration fixture.
+});
+
+test('Back is in a fixed safe-area header, outside the scrolling verification form', async () => {
+  await begin();
+  expect(within(screen.getByTestId('verification-back-header')).getByRole('button', { name: 'Back to sign in' })).toBeTruthy();
+  expect(within(screen.UNSAFE_getByType(ScrollView)).queryByRole('button', { name: 'Back to sign in' })).toBeNull();
+});
+
+test('Back cannot interrupt an active verification and becomes available after an error', async () => {
+  await begin(); let finish!: (value: unknown) => void;
+  (fetch as jest.Mock).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  submit();
+  const back = screen.getByRole('button', { name: 'Back to sign in' });
+  expect(back).toBeDisabled(); fireEvent.press(back);
+  expect(router.replace).not.toHaveBeenCalled(); expect(auth.pendingVerification).not.toBeNull();
+  await act(async () => finish(response(400, { code: 'EMAIL_VERIFICATION_CODE_INVALID' })));
+  expect(screen.getByRole('button', { name: 'Back to sign in' })).toBeEnabled();
+  expect(requests('/auth/verify-email')).toHaveLength(1);
+});
+
+test('Back cannot interrupt an active resend but is available during its new cooldown', async () => {
+  await begin(0); let finish!: (value: unknown) => void;
+  (fetch as jest.Mock).mockReturnValue(new Promise((resolve) => { finish = resolve; }));
+  fireEvent.press(screen.getByTestId('resend-verification-submit'));
+  const back = screen.getByRole('button', { name: 'Back to sign in' });
+  expect(back).toBeDisabled(); fireEvent.press(back);
+  expect(router.replace).not.toHaveBeenCalled(); expect(auth.pendingVerification).not.toBeNull();
+  await act(async () => finish(response(200, { sent: true, channel: 'email', expiresInMinutes: 10, resendAfterSeconds: 60 })));
+  expect(screen.getByRole('button', { name: 'Back to sign in' })).toBeEnabled();
+  expect(screen.getByTestId('resend-verification-submit')).toBeDisabled();
+  expect(requests('/auth/resend-verification')).toHaveLength(1);
+});
 
 test('first connection failure then verified response signs in with one retry', async () => {
   await begin();

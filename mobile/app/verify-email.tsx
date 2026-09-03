@@ -188,7 +188,7 @@ export default function VerifyEmailScreen() {
   };
 
   const returnToSignIn = () => {
-    if (inFlight.current) return;
+    if (inFlight.current || departing.current) return;
     departing.current = true;
     clearPendingVerification();
     router.replace('/login');
@@ -196,6 +196,26 @@ export default function VerifyEmailScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
+      <View testID="verification-back-header" style={{ paddingHorizontal: 24, paddingTop: 8, paddingBottom: 4 }}>
+        <Pressable
+          testID="verification-back"
+          accessibilityRole="button"
+          accessibilityLabel="Back to sign in"
+          accessibilityHint="Returns to sign in without sending another code."
+          accessibilityState={{ disabled: verifying || resending }}
+          onPress={returnToSignIn}
+          disabled={verifying || resending}
+          style={({ pressed }) => ({
+            alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 8,
+            minHeight: 48, paddingHorizontal: 16, paddingVertical: 8, borderRadius: 24,
+            backgroundColor: '#151d33', borderWidth: 1, borderColor: '#33415e',
+            opacity: verifying || resending ? 0.45 : pressed ? 0.7 : 1,
+          })}
+        >
+          <Text accessible={false} style={{ color: '#c4b5fd', fontSize: 24 }}>‹</Text>
+          <Text style={{ color: '#fff', fontSize: 16, fontWeight: '700' }}>Back</Text>
+        </Pressable>
+      </View>
       <ScrollView keyboardShouldPersistTaps="handled" keyboardDismissMode="on-drag"
         contentContainerStyle={{ flexGrow: 1, padding: 24, justifyContent: 'center', gap: 16 }}>
         <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>Verify your email</Text>
