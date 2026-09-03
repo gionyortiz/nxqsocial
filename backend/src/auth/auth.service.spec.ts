@@ -1,4 +1,4 @@
-import { ConflictException } from '@nestjs/common';
+import { BadRequestException, ConflictException } from '@nestjs/common';
 import { AuthService } from './auth.service';
 
 describe('AuthService registration commit semantics', () => {
@@ -50,6 +50,7 @@ describe('AuthService registration commit semantics', () => {
       {} as any,
       {} as any,
       { verifySignup: jest.fn() } as any,
+      { get: jest.fn((_key, fallback) => fallback) } as any,
     );
     return { service, prisma, user };
   }
@@ -89,13 +90,24 @@ describe('AuthService password reset delivery', () => {
     const user = userExists
       ? { id: 'user-1', email: 'user@example.test' }
       : null;
+    let idempotentToken: Record<string, unknown> | null = null;
+    const passwordResetToken = {
+      deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
+      create: jest.fn().mockResolvedValue({ id: 'reset-1' }),
+      upsert: jest.fn().mockImplementation(({ where, create, update }) => {
+        if (idempotentToken?.tokenHash === where.tokenHash) {
+          idempotentToken = { ...idempotentToken, ...update };
+        } else {
+          idempotentToken = { id: 'reset-idempotent', ...create };
+        }
+        return Promise.resolve(idempotentToken);
+      }),
+      delete: jest.fn().mockResolvedValue({ id: 'reset-1' }),
+    };
     const prisma = {
       user: { findUnique: jest.fn().mockResolvedValue(user) },
-      passwordResetToken: {
-        deleteMany: jest.fn().mockResolvedValue({ count: 0 }),
-        create: jest.fn().mockResolvedValue({ id: 'reset-1' }),
-        delete: jest.fn().mockResolvedValue({ id: 'reset-1' }),
-      },
+      passwordResetToken,
+      $transaction: jest.fn((action) => action(prisma)),
     };
     const mail = {
       sendPasswordReset: jest.fn().mockResolvedValue(accepted),
@@ -106,6 +118,11 @@ describe('AuthService password reset delivery', () => {
       mail as any,
       {} as any,
       {} as any,
+      {
+        get: jest.fn(
+          () => 'fixture-password-reset-pepper-which-is-long-enough',
+        ),
+      } as any,
     );
     return { service, prisma, mail };
   }
@@ -133,5 +150,33 @@ describe('AuthService password reset delivery', () => {
     expect(prisma.passwordResetToken.delete).toHaveBeenCalledWith({
       where: { id: 'reset-1' },
     });
+  });
+
+  it('reuses the same token and provider idempotency key for a transport replay', async () => {
+    const { service, prisma, mail } = buildService();
+    const key = 'nxq-reset-11111111-1111-4111-8111-111111111111';
+
+    await service.forgotPassword({ email: 'user@example.test' }, key);
+    await service.forgotPassword({ email: 'user@example.test' }, key);
+
+    expect(prisma.passwordResetToken.upsert).toHaveBeenCalledTimes(2);
+    expect(mail.sendPasswordReset).toHaveBeenCalledTimes(2);
+    expect(mail.sendPasswordReset.mock.calls[0][1]).toBe(
+      mail.sendPasswordReset.mock.calls[1][1],
+    );
+    expect(mail.sendPasswordReset.mock.calls[0][2]).toBe(key);
+    expect(mail.sendPasswordReset.mock.calls[1][2]).toBe(key);
+  });
+
+  it('rejects malformed idempotency keys before querying an account', async () => {
+    const { service, prisma } = buildService();
+
+    await expect(
+      service.forgotPassword(
+        { email: 'user@example.test' },
+        'attacker-controlled-value',
+      ),
+    ).rejects.toBeInstanceOf(BadRequestException);
+    expect(prisma.user.findUnique).not.toHaveBeenCalled();
   });
 });

@@ -16,7 +16,7 @@ test('expired JWT still signs out on password change', async () => {
   await expect(apiRequest('/auth/change-password', { method: 'POST', token: 'expired-fixture' })).rejects.toBeInstanceOf(ApiError);
   expect(logout).toHaveBeenCalledTimes(1);
 });
-test.each(['/auth/login', '/auth/register', '/auth/forgot-password', '/auth/reset-password', '/auth/change-password'])('never retries %s after uncertain network failure', async (path) => {
+test.each(['/auth/login', '/auth/register', '/auth/reset-password', '/auth/change-password'])('never retries %s after uncertain network failure', async (path) => {
   await expect(apiRequest(path, { method: 'POST', body: { password: 'Fixture-Only-123' } })).rejects.toThrow();
   expect(fetch).toHaveBeenCalledTimes(1);
 });

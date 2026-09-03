@@ -23,7 +23,11 @@ export class MailService {
     }
   }
 
-  async sendPasswordReset(to: string, resetUrl: string) {
+  async sendPasswordReset(
+    to: string,
+    resetUrl: string,
+    idempotencyKey?: string,
+  ) {
     const subject = 'Reset your NXQ Social password';
     const html = `
       <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">
@@ -57,12 +61,15 @@ export class MailService {
     }
 
     try {
-      const result = await this.resend.emails.send({
-        from: this.from,
-        to,
-        subject,
-        html,
-      });
+      const result = await this.resend.emails.send(
+        {
+          from: this.from,
+          to,
+          subject,
+          html,
+        },
+        idempotencyKey ? { idempotencyKey } : undefined,
+      );
       if (result.error) {
         this.logger.error(`Reset email provider rejected delivery to ${to}`);
         return false;

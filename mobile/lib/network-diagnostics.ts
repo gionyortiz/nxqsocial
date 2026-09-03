@@ -1,7 +1,7 @@
 import { mobileProof } from './runtimeProof';
 
 export type NetworkFailureClassification = 'network' | 'timeout' | 'dns' | 'tls' | 'unknown';
-type AuthEndpointClass = 'email_verification' | 'email_verification_resend';
+type AuthEndpointClass = 'email_verification' | 'email_verification_resend' | 'password_reset_request';
 const CONNECTIVITY_TYPES = new Set(['WIFI', 'CELLULAR', 'ETHERNET', 'BLUETOOTH', 'VPN', 'WIMAX', 'OTHER', 'NONE', 'UNKNOWN']);
 
 /** Only a coarse connection type, never IP, SSID, identifiers or raw exceptions. */
