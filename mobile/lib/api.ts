@@ -71,6 +71,10 @@ interface ApiOptions {
   retryNetworkErrors?: boolean;
   /** Restricted to native POST /auth/verify-email; at most one transport retry. */
   verificationRetry?: boolean;
+  /** Restricted to native POST /auth/forgot-password with a valid idempotency key. */
+  passwordResetRequestRetry?: boolean;
+  /** Stable only for one logical mutation; sent to the backend as Idempotency-Key. */
+  idempotencyKey?: string;
 }
 
 interface ApiErrorPayload {
@@ -112,6 +116,7 @@ export class ApiError extends Error {
 const NATIVE_NETWORK_RETRY_ATTEMPTS = 3;
 const NATIVE_NETWORK_RETRY_DELAY_MS = 500;
 const REQUEST_TIMEOUT_MS = 12000;
+const PASSWORD_RESET_IDEMPOTENCY_KEY = /^nxq-reset-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 export class ApiNetworkError extends Error {
   constructor(
@@ -188,7 +193,16 @@ function isTransientNativeNetworkError(error: unknown): boolean {
 
 export async function apiRequest<T>(
   path: string,
-  { method = 'GET', token, body, headers = {}, retryNetworkErrors, verificationRetry = false }: ApiOptions = {},
+  {
+    method = 'GET',
+    token,
+    body,
+    headers = {},
+    retryNetworkErrors,
+    verificationRetry = false,
+    passwordResetRequestRetry = false,
+    idempotencyKey,
+  }: ApiOptions = {},
 ): Promise<T> {
   let res: Response | null = null;
   let lastError: unknown = null;
@@ -199,10 +213,17 @@ export async function apiRequest<T>(
   const nativeVerificationRetry = verificationRetry
     && (Platform.OS === 'ios' || Platform.OS === 'android')
     && method === 'POST' && path === '/auth/verify-email';
+  const validPasswordResetIdempotencyKey = typeof idempotencyKey === 'string'
+    && PASSWORD_RESET_IDEMPOTENCY_KEY.test(idempotencyKey) ? idempotencyKey : undefined;
+  const nativePasswordResetRequestRetry = passwordResetRequestRetry
+    && (Platform.OS === 'ios' || Platform.OS === 'android')
+    && method === 'POST' && path === '/auth/forgot-password'
+    && validPasswordResetIdempotencyKey !== undefined;
   // A resend creates a fresh OTP: even an accidental caller opt-in must not replay it.
   const isVerificationResend = method === 'POST' && path === '/auth/resend-verification';
   const maxAttempts = isVerificationResend ? 1
-    : nativeVerificationRetry ? 2 : (shouldRetryNetworkErrors ? NATIVE_NETWORK_RETRY_ATTEMPTS : 1);
+    : (nativeVerificationRetry || nativePasswordResetRequestRetry) ? 2
+      : (shouldRetryNetworkErrors ? NATIVE_NETWORK_RETRY_ATTEMPTS : 1);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
@@ -214,6 +235,9 @@ export async function apiRequest<T>(
           'Content-Type': 'application/json',
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
           ...headers,
+          // A generic caller header must not replace the key that authorizes
+          // this bounded mutation replay.
+          ...(validPasswordResetIdempotencyKey ? { 'Idempotency-Key': validPasswordResetIdempotencyKey } : {}),
         },
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal,
@@ -224,14 +248,16 @@ export async function apiRequest<T>(
       clearTimeout(timer);
       lastError = error;
       const classification = classifyNetworkError(error);
-      if (path === '/auth/verify-email' || path === '/auth/resend-verification') {
+      if (path === '/auth/verify-email' || path === '/auth/resend-verification' || path === '/auth/forgot-password') {
         await recordAuthNetworkFailure(
-          path === '/auth/verify-email' ? 'email_verification' : 'email_verification_resend',
+          path === '/auth/verify-email' ? 'email_verification'
+            : path === '/auth/resend-verification' ? 'email_verification_resend'
+              : 'password_reset_request',
           classification, attempt,
         );
       }
       const isAbort = error instanceof Error && error.name === 'AbortError';
-      const retryable = nativeVerificationRetry
+      const retryable = nativeVerificationRetry || nativePasswordResetRequestRetry
         ? classification !== 'unknown'
         : isAbort || isTransientNativeNetworkError(error);
       const shouldRetry = retryable && attempt < maxAttempts;

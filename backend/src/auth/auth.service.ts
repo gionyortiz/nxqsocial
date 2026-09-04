@@ -7,6 +7,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
+import { ConfigService } from '@nestjs/config';
 import * as bcrypt from 'bcryptjs';
 import * as crypto from 'crypto';
 import { PrismaService } from '../prisma/prisma.service';
@@ -54,10 +55,23 @@ const SAFE_USER_SELECT = {
 } as const satisfies Prisma.UserSelect;
 
 type SafeUser = Prisma.UserGetPayload<{ select: typeof SAFE_USER_SELECT }>;
+const PASSWORD_RESET_IDEMPOTENCY_KEY =
+  /^nxq-reset-[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 function flattenUser(user: SafeUser) {
   const { profile, ...base } = user;
   return { ...base, ...(profile ?? {}) };
+}
+
+function normalizePasswordResetIdempotencyKey(
+  value?: string,
+): string | undefined {
+  if (value === undefined) return undefined;
+  const normalized = value.trim();
+  if (!PASSWORD_RESET_IDEMPOTENCY_KEY.test(normalized)) {
+    throw new BadRequestException('Invalid password recovery request.');
+  }
+  return normalized;
 }
 
 // A real bcrypt hash (of a random string) used only for timing-safe dummy
@@ -82,6 +96,7 @@ export class AuthService {
     private mailService: MailService,
     private otpService: OtpService,
     private turnstileService: TurnstileService,
+    private configService: ConfigService,
   ) {}
 
   async register(dto: RegisterDto, remoteIp = 'unknown') {
@@ -244,32 +259,55 @@ export class AuthService {
     return this.otpService.sendEmailOtp(user.id);
   }
 
-  async forgotPassword(dto: ForgotPasswordDto) {
+  async forgotPassword(dto: ForgotPasswordDto, idempotencyKey?: string) {
+    const normalizedIdempotencyKey =
+      normalizePasswordResetIdempotencyKey(idempotencyKey);
     const user = await this.prisma.user.findUnique({
       where: { email: dto.email },
     });
     // Always respond the same way so we never reveal whether an email exists.
     if (user) {
-      const rawToken = crypto.randomBytes(32).toString('hex');
+      const rawToken = normalizedIdempotencyKey
+        ? this.deriveIdempotentPasswordResetToken(
+            user.email,
+            normalizedIdempotencyKey,
+          )
+        : crypto.randomBytes(32).toString('hex');
       const tokenHash = crypto
         .createHash('sha256')
         .update(rawToken)
         .digest('hex');
       const expiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
 
-      // Invalidate any previous unused tokens for this user.
-      await this.prisma.passwordResetToken.deleteMany({
-        where: { userId: user.id, usedAt: null },
-      });
-      const resetToken = await this.prisma.passwordResetToken.create({
-        data: { userId: user.id, tokenHash, expiresAt },
-      });
+      const resetToken = normalizedIdempotencyKey
+        ? await this.prisma.$transaction(async (transaction) => {
+            // A transport retry derives the same unique token. Keep that token
+            // while invalidating unrelated, unused reset requests.
+            await transaction.passwordResetToken.deleteMany({
+              where: {
+                userId: user.id,
+                usedAt: null,
+                tokenHash: { not: tokenHash },
+              },
+            });
+            return transaction.passwordResetToken.upsert({
+              where: { tokenHash },
+              create: { userId: user.id, tokenHash, expiresAt },
+              update: { expiresAt },
+            });
+          })
+        : await this.createOneTimePasswordResetToken(
+            user.id,
+            tokenHash,
+            expiresAt,
+          );
 
       const appUrl = process.env.APP_BASE_URL ?? 'https://nxqsocial.com';
       const resetUrl = `${appUrl}/reset-password?token=${rawToken}`;
       const accepted = await this.mailService.sendPasswordReset(
         user.email,
         resetUrl,
+        normalizedIdempotencyKey,
       );
       if (!accepted) {
         await this.prisma.passwordResetToken.delete({
@@ -286,6 +324,38 @@ export class AuthService {
     return {
       message: 'If that email is registered, a reset link has been sent.',
     };
+  }
+
+  private async createOneTimePasswordResetToken(
+    userId: string,
+    tokenHash: string,
+    expiresAt: Date,
+  ) {
+    await this.prisma.passwordResetToken.deleteMany({
+      where: { userId, usedAt: null },
+    });
+    return this.prisma.passwordResetToken.create({
+      data: { userId, tokenHash, expiresAt },
+    });
+  }
+
+  private deriveIdempotentPasswordResetToken(
+    email: string,
+    idempotencyKey: string,
+  ): string {
+    const pepper = this.configService.get<string>('OTP_PEPPER', '').trim();
+    if (pepper.length < 32) {
+      this.logger.error(
+        'Password reset idempotency is unavailable because OTP_PEPPER is invalid.',
+      );
+      throw new ServiceUnavailableException(
+        'Password recovery is temporarily unavailable.',
+      );
+    }
+    return crypto
+      .createHmac('sha256', pepper)
+      .update(`password-reset-v1\0${email}\0${idempotencyKey}`)
+      .digest('hex');
   }
 
   async resetPassword(dto: ResetPasswordDto) {

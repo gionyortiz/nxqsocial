@@ -36,7 +36,7 @@ const appJson = JSON.parse(appJsonText);
 const easJson = JSON.parse(easJsonText);
 const packageJson = JSON.parse(packageJsonText);
 
-assert.equal(appJson.expo.version, '1.0.8', 'The password hotfix remains a candidate for App Store version 1.0.8');
+assert.equal(appJson.expo.version, '1.0.9', 'The native reliability candidate is isolated as App Store version 1.0.9');
 assert.equal(appJson.expo.ios.bundleIdentifier, 'com.gionyortiz.nxqsocial');
 assert.equal(appJson.expo.runtimeVersion?.policy, 'appVersion');
 assert.equal(appJson.expo.ios.associatedDomains, undefined, 'Associated Domains must stay disabled for the current signing profile');

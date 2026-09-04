@@ -96,7 +96,13 @@ test('network failure consumes challenge locally without retrying registration',
 test('forgot-password uses generic confirmation and resend cooldown', async () => {
   render(<Forgot />); change('forgot-password-email', ' Person@Example.com '); press('forgot-password-submit');
   await waitFor(() => expect(screen.getByText('Check your email')).toBeTruthy());
-  expect(apiRequest).toHaveBeenCalledWith('/auth/forgot-password', { method: 'POST', body: { email: 'person@example.com' }, retryNetworkErrors: false });
+  expect(apiRequest).toHaveBeenCalledWith('/auth/forgot-password', {
+    method: 'POST',
+    body: { email: 'person@example.com' },
+    retryNetworkErrors: false,
+    passwordResetRequestRetry: true,
+    idempotencyKey: 'nxq-reset-11111111-1111-4111-8111-111111111111',
+  });
   expect(screen.getByText(/If person@example.com belongs/)).toBeTruthy();
   expect(screen.getByTestId('forgot-password-submit')).toBeDisabled();
 });

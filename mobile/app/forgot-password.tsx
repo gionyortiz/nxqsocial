@@ -1,4 +1,5 @@
 import { router } from 'expo-router';
+import * as Crypto from 'expo-crypto';
 import { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
 import { apiRequest } from '@/lib/api';
@@ -15,7 +16,14 @@ export default function ForgotPasswordScreen() {
     const invalidEmail = emailError(normalizedEmail);
     if (invalidEmail) return form.setError(invalidEmail);
     void form.run(async () => {
-      await apiRequest('/auth/forgot-password', { method: 'POST', body: { email: normalizedEmail }, retryNetworkErrors: false });
+      const idempotencyKey = `nxq-reset-${Crypto.randomUUID()}`;
+      await apiRequest('/auth/forgot-password', {
+        method: 'POST',
+        body: { email: normalizedEmail },
+        retryNetworkErrors: false,
+        passwordResetRequestRetry: true,
+        idempotencyKey,
+      });
       setSentTo(normalizedEmail);
       form.startCooldown(60);
     });
