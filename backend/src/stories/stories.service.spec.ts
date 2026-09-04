@@ -112,6 +112,78 @@ describe('StoriesService media lifecycle', () => {
     });
   });
 
+  it('does not expose a private R2 hostname in a story API response', async () => {
+    const originalEnv = {
+      bucket: process.env.S3_BUCKET,
+      publicBase: process.env.S3_PUBLIC_BASE_URL,
+    };
+    process.env.S3_BUCKET = 'nxqsocial-media';
+    process.env.S3_PUBLIC_BASE_URL = 'https://media.nxqsocial.com';
+    prisma.mediaAsset.findUnique.mockResolvedValue({
+      id: 'media-1',
+      userId: 'user-1',
+      postId: null,
+      storyId: null,
+      uploadStatus: 'PUBLISHED',
+      moderationStatus: 'APPROVED',
+      url: 'https://old-account.r2.cloudflarestorage.com/nxqsocial-media/videos/story.mp4',
+    });
+    tx.story.create.mockResolvedValue({ id: 'story-1' });
+    tx.mediaAsset.updateMany.mockResolvedValue({ count: 1 });
+    tx.story.findUnique.mockResolvedValue({
+      id: 'story-1',
+      caption: 'legacy story',
+      visibility: 'PUBLIC',
+      status: 'PUBLISHED',
+      expiresAt: new Date(Date.now() + 60_000),
+      createdAt: new Date(),
+      author: {
+        id: 'user-1',
+        username: 'creator',
+        profile: { displayName: 'Creator', avatarUrl: null },
+      },
+      media: {
+        id: 'media-1',
+        bucket: 'nxqsocial-media',
+        s3Key: 'videos/story.mp4',
+        url: 'https://old-account.r2.cloudflarestorage.com/nxqsocial-media/videos/story.mp4',
+        thumbnailUrl:
+          'https://old-account.r2.cloudflarestorage.com/nxqsocial-media/thumbnails/story.jpg',
+        mimeType: 'video/mp4',
+        width: 1080,
+        height: 1920,
+        durationSec: 10,
+      },
+    });
+
+    try {
+      const result = await service.createFromAsset('user-1', {
+        mediaId: 'media-1',
+        caption: 'legacy story',
+      } as any);
+      const serialized = JSON.stringify(result);
+
+      expect(result.media).toEqual(
+        expect.objectContaining({
+          url: 'https://media.nxqsocial.com/videos/story.mp4',
+          thumbnailUrl: 'https://media.nxqsocial.com/thumbnails/story.jpg',
+        }),
+      );
+      expect(result.media).not.toHaveProperty('bucket');
+      expect(result.media).not.toHaveProperty('s3Key');
+      expect(serialized).not.toMatch(/\.r2\.cloudflarestorage\.com/i);
+      expect(serialized).not.toContain('old-account');
+    } finally {
+      if (originalEnv.bucket === undefined) delete process.env.S3_BUCKET;
+      else process.env.S3_BUCKET = originalEnv.bucket;
+      if (originalEnv.publicBase === undefined) {
+        delete process.env.S3_PUBLIC_BASE_URL;
+      } else {
+        process.env.S3_PUBLIC_BASE_URL = originalEnv.publicBase;
+      }
+    }
+  });
+
   it('deletes exclusive media transactionally before cleaning owned objects', async () => {
     tx.story.findUnique.mockResolvedValue({
       id: 'story-1',

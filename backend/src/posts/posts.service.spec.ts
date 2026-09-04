@@ -1,13 +1,11 @@
-import {
-  BadRequestException,
-  ForbiddenException,
-} from '@nestjs/common';
+import { BadRequestException, ForbiddenException } from '@nestjs/common';
 import { PostsService } from './posts.service';
 
 describe('PostsService production media durability', () => {
   const prisma = {
     post: {
       create: jest.fn(),
+      findMany: jest.fn(),
       findUnique: jest.fn(),
       delete: jest.fn(),
     },
@@ -299,7 +297,78 @@ describe('PostsService production media durability', () => {
     await service.deletePost('post-1', 'user-1');
 
     expect(prisma.mediaAsset.deleteMany).not.toHaveBeenCalled();
-    expect(prisma.post.delete).toHaveBeenCalledWith({ where: { id: 'post-1' } });
+    expect(prisma.post.delete).toHaveBeenCalledWith({
+      where: { id: 'post-1' },
+    });
     expect(storage.deleteManagedObject).not.toHaveBeenCalled();
+  });
+
+  it('does not expose a private R2 hostname in a reels API response', async () => {
+    const originalEnv = {
+      bucket: process.env.S3_BUCKET,
+      publicBase: process.env.S3_PUBLIC_BASE_URL,
+    };
+    process.env.S3_BUCKET = 'nxqsocial-media';
+    process.env.S3_PUBLIC_BASE_URL = 'https://media.nxqsocial.com';
+    prisma.post.findMany.mockResolvedValue([
+      {
+        id: 'post-1',
+        caption: 'legacy reel',
+        type: 'VIDEO',
+        visibility: 'PUBLIC',
+        status: 'PUBLISHED',
+        aiLabel: 'NONE',
+        createdAt: new Date(),
+        author: {
+          id: 'user-1',
+          username: 'creator',
+          verificationStatus: 'UNVERIFIED',
+          trustScore: 0,
+          role: 'USER',
+          profile: { displayName: 'Creator', avatarUrl: null },
+        },
+        media: [
+          {
+            id: 'media-1',
+            bucket: 'nxqsocial-media',
+            s3Key: 'videos/reel.mp4',
+            url: 'https://old-account.r2.cloudflarestorage.com/nxqsocial-media/videos/reel.mp4',
+            thumbnailUrl:
+              'https://old-account.r2.cloudflarestorage.com/nxqsocial-media/thumbnails/reel.jpg',
+            mimeType: 'video/mp4',
+            width: 1080,
+            height: 1920,
+            durationSec: 10,
+            order: 0,
+          },
+        ],
+        likes: [],
+        _count: { likes: 0, comments: 0 },
+      },
+    ]);
+
+    try {
+      const result = await service.getReels('viewer-1');
+      const serialized = JSON.stringify(result);
+
+      expect(result.data[0].media[0]).toEqual(
+        expect.objectContaining({
+          url: 'https://media.nxqsocial.com/videos/reel.mp4',
+          thumbnailUrl: 'https://media.nxqsocial.com/thumbnails/reel.jpg',
+        }),
+      );
+      expect(result.data[0].media[0]).not.toHaveProperty('bucket');
+      expect(result.data[0].media[0]).not.toHaveProperty('s3Key');
+      expect(serialized).not.toMatch(/\.r2\.cloudflarestorage\.com/i);
+      expect(serialized).not.toContain('old-account');
+    } finally {
+      if (originalEnv.bucket === undefined) delete process.env.S3_BUCKET;
+      else process.env.S3_BUCKET = originalEnv.bucket;
+      if (originalEnv.publicBase === undefined) {
+        delete process.env.S3_PUBLIC_BASE_URL;
+      } else {
+        process.env.S3_PUBLIC_BASE_URL = originalEnv.publicBase;
+      }
+    }
   });
 });

@@ -22,9 +22,12 @@ import {
   OwnedMediaReference,
   queueOwnedMediaCleanup,
 } from '../common/storage/owned-media-cleanup';
+import { canonicalPublicMediaUrl } from '../common/storage/public-media-url';
 
 const MEDIA_SELECT = {
   id: true,
+  bucket: true,
+  s3Key: true,
   url: true,
   thumbnailUrl: true,
   mimeType: true,
@@ -61,14 +64,6 @@ function postSelect(userId: string) {
     ...BASE_POST_SELECT,
     likes: { where: { userId }, select: { id: true } },
   };
-}
-
-function resolveMediaUrl(url: string | null): string | null {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  // Convert relative URL to absolute HTTPS URL
-  const apiBase = process.env.API_BASE_URL || 'https://api.nxqsocial.com/api';
-  return `${apiBase}${url}`;
 }
 
 function localUploadFilePath(url: string | null): string | null {
@@ -131,13 +126,27 @@ function mapPost(p: any) {
   return {
     ...rest,
     isLiked: likes?.length > 0,
-    author: { ...authorBase, ...(profile ?? {}) },
+    author: {
+      ...authorBase,
+      ...(profile ?? {}),
+      avatarUrl: canonicalPublicMediaUrl(profile?.avatarUrl),
+    },
     media:
-      media?.filter(mediaIsAvailable).map((m: any) => ({
-        ...m,
-        url: resolveMediaUrl(m.url),
-        thumbnailUrl: resolveMediaUrl(m.thumbnailUrl),
-      })) ?? [],
+      media?.filter(mediaIsAvailable).map((m: any) => {
+        const { bucket, s3Key, ...publicMedia } = m;
+        return {
+          ...publicMedia,
+          url: canonicalPublicMediaUrl(m.url, {
+            bucket,
+            objectKey: s3Key,
+            allowedPrefixes: ['images', 'videos', 'audio', 'uploads'],
+          }),
+          thumbnailUrl: canonicalPublicMediaUrl(m.thumbnailUrl, {
+            bucket,
+            allowedPrefixes: ['thumbnails'],
+          }),
+        };
+      }) ?? [],
   };
 }
 
@@ -771,12 +780,7 @@ export class PostsService {
       }
     }
     await this.prisma.$transaction(async (tx) => {
-      await queueOwnedMediaCleanup(
-        tx,
-        this.storage,
-        references,
-        'post-delete',
-      );
+      await queueOwnedMediaCleanup(tx, this.storage, references, 'post-delete');
       if (mediaIds.length > 0) {
         await tx.mediaAsset.deleteMany({ where: { id: { in: mediaIds } } });
       }
@@ -812,10 +816,11 @@ export class PostsService {
     if (asset.userId !== authorId)
       throw new ForbiddenException('Not your media asset');
     if (asset.postId || asset.storyId)
-      throw new BadRequestException(
-        'Media asset is already attached',
-      );
-    if (asset.uploadStatus === 'PENDING' || asset.uploadStatus === 'FINALIZING') {
+      throw new BadRequestException('Media asset is already attached');
+    if (
+      asset.uploadStatus === 'PENDING' ||
+      asset.uploadStatus === 'FINALIZING'
+    ) {
       throw new BadRequestException(
         'Upload not confirmed yet — call complete-upload first',
       );

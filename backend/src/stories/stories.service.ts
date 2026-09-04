@@ -17,6 +17,7 @@ import {
   ownedLocalUploadPath,
   queueOwnedMediaCleanup,
 } from '../common/storage/owned-media-cleanup';
+import { canonicalPublicMediaUrl } from '../common/storage/public-media-url';
 import { CreateStoryDto } from './stories.dto';
 
 const STORY_ACTIVE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -60,6 +61,8 @@ const AUTHOR_SELECT = {
 
 const MEDIA_SELECT = {
   id: true,
+  bucket: true,
+  s3Key: true,
   url: true,
   thumbnailUrl: true,
   mimeType: true,
@@ -79,26 +82,33 @@ const STORY_SELECT = {
   media: { select: MEDIA_SELECT },
 };
 
-function resolveMediaUrl(url: string | null | undefined): string | null {
-  if (!url) return null;
-  if (url.startsWith('http://') || url.startsWith('https://')) return url;
-  const apiBase = process.env.API_BASE_URL || 'https://api.nxqsocial.com/api';
-  return `${apiBase}${url}`;
-}
-
 function mapStory(s: any, viewed: boolean) {
   const { author, media, ...rest } = s;
   const { profile, ...authorBase } = author;
   return {
     ...rest,
     viewed,
-    author: { ...authorBase, ...(profile ?? {}) },
+    author: {
+      ...authorBase,
+      ...(profile ?? {}),
+      avatarUrl: canonicalPublicMediaUrl(profile?.avatarUrl),
+    },
     media: media
-      ? {
-          ...media,
-          url: resolveMediaUrl(media.url),
-          thumbnailUrl: resolveMediaUrl(media.thumbnailUrl),
-        }
+      ? (() => {
+          const { bucket, s3Key, ...publicMedia } = media;
+          return {
+            ...publicMedia,
+            url: canonicalPublicMediaUrl(media.url, {
+              bucket,
+              objectKey: s3Key,
+              allowedPrefixes: ['images', 'videos', 'audio', 'uploads'],
+            }),
+            thumbnailUrl: canonicalPublicMediaUrl(media.thumbnailUrl, {
+              bucket,
+              allowedPrefixes: ['thumbnails'],
+            }),
+          };
+        })()
       : null,
   };
 }
