@@ -1,13 +1,11 @@
 # Preserve the exact healthy production runtime, including the deployed
-# password-reset safeguard, while overlaying only the reviewed media response
-# serializer modules built from commit 5163dbb.
-FROM nexaquantumchat-backend:media-url-5163dbb-candidate AS media_url_candidate
-
+# password-reset safeguard. Patch only the two legacy response serializers in
+# place so no newer upload, deletion, lifecycle, or auth modules are introduced.
 FROM nexaquantumchat-backend:password-reset-bdd77da
 
-COPY --from=media_url_candidate /app/dist/src/common/storage/public-media-url.js /app/dist/src/common/storage/public-media-url.js
-COPY --from=media_url_candidate /app/dist/src/posts/posts.service.js /app/dist/src/posts/posts.service.js
-COPY --from=media_url_candidate /app/dist/src/stories/stories.service.js /app/dist/src/stories/stories.service.js
+COPY scripts/patch-legacy-media-url-runtime.cjs /tmp/patch-legacy-media-url-runtime.cjs
+RUN node /tmp/patch-legacy-media-url-runtime.cjs \
+    && rm /tmp/patch-legacy-media-url-runtime.cjs
 
 LABEL nxq.git.commit="5163dbb21130ce0141ce959560f5078952418b1a"
 LABEL nxq.media.guard.commit="5163dbb21130ce0141ce959560f5078952418b1a"
