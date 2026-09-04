@@ -22,7 +22,10 @@ describe('MailService', () => {
   function buildService() {
     process.env.RESEND_API_KEY = 're_test_key';
     const service = new MailService();
-    const send = jest.fn<Promise<TestEmailResult>, [TestEmailMessage]>();
+    const send = jest.fn<
+      Promise<TestEmailResult>,
+      [TestEmailMessage, TestEmailRequestOptions?]
+    >();
     Object.defineProperty(service, 'resend', {
       value: { emails: { send } },
       configurable: true,
@@ -67,6 +70,26 @@ describe('MailService', () => {
         'https://app.example.test/reset-password?token=test',
       ),
     ).resolves.toBe(true);
+  });
+
+  it('forwards a stable idempotency key to the email provider', async () => {
+    const { service, send } = buildService();
+    send.mockResolvedValue({ data: { id: 'email-1' }, error: null });
+    const key = 'nxq-reset-11111111-1111-4111-8111-111111111111';
+
+    await service.sendPasswordReset(
+      'user@example.test',
+      'https://app.example.test/reset-password?token=test',
+      key,
+    );
+
+    expect(send).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: 'user@example.test',
+        subject: 'Reset your NXQ Social password',
+      }),
+      { idempotencyKey: key },
+    );
   });
 
   it('returns false when no email provider is configured', async () => {
@@ -161,6 +184,10 @@ interface TestEmailMessage {
   to: string;
   subject: string;
   html: string;
+}
+
+interface TestEmailRequestOptions {
+  idempotencyKey?: string;
 }
 
 interface TestEmailResult {

@@ -2,6 +2,7 @@ import {
   Controller,
   Post,
   Body,
+  Headers,
   HttpCode,
   HttpException,
   HttpStatus,
@@ -72,8 +73,11 @@ export class AuthController {
   @Post('forgot-password')
   @Throttle({ default: { limit: 3, ttl: 600000 } })
   @HttpCode(HttpStatus.OK)
-  forgotPassword(@Body() dto: ForgotPasswordDto) {
-    return this.authService.forgotPassword(dto);
+  forgotPassword(
+    @Body() dto: ForgotPasswordDto,
+    @Headers('idempotency-key') idempotencyKey?: string,
+  ) {
+    return this.authService.forgotPassword(dto, idempotencyKey);
   }
 
   @Post('reset-password')
