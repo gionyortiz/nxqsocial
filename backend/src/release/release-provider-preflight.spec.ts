@@ -23,6 +23,8 @@ const validEnvironment = () => ({
   MEDIA_MODERATION_PROVIDER: 'staging-mock',
   RESEND_API_KEY: 're_staging_1234567890',
   EMAIL_FROM: 'NXQ Social Staging <staging@mail.nxqsocial.com>',
+  STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+  STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
   SIGNUP_HARDENING_ENABLED: 'true',
   TURNSTILE_SECRET_KEY: 'turnstile_secret_1234567890',
   TURNSTILE_ALLOWED_HOSTNAMES:
@@ -40,11 +42,11 @@ describe('validateFullStagingReleaseProviders', () => {
     const result = validateFullStagingReleaseProviders(validEnvironment());
 
     expect(result.ok).toBe(true);
-    expect(result.checkedGroups).toHaveLength(6);
+    expect(result.checkedGroups).toHaveLength(7);
     expect(formatReleaseProviderPreflightSuccess(result)).toBe(
       [
         'Offline staging provider configuration validation passed.',
-        'Validated declared provider groups: 6.',
+        'Validated declared provider groups: 7.',
         'No network calls were made and no credential values were printed.',
         'Offline validation cannot prove provider credential scope or provider-side resource ownership; provider API smoke checks are still required.',
       ].join('\n'),
@@ -66,6 +68,18 @@ describe('validateFullStagingReleaseProviders', () => {
 
     expect(() => validateFullStagingReleaseProviders(environment)).toThrow(
       /TURNSTILE_TEST_BYPASS must be disabled[\s\S]*STRIPE_SECRET_KEY must be a test-mode key/,
+    );
+  });
+
+  it('requires explicit recipient and device-token delivery controls', () => {
+    expect(() =>
+      validateFullStagingReleaseProviders({
+        ...validEnvironment(),
+        STAGING_EMAIL_RECIPIENT_ALLOWLIST: '',
+        STAGING_PUSH_TOKEN_ALLOWLIST: 'ExponentPushToken[test],invalid',
+      }),
+    ).toThrow(
+      /STAGING_EMAIL_RECIPIENT_ALLOWLIST must contain unique, valid test-recipient email addresses[\s\S]*STAGING_PUSH_TOKEN_ALLOWLIST must be disabled or contain unique Expo push tokens/,
     );
   });
 

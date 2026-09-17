@@ -1,4 +1,5 @@
 import { isIP } from 'net';
+import { validateStagingOutboundDeliveryConfiguration } from '../common/outbound/staging-outbound-policy';
 
 type Environment = Record<string, unknown>;
 
@@ -53,6 +54,7 @@ export function validateEnvironment(environment: Environment): Environment {
   requireSecret(environment, 'OTP_PEPPER', 32, errors);
   requireSecret(environment, 'RESEND_API_KEY', 1, errors);
   requireEmailFrom(environment, errors);
+  errors.push(...validateStagingOutboundDeliveryConfiguration(environment));
 
   const testBypass = readBoolean(environment, 'TURNSTILE_TEST_BYPASS', errors);
   if (testBypass === true) {

@@ -1,5 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { Resend } from 'resend';
+import { isStagingEmailRecipientAllowed } from '../common/outbound/staging-outbound-policy';
 
 @Injectable()
 export class MailService {
@@ -24,6 +25,13 @@ export class MailService {
   }
 
   async sendPasswordReset(to: string, resetUrl: string) {
+    if (!isStagingEmailRecipientAllowed(to, process.env)) {
+      this.logger.warn(
+        'Staging password-reset delivery blocked by recipient allowlist.',
+      );
+      return false;
+    }
+
     const subject = 'Reset your NXQ Social password';
     const html = `
       <div style="font-family:system-ui,Arial,sans-serif;max-width:480px;margin:0 auto;padding:24px;">
@@ -75,6 +83,13 @@ export class MailService {
   }
 
   async sendVerificationEmail(to: string, username: string) {
+    if (!isStagingEmailRecipientAllowed(to, process.env)) {
+      this.logger.warn(
+        'Staging verification-email delivery blocked by recipient allowlist.',
+      );
+      return false;
+    }
+
     const subject = 'Verify your NXQ Social email';
     const safeUsername = escapeHtml(username);
     const safeVerificationUrl = escapeHtml(this.verificationUrl);

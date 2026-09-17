@@ -76,6 +76,14 @@ Do not send verification email, SMS, push notifications, payment events, or
 LiveKit invitations to restored production users. If an audited sanitizer and
 outbound sink are not ready, use synthetic data instead.
 
+The backend also enforces a staging delivery boundary. Set
+`STAGING_EMAIL_RECIPIENT_ALLOWLIST` to only controlled test inboxes. Set
+`STAGING_PUSH_TOKEN_ALLOWLIST=disabled` unless a test needs a real device push;
+for that test, replace `disabled` with only the exact Expo push token of the
+controlled test device. Missing, malformed, or non-matching values deny
+outbound delivery. Do not put restored customer addresses or device tokens in
+either setting.
+
 ## Service layout
 
 Use four resources in one Railway staging environment:
@@ -170,6 +178,8 @@ NEXT_PUBLIC_TURNSTILE_SITE_KEY
 OTP_PEPPER
 RESEND_API_KEY
 EMAIL_FROM
+STAGING_EMAIL_RECIPIENT_ALLOWLIST
+STAGING_PUSH_TOKEN_ALLOWLIST
 STRIPE_SECRET_KEY
 STRIPE_WEBHOOK_SECRET
 LIVEKIT_URL

@@ -1,19 +1,30 @@
 import { ConfigService } from '@nestjs/config';
+import type Redis from 'ioredis';
 import { NotificationsService } from './notifications.service';
 
 describe('NotificationsService email delivery', () => {
-  function buildService() {
+  function buildService(overrides: Record<string, string | undefined> = {}) {
+    const values: Record<string, string | undefined> = {
+      RESEND_API_KEY: 're_test_key',
+      EMAIL_FROM: 'noreply@example.test',
+      ...overrides,
+    };
     const config = {
       get: jest.fn((name: string, fallback?: string) => {
-        if (name === 'RESEND_API_KEY') return 're_test_key';
-        if (name === 'EMAIL_FROM') return 'noreply@example.test';
-        return fallback;
+        return values[name] ?? fallback;
       }),
     } as unknown as ConfigService;
-    const service = new NotificationsService(config, {} as any);
+    const redis = {
+      smembers: jest.fn(),
+      srem: jest.fn(),
+    };
+    const service = new NotificationsService(config, redis as unknown as Redis);
     const send = jest.fn();
-    (service as any).resend = { emails: { send } };
-    return { service, send };
+    Object.defineProperty(service, 'resend', {
+      value: { emails: { send } },
+      configurable: true,
+    });
+    return { service, send, redis };
   }
 
   it('accepts a provider-confirmed email send', async () => {
@@ -35,5 +46,38 @@ describe('NotificationsService email delivery', () => {
     await expect(
       service.sendEmailOtp('user@example.test', '123456', 'user'),
     ).rejects.toThrow('Email OTP delivery failed');
+  });
+
+  it('does not deliver OTP email to a restored customer in staging', async () => {
+    const { service, send } = buildService({
+      NXQ_RELEASE_TARGET: 'staging',
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+      STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
+    });
+
+    await expect(
+      service.sendEmailOtp('restored-customer@example.test', '123456', 'user'),
+    ).rejects.toThrow(
+      'Email OTP delivery is disabled for this staging recipient',
+    );
+    expect(send).not.toHaveBeenCalled();
+  });
+
+  it('does not call Expo when staging push delivery is disabled', async () => {
+    const { service, redis } = buildService({
+      NXQ_RELEASE_TARGET: 'staging',
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+      STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
+    });
+    redis.smembers.mockResolvedValue(['ExponentPushToken[restored-device]']);
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    await service.sendPushToUsers(['restored-user'], {
+      title: 'NXQ Social',
+      body: 'A restored-user notification',
+    });
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
   });
 });

@@ -1,5 +1,6 @@
 import { NXQ_SOCIAL_STAGING_TARGET } from './staging-target';
 import { isIP } from 'net';
+import { validateStagingOutboundDeliveryConfiguration } from '../common/outbound/staging-outbound-policy';
 
 type ReleaseEnvironment = Record<string, string | undefined>;
 
@@ -7,6 +8,7 @@ export const FULL_STAGING_PROVIDER_GROUPS = [
   'R2 public/quarantine storage',
   'Staging moderation mock',
   'Resend email',
+  'Outbound delivery safety',
   'Turnstile bot protection',
   'Stripe test mode',
   'LiveKit',
@@ -53,6 +55,7 @@ export function validateFullStagingReleaseProviders(
   validateR2(environment, issues);
   validateStagingModeration(environment, issues);
   validateResend(environment, issues);
+  validateStagingOutboundDelivery(environment, issues);
   validateTurnstile(environment, issues);
   validateStripeTestMode(environment, issues);
   validateLiveKit(environment, issues);
@@ -297,6 +300,17 @@ function validateResend(environment: ReleaseEnvironment, issues: string[]) {
     issues.push(
       '[Resend] EMAIL_FROM must use the approved mail.nxqsocial.com domain',
     );
+  }
+}
+
+function validateStagingOutboundDelivery(
+  environment: ReleaseEnvironment,
+  issues: string[],
+) {
+  for (const issue of validateStagingOutboundDeliveryConfiguration(
+    environment,
+  )) {
+    issues.push(`[Outbound delivery] ${issue}`);
   }
 }
 

@@ -5,17 +5,36 @@ describe('MailService', () => {
     NODE_ENV: process.env.NODE_ENV,
     APP_BASE_URL: process.env.APP_BASE_URL,
     RESEND_API_KEY: process.env.RESEND_API_KEY,
+    NXQ_RELEASE_TARGET: process.env.NXQ_RELEASE_TARGET,
+    RAILWAY_ENVIRONMENT_NAME: process.env.RAILWAY_ENVIRONMENT_NAME,
+    STAGING_EMAIL_RECIPIENT_ALLOWLIST:
+      process.env.STAGING_EMAIL_RECIPIENT_ALLOWLIST,
   };
 
   beforeEach(() => {
     process.env.NODE_ENV = 'test';
     process.env.APP_BASE_URL = 'https://staging.nxqsocial.test';
+    delete process.env.NXQ_RELEASE_TARGET;
+    delete process.env.RAILWAY_ENVIRONMENT_NAME;
+    delete process.env.STAGING_EMAIL_RECIPIENT_ALLOWLIST;
   });
 
   afterEach(() => {
     restoreEnvironment('NODE_ENV', originalEnvironment.NODE_ENV);
     restoreEnvironment('APP_BASE_URL', originalEnvironment.APP_BASE_URL);
     restoreEnvironment('RESEND_API_KEY', originalEnvironment.RESEND_API_KEY);
+    restoreEnvironment(
+      'NXQ_RELEASE_TARGET',
+      originalEnvironment.NXQ_RELEASE_TARGET,
+    );
+    restoreEnvironment(
+      'RAILWAY_ENVIRONMENT_NAME',
+      originalEnvironment.RAILWAY_ENVIRONMENT_NAME,
+    );
+    restoreEnvironment(
+      'STAGING_EMAIL_RECIPIENT_ALLOWLIST',
+      originalEnvironment.STAGING_EMAIL_RECIPIENT_ALLOWLIST,
+    );
     jest.restoreAllMocks();
   });
 
@@ -67,6 +86,47 @@ describe('MailService', () => {
         'https://app.example.test/reset-password?token=test',
       ),
     ).resolves.toBe(true);
+  });
+
+  it.each([
+    [
+      'password reset',
+      (service: MailService) =>
+        service.sendPasswordReset(
+          'restored-customer@example.test',
+          'https://app.example.test/reset-password?token=test',
+        ),
+    ],
+    [
+      'verification reminder',
+      (service: MailService) =>
+        service.sendVerificationEmail('restored-customer@example.test', 'user'),
+    ],
+  ])(
+    'does not call Resend for a non-allowlisted staging %s recipient',
+    async (_name, invoke) => {
+      process.env.NXQ_RELEASE_TARGET = 'staging';
+      process.env.STAGING_EMAIL_RECIPIENT_ALLOWLIST = 'operator@nxqsocial.test';
+      const { service, send } = buildService();
+
+      await expect(invoke(service)).resolves.toBe(false);
+      expect(send).not.toHaveBeenCalled();
+    },
+  );
+
+  it('allows an exact configured staging test inbox', async () => {
+    process.env.NXQ_RELEASE_TARGET = 'staging';
+    process.env.STAGING_EMAIL_RECIPIENT_ALLOWLIST = 'operator@nxqsocial.test';
+    const { service, send } = buildService();
+    send.mockResolvedValue({ data: { id: 'email-1' }, error: null });
+
+    await expect(
+      service.sendPasswordReset(
+        'operator@nxqsocial.test',
+        'https://app.example.test/reset-password?token=test',
+      ),
+    ).resolves.toBe(true);
+    expect(send).toHaveBeenCalledTimes(1);
   });
 
   it('returns false when no email provider is configured', async () => {

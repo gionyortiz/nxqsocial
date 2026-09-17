@@ -43,6 +43,8 @@ describe('validateEnvironment', () => {
       ...validProductionEnvironment(),
       NXQ_RELEASE_TARGET: 'staging',
       RAILWAY_ENVIRONMENT_NAME: 'staging',
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+      STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
       MEDIA_MODERATION_PROVIDER: 'staging-mock',
       REKOGNITION_REGION: '',
       REKOGNITION_ACCESS_KEY_ID: '',
@@ -151,6 +153,28 @@ describe('validateEnvironment', () => {
 
     expect(() => validateEnvironment(environment)).toThrow(
       /SIGNUP_HARDENING_ENABLED cannot be disabled in production/,
+    );
+  });
+
+  it('requires explicit safe outbound-delivery configuration for staging', () => {
+    const environment = {
+      ...validProductionEnvironment(),
+      NXQ_RELEASE_TARGET: 'staging',
+      RAILWAY_ENVIRONMENT_NAME: 'staging',
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+      STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
+    };
+
+    expect(validateEnvironment(environment)).toBe(environment);
+
+    expect(() =>
+      validateEnvironment({
+        ...environment,
+        STAGING_EMAIL_RECIPIENT_ALLOWLIST: '',
+        STAGING_PUSH_TOKEN_ALLOWLIST: 'restored-device-token',
+      }),
+    ).toThrow(
+      /STAGING_EMAIL_RECIPIENT_ALLOWLIST must contain unique, valid test-recipient email addresses[\s\S]*STAGING_PUSH_TOKEN_ALLOWLIST must be disabled or contain unique Expo push tokens/,
     );
   });
 

@@ -3,6 +3,11 @@ import { ConfigService } from '@nestjs/config';
 import { Resend } from 'resend';
 import type Redis from 'ioredis';
 import { REDIS_CLIENT } from '../redis/redis.module';
+import {
+  filterStagingPushTokens,
+  isStagingEmailRecipientAllowed,
+  isStagingOutboundRestricted,
+} from '../common/outbound/staging-outbound-policy';
 
 type PushPayload = {
   title: string;
@@ -14,7 +19,10 @@ type PushPayload = {
 const PUSH_TOKEN_SET = (userId: string) => `push:tokens:${userId}`;
 
 function isExpoPushToken(token: string): boolean {
-  return /^ExponentPushToken\[[^\]]+\]$/.test(token) || /^ExpoPushToken\[[^\]]+\]$/.test(token);
+  return (
+    /^ExponentPushToken\[[^\]]+\]$/.test(token) ||
+    /^ExpoPushToken\[[^\]]+\]$/.test(token)
+  );
 }
 
 @Injectable()
@@ -30,7 +38,9 @@ export class NotificationsService {
     if (resendApiKey) {
       this.resend = new Resend(resendApiKey);
     } else {
-      this.logger.warn('Resend is not configured; email OTP delivery is disabled');
+      this.logger.warn(
+        'Resend is not configured; email OTP delivery is disabled',
+      );
     }
   }
 
@@ -54,9 +64,23 @@ export class NotificationsService {
   async sendPushToUsers(userIds: string[], payload: PushPayload) {
     if (!userIds.length) return;
 
-    const tokenGroups = await Promise.all(userIds.map((userId) => this.redis.smembers(PUSH_TOKEN_SET(userId))));
+    const tokenGroups = await Promise.all(
+      userIds.map((userId) => this.redis.smembers(PUSH_TOKEN_SET(userId))),
+    );
     const tokens = Array.from(new Set(tokenGroups.flat().filter(Boolean)));
-    if (!tokens.length) return;
+    const permittedTokens = filterStagingPushTokens(
+      tokens,
+      this.outboundEnvironment(),
+    );
+    if (!permittedTokens.length) {
+      if (
+        tokens.length &&
+        isStagingOutboundRestricted(this.outboundEnvironment())
+      ) {
+        this.logger.warn('Staging push delivery blocked by token allowlist.');
+      }
+      return;
+    }
 
     const headers: Record<string, string> = {
       'Content-Type': 'application/json',
@@ -67,7 +91,7 @@ export class NotificationsService {
       headers.Authorization = `Bearer ${accessToken}`;
     }
 
-    const messages = tokens.map((to) => ({
+    const messages = permittedTokens.map((to) => ({
       to,
       title: payload.title,
       body: payload.body,
@@ -89,23 +113,42 @@ export class NotificationsService {
         return;
       }
 
-      const json = (await res.json()) as { data?: Array<{ status?: string; details?: { error?: string } }> };
+      const json = (await res.json()) as {
+        data?: Array<{ status?: string; details?: { error?: string } }>;
+      };
       const tickets = json?.data ?? [];
       for (let i = 0; i < tickets.length; i += 1) {
         const ticket = tickets[i];
-        const token = tokens[i];
+        const token = permittedTokens[i];
         if (!token) continue;
         const error = ticket?.details?.error;
-        if (ticket?.status === 'error' && (error === 'DeviceNotRegistered' || error === 'InvalidCredentials')) {
-          await Promise.all(userIds.map((userId) => this.redis.srem(PUSH_TOKEN_SET(userId), token)));
+        if (
+          ticket?.status === 'error' &&
+          (error === 'DeviceNotRegistered' || error === 'InvalidCredentials')
+        ) {
+          await Promise.all(
+            userIds.map((userId) =>
+              this.redis.srem(PUSH_TOKEN_SET(userId), token),
+            ),
+          );
         }
       }
-    } catch (err: any) {
-      this.logger.warn(`Expo push exception: ${err?.message ?? 'unknown error'}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'unknown error';
+      this.logger.warn(`Expo push exception: ${message}`);
     }
   }
 
   async sendEmailOtp(to: string, code: string, username: string) {
+    if (!isStagingEmailRecipientAllowed(to, this.outboundEnvironment())) {
+      this.logger.warn(
+        'Staging email OTP delivery blocked by recipient allowlist.',
+      );
+      throw new Error(
+        'Email OTP delivery is disabled for this staging recipient',
+      );
+    }
+
     if (!this.resend) {
       throw new Error('Email OTP delivery is not configured');
     }
@@ -137,8 +180,9 @@ export class NotificationsService {
         throw new Error('Email OTP delivery failed');
       }
       this.logger.log(`Email OTP sent to ${to}`);
-    } catch (err: any) {
-      this.logger.error(`Failed to send email OTP to ${to}: ${err.message}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : 'unknown error';
+      this.logger.error(`Failed to send email OTP to ${to}: ${message}`);
       throw err;
     }
   }
@@ -160,7 +204,9 @@ export class NotificationsService {
 
     const body = `Your NXQ Social code is: ${code}. Expires in 10 minutes.`;
     const url = `https://api.twilio.com/2010-04-01/Accounts/${accountSid}/Messages.json`;
-    const encoded = Buffer.from(`${accountSid}:${authToken}`).toString('base64');
+    const encoded = Buffer.from(`${accountSid}:${authToken}`).toString(
+      'base64',
+    );
 
     const res = await fetch(url, {
       method: 'POST',
@@ -177,5 +223,20 @@ export class NotificationsService {
       throw new Error('Phone OTP delivery failed');
     }
     this.logger.log(`Phone OTP sent to ${to}`);
+  }
+
+  private outboundEnvironment() {
+    return {
+      NXQ_RELEASE_TARGET: this.config.get<string>('NXQ_RELEASE_TARGET'),
+      RAILWAY_ENVIRONMENT_NAME: this.config.get<string>(
+        'RAILWAY_ENVIRONMENT_NAME',
+      ),
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: this.config.get<string>(
+        'STAGING_EMAIL_RECIPIENT_ALLOWLIST',
+      ),
+      STAGING_PUSH_TOKEN_ALLOWLIST: this.config.get<string>(
+        'STAGING_PUSH_TOKEN_ALLOWLIST',
+      ),
+    };
   }
 }
