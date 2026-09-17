@@ -36,7 +36,7 @@ COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
 
-# Railway runs `npm run db:migrate:release` as a pre-deploy command. Keeping
-# the web process migration-free avoids concurrent migration attempts when
-# scaling and keeps the API on DATABASE_URL rather than the migration URL.
+# Railway runs migrations in a separate one-shot migration service. Keeping the
+# web process migration-free avoids concurrent migration attempts when scaling
+# and ensures the API receives only its restricted DATABASE_URL.
 CMD ["npm", "run", "start:prod"]

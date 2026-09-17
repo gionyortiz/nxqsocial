@@ -3,13 +3,14 @@
 [`railway.ts`](./railway.ts) is the single project-level definition for the
 existing `nxq-social-staging` Railway project and its `staging` environment.
 It preserves the existing Postgres, Redis, and volume resources and proposes
-the `backend` and `frontend` services from
+the `backend`, `frontend`, and one-shot `migration-job` services from
 `release/railway-staging-20260916`.
 
 The configuration intentionally contains no custom domains, provider secrets,
-production resources, or deployment authorization. The backend provider
-preflight is a fail-closed pre-deploy command; future deployments cannot pass
-until the separately managed staging credentials are complete.
+production resources, or deployment authorization. The backend pre-deploy
+sequence is fail-closed: provider configuration must validate and the
+restricted runtime role must verify the committed Prisma migration set before
+an API deployment can become healthy.
 
 A remote revision of `release/railway-staging-20260916` is **not eligible for
 an IaC apply** unless one reviewed atomic commit contains all of the following
@@ -55,9 +56,9 @@ value-decryption/display flags, never prints status JSON, and never calls
 After every required staging shared variable exists and the reviewed commit is
 clean, pushed, and green in CI, the separate apply wrapper performs the same
 exact target and CLI checks again. It additionally proves the local commit
-equals the remote staging branch, refuses missing or placeholder shared
-variables, and reruns the exact `2 add, 0 change, 0 destroy` plan before
-invoking a non-destructive apply:
+equals the remote staging branch, refuses missing shared variables (including
+sealed values), and reruns the exact `3 add, 0 change, 0 destroy` plan before
+opening Railway's interactive resource apply:
 
 ```powershell
 $env:RAILWAY_CLI_PATH = 'C:\Tools\Railway\v5.43.3\railway.exe'
@@ -71,8 +72,12 @@ succeeded, and passes only a minimal operating-system environment to every
 child process so unrelated provider credentials are not inherited. The release
 preflight also does not auto-load repository `.env` files. It rechecks the
 target immediately before opening Railway's own interactive apply prompt;
-confirm only after that final displayed plan is still exactly two service
-additions with no other changes.
+confirm only after that final displayed plan is still exactly three service
+additions with no other changes. Railway can schedule independent services in
+parallel, so service creation itself is not evidence of schema order: the API
+has a read-only pre-deploy migration-status gate and cannot become healthy
+until the migration job has completed successfully. After that job exits,
+redeploy backend/frontend and require the schema gate to pass.
 
 The offline CI check executes `npm --prefix .railway run validate`. That parses
 and evaluates the TypeScript definition with the exact approved context,
@@ -82,9 +87,10 @@ identities fail closed without authentication or network access.
 The expected pre-apply plan is:
 
 ```text
-Plan: 2 to add, 0 to change, 0 to destroy
+Plan: 3 to add, 0 to change, 0 to destroy
   + Create service backend
   + Create service frontend
+  + Create service migration-job
 ```
 
 Do not apply if the plan contains a database or volume change, a domain, a
@@ -116,6 +122,7 @@ The following shared-variable names must all exist before an apply:
 - `LIVEKIT_API_SECRET`
 - `CLOUDFLARE_PROXY_CIDRS`
 - `RUNTIME_DATABASE_URL`
+- `MIGRATION_DATABASE_URL`
 
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are the standard S3-compatible
 environment names consumed by the SDK, but in this staging definition they are
@@ -123,9 +130,11 @@ scoped Cloudflare R2 credentials. They do not authorize or require an AWS
 account. Staging moderation is pinned to the non-secret `staging-mock` provider;
 no Rekognition, AWS S3 bucket, or IAM credential is used.
 
-`MIGRATION_DATABASE_URL` is also required before an apply, but is deliberately
-listed separately: the apply wrapper validates it without mapping it into the
-backend service's IaC environment.
+The wrapper treats a sealed Railway variable as present without reading its
+value. It runs only synthetic, structurally valid fixtures locally; exact
+secret validation happens inside the staged service preflight. This keeps real
+provider credentials out of local child processes and supports sealed Railway
+variables.
 
 The public staging origins, exact NXQSocial R2 account endpoint, staging bucket
 identities, Turnstile hostname, feature flags, and R2 region are non-secret and
@@ -142,26 +151,32 @@ with the staging release evidence.
 ## Database migration authority
 
 Railway maps the separately provisioned `RUNTIME_DATABASE_URL` to the API's
-`DATABASE_URL`; it must be a restricted application role, not the Railway
-database service's default/owner connection. The pre-deploy command runs
-`npm run db:migrate:release`, which requires a second
-`MIGRATION_DATABASE_URL`, verifies that it is a valid PostgreSQL URL for the
-same named database, and fails closed if its credential matches the runtime
-credential. It then supplies that URL only to the one-shot Prisma migration
-child process. The normal Docker command remains `npm run start:prod` and does
-not run migrations. `MIGRATION_DATABASE_URL` is intentionally **not** a
-backend service/IaC environment binding: the apply wrapper validates the
-separately governed shared secret locally, but it must be injected only into
-an approved pre-deploy scope or an isolated one-shot migration job.
+`DATABASE_URL`; it must use the restricted `nxqsocial_runtime` PostgreSQL role,
+not the Railway database service's default/owner connection. Railway makes a
+service's variables available to both pre-deploy and runtime containers, so
+this API never receives `MIGRATION_DATABASE_URL` and never performs schema
+changes. `RUNTIME_DATABASE_ROLE` is fixed in source to
+`nxqsocial_runtime`, so it cannot be self-attested as the migration role by a
+Railway variable.
 
-This source/IaC boundary does **not** create PostgreSQL roles, grants, or a
-pre-deploy-only Railway secret scope. Before any production cutover, an
-operator must create and test a restricted runtime role plus a separately
-governed migration role, and prove that the provider's runtime service cannot
-use the migration credential outside the authorized pre-deploy job. If Railway
-cannot scope that secret to pre-deploy, use an isolated one-shot migration
-service/job instead. Do not treat a successful source test as evidence that
-those provider-side controls exist.
+The separate `migration-job` service receives only
+`MIGRATION_DATABASE_URL`, which must use the distinct
+`nxqsocial_migrator` role. Its start command is
+`npm run db:migrate:isolated`; it has no public domain, has no API runtime
+credentials, and uses restart policy `NEVER`. The job fails closed if any
+runtime/API credential or storage/provider configuration is present, or if its
+URL username differs from its declared role. Its Prisma child receives only
+the migration URL plus minimal operating-system context. Deploy it once,
+observe a successful exit, then redeploy backend/frontend; their read-only
+schema-status gate must pass before either API deployment is healthy.
+
+This source/IaC boundary does **not** create PostgreSQL roles or grants. Before
+any staging deployment, an operator must create and test the restricted runtime
+role plus the separate migration role, verify their grants against the exact
+staging database, grant the runtime role read-only access to
+`_prisma_migrations` for the schema-status gate, and store both connection URLs
+as sealed Railway shared variables. Do not treat a successful source test as
+evidence that those provider-side controls exist.
 
 ## Migration notes
 

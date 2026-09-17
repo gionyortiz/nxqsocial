@@ -58,10 +58,10 @@ Use one of these reviewed patterns:
    hashes, contact data, provider references, push tokens, or private content.
 
 Use staging-only resources and credentials throughout. The active IaC preserves
-the already-imported Railway PostgreSQL and Redis resources and proposes only
-the `backend` and `frontend` services. Do not create, replace, resize, or
-change either data resource unless a separately reviewed read-only plan proves
-that it is safe:
+the already-imported Railway PostgreSQL and Redis resources and proposes the
+`backend`, `frontend`, and one-shot `migration-job` services. Do not create,
+replace, resize, or change either data resource unless a separately reviewed
+read-only plan proves that it is safe:
 
 - the retained Railway PostgreSQL service must never point at production and
   must remain on its verified image/version and volume;
@@ -87,14 +87,15 @@ customer addresses, phone numbers, or device tokens in any allowlist.
 
 ## Service layout
 
-Use four resources in one Railway staging environment:
+Use five resources in one Railway staging environment:
 
-| Service    | Source/root                     | Public exposure                                          | Deployment check                    |
-| ---------- | ------------------------------- | -------------------------------------------------------- | ----------------------------------- |
-| `backend`  | GitHub, `/backend`, Dockerfile  | Access-gated custom domain or sanitized-data test domain | `/api/health/ready`                 |
-| `frontend` | GitHub, `/frontend`, Dockerfile | Access-gated custom domain                               | `/health`                           |
-| PostgreSQL | Railway PostgreSQL              | none                                                     | offline restore + backend readiness |
-| Redis      | Railway Redis                   | none                                                     | backend readiness                   |
+| Service         | Source/root                     | Public exposure                                          | Deployment check                          |
+| --------------- | ------------------------------- | -------------------------------------------------------- | ----------------------------------------- |
+| `backend`       | GitHub, `/backend`, Dockerfile  | Access-gated custom domain or sanitized-data test domain | `/api/health/ready`                       |
+| `frontend`      | GitHub, `/frontend`, Dockerfile | Access-gated custom domain                               | `/health`                                 |
+| `migration-job` | GitHub, `/backend`, Dockerfile  | none                                                     | one successful `db:migrate:isolated` exit |
+| PostgreSQL      | Railway PostgreSQL              | none                                                     | offline restore + backend readiness       |
+| Redis           | Railway Redis                   | none                                                     | backend readiness                         |
 
 Use Railway private networking for PostgreSQL and Redis. Do not define a fixed
 Railway `PORT`; Railway injects it. The web containers bind to `0.0.0.0`.
@@ -114,10 +115,10 @@ Before any apply:
    with the pinned external Railway CLI described in `.railway/README.md`.
 3. Require the wrapper to confirm the exact `nxq-social-staging` project and
    `staging` environment. Stop if it cannot prove both identities.
-4. Require the plan to be exactly `2 to add, 0 to change, 0 to destroy`, with
-   only the `backend` and `frontend` services added. Any database, Redis,
-   volume, domain, image, production resource, change, or deletion stops the
-   rollout.
+4. Require the plan to be exactly `3 to add, 0 to change, 0 to destroy`, with
+   only the `backend`, `frontend`, and `migration-job` services added. Any
+   database, Redis, volume, domain, image, production resource, change, or
+   deletion stops the rollout.
 5. Keep Railway auto-deploy disabled while staging is stopped. A revision is
    not eligible for a separately authorized manual deployment until CI passes
    on that exact commit.
@@ -141,9 +142,10 @@ than allowing a service deployment to decide the database version.
   graph requires Node 22; keep the build and runtime major aligned and do not
   downgrade to Node 20 without a clean install, migration, and startup smoke
   test.
-- Pre-deploy command: `node dist/scripts/release-provider-preflight.js && npm run db:migrate:release`.
-  Railway accepts one pre-deploy command; `&&` keeps provider preflight first
-  and prevents migrations from starting if it fails.
+- Backend pre-deploy commands: `node dist/scripts/release-provider-preflight.js`
+  followed by `npm run db:migrate:verify-runtime`. The latter is read-only: it
+  refuses an API deployment unless the restricted runtime role can verify the
+  committed Prisma migration set. It never applies schema changes.
 - Start command: leave unset (`npm run start:prod` is the image command)
 - Healthcheck path: `/api/health/ready`
 - Healthcheck timeout: 300 seconds
@@ -152,17 +154,21 @@ than allowing a service deployment to decide the database version.
   (prevents an unbounded staging crash loop from consuming the authorized budget)
 - Draining time: at least 20 seconds
 
-The pre-deploy container has no persistent volume. Its only permitted sequence
-is the offline, read-only provider/application-target preflight followed by the
-release migration command; a preflight failure must prevent the migration
-command from starting. `db:migrate:release` fails closed without a separate
-`MIGRATION_DATABASE_URL`, rejects an equal runtime/migration credential or a
-reused PostgreSQL role, and passes the migration URL only to Prisma's one-shot
-child process. The runtime Docker command remains migration-free and uses
-`DATABASE_URL`. Never run the
-local-media migration or video backfill as a pre-deploy command. The Windows
-Compose deployment deliberately uses `npm run start:with-migrations` for its
-existing single backend instance.
+Railway supplies a service's environment variables to both its pre-deploy and
+runtime containers. Therefore the backend never receives a migration owner
+credential. Migrations run through the separate one-shot `migration-job`
+service instead: it receives only `MIGRATION_DATABASE_URL`, must use the
+`nxqsocial_migrator` role, has no public domain, and exits after
+`npm run db:migrate:isolated` with restart policy `NEVER`. The backend receives
+only `RUNTIME_DATABASE_URL` through `DATABASE_URL`, must use the restricted
+`nxqsocial_runtime` role, and remains migration-free. The API cannot pass
+pre-deploy or become healthy until that restricted role sees the committed
+migration set. A failed, late, or parallel migration job therefore leaves the
+API unavailable instead of serving an unknown schema. After the job exits
+successfully, redeploy the backend/frontend and verify the read-only schema
+check. Never run the local-media migration or video backfill as a pre-deploy
+command. The Windows Compose deployment deliberately uses
+`npm run start:with-migrations` for its existing single backend instance.
 
 The project IaC pins the non-secret staging target and application origins,
 maps the restricted database runtime credential from a shared variable, and
@@ -197,6 +203,7 @@ LIVEKIT_URL
 LIVEKIT_API_KEY
 LIVEKIT_API_SECRET
 RUNTIME_DATABASE_URL
+MIGRATION_DATABASE_URL
 
 # Current Cloudflare published proxy CIDRs, reviewed before the release.
 CLOUDFLARE_PROXY_CIDRS
@@ -206,8 +213,10 @@ AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 ```
 
-`MIGRATION_DATABASE_URL` is separately required and locally validated by the
-apply wrapper, but must not be added to the backend service environment above.
+`MIGRATION_DATABASE_URL` is bound only to `migration-job`, never to the backend
+service. Store both database URLs as sealed Railway shared variables; the apply
+wrapper validates only their presence and uses synthetic fixtures locally so
+real secrets are never copied into an operator subprocess.
 
 The IaC sets `JWT_EXPIRES_IN`, `SIGNUP_HARDENING_ENABLED`,
 `TURNSTILE_ALLOWED_HOSTNAMES`, `TURNSTILE_TEST_BYPASS`, the exact NXQSocial R2
@@ -223,21 +232,17 @@ Do not add production Rekognition credentials just to make staging look like
 production; real moderation credentials and the separate private moderation
 bucket are a later production-release gate.
 
-`RUNTIME_DATABASE_URL` is mapped to the API's `DATABASE_URL` and must be a
-restricted application role, not the Railway Postgres service's default/owner
-credential. `MIGRATION_DATABASE_URL` is a separately governed PostgreSQL
-credential for the one-shot Prisma migration command; it must not equal the
-runtime credential. It is deliberately absent from the backend service's IaC
-environment binding. The apply wrapper validates the separately governed
-shared secret locally; it does not map it into the API runtime. The repository
-cannot create PostgreSQL roles/grants or prove that Railway scopes a secret to
-pre-deploy only. Before any production cutover, complete a provider-side
-role/grant rehearsal and prove that the API runtime has only its restricted
-`DATABASE_URL`. If Railway cannot provide that pre-deploy-only scope, run the
-migration through an isolated one-shot migration service/job; the checked-in
-pre-deploy command will otherwise fail closed without
-`MIGRATION_DATABASE_URL`. This is a hard operational gate, not a claim made by
-this IaC file.
+`RUNTIME_DATABASE_URL` is mapped to the API's `DATABASE_URL` and must use the
+hard-coded restricted `nxqsocial_runtime` role, not the Railway Postgres
+service's default/owner credential. It must have read-only access to
+`_prisma_migrations` so the API pre-deploy schema verifier can fail closed.
+`MIGRATION_DATABASE_URL` is bound only to
+`migration-job` and must use the separate `nxqsocial_migrator` role. The
+repository cannot create PostgreSQL roles/grants or prove their provider-side
+privileges. Before any staging deployment, complete a provider-side role/grant
+rehearsal and prove that the API runtime contains only its restricted
+`DATABASE_URL`; this is a hard operational gate, not a claim made by this IaC
+file.
 
 The application origins are not free-form staging inputs. They must remain this
 single approved set; the release preflight rejects missing, alternate,

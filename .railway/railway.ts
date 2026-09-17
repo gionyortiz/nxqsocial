@@ -71,13 +71,20 @@ export default defineRailway((ctx) => {
     source: github(SOURCE_REPOSITORY, {
       branch: STAGING_BRANCH,
       rootDirectory: "backend",
+      checkSuites: true,
     }),
     build: {
       builder: "DOCKERFILE",
       dockerfilePath: "Dockerfile",
     },
+    // Do not run migrations here. Railway provides a service's variables to
+    // both its pre-deploy container and its long-lived runtime, so a migration
+    // credential in this service would also be visible to the API. The second
+    // command is read-only: it refuses deployment unless the restricted API
+    // role can verify that the separate migration job already applied the
+    // lockfile-pinned migration set.
     preDeployCommand:
-      "node dist/scripts/release-provider-preflight.js && npm run db:migrate:release",
+      "node dist/scripts/release-provider-preflight.js && npm run db:migrate:verify-runtime",
     deploy: {
       healthcheckPath: "/api/health/ready",
       healthcheckTimeout: 300,
@@ -101,6 +108,7 @@ export default defineRailway((ctx) => {
       // restricted application role. The release migration validator refuses a
       // matching migration credential before Prisma can run.
       DATABASE_URL: shared.RUNTIME_DATABASE_URL,
+      RUNTIME_DATABASE_ROLE: "nxqsocial_runtime",
       REDIS_URL: Redis.env.REDIS_URL,
       JWT_SECRET: shared.JWT_SECRET,
       JWT_EXPIRES_IN: "7d",
@@ -136,10 +144,39 @@ export default defineRailway((ctx) => {
     },
   });
 
+  // This job is deliberately separate from `backend`: it receives the DDL
+  // credential but none of the API's runtime secrets or DATABASE_URL. An
+  // operator deploys it once, observes a successful exit, then deploys the
+  // backend/frontend. NEVER prevents a completed job from restarting.
+  const migrationJob = service("migration-job", {
+    source: github(SOURCE_REPOSITORY, {
+      branch: STAGING_BRANCH,
+      rootDirectory: "backend",
+      checkSuites: true,
+    }),
+    build: {
+      builder: "DOCKERFILE",
+      dockerfilePath: "Dockerfile",
+    },
+    deploy: {
+      startCommand: "npm run db:migrate:isolated",
+      restartPolicyType: "NEVER",
+      restartPolicyMaxRetries: 0,
+    },
+    replicas: { "us-west2": 1 },
+    env: {
+      NODE_ENV: "production",
+      NXQ_RELEASE_TARGET: "staging",
+      MIGRATION_DATABASE_ROLE: "nxqsocial_migrator",
+      MIGRATION_DATABASE_URL: shared.MIGRATION_DATABASE_URL,
+    },
+  });
+
   const frontend = service("frontend", {
     source: github(SOURCE_REPOSITORY, {
       branch: STAGING_BRANCH,
       rootDirectory: "frontend",
+      checkSuites: true,
     }),
     build: {
       builder: "DOCKERFILE",
@@ -169,6 +206,7 @@ export default defineRailway((ctx) => {
       Postgres,
       postgresVolume,
       redisVolume,
+      migrationJob,
       backend,
       frontend,
     ],

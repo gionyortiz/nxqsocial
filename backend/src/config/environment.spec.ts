@@ -88,6 +88,9 @@ describe('validateEnvironment', () => {
       RAILWAY_SERVICE_ID: 'railway-service',
       RAILWAY_ENVIRONMENT_NAME: 'staging',
       NXQ_RELEASE_TARGET: 'staging',
+      RUNTIME_DATABASE_ROLE: 'nxqsocial_runtime',
+      DATABASE_URL:
+        'postgresql://nxqsocial_runtime:password@db.internal:5432/nxqsocial',
       MEDIA_MODERATION_PROVIDER: 'staging-mock',
       REKOGNITION_REGION: '',
       REKOGNITION_ACCESS_KEY_ID: '',
@@ -115,6 +118,50 @@ describe('validateEnvironment', () => {
       }),
     ).toThrow(
       /NXQ_RELEASE_TARGET must explicitly equal staging or production in a Railway runtime/,
+    );
+  });
+
+  it('requires the restricted runtime role in Railway environments', () => {
+    const railwayEnvironment = {
+      ...validProductionEnvironment(),
+      RAILWAY_PROJECT_ID: 'railway-project',
+      RAILWAY_ENVIRONMENT_ID: 'railway-environment',
+      RAILWAY_SERVICE_ID: 'railway-service',
+      RAILWAY_ENVIRONMENT_NAME: 'staging',
+      NXQ_RELEASE_TARGET: 'staging',
+      RUNTIME_DATABASE_ROLE: 'nxqsocial_runtime',
+      MEDIA_MODERATION_PROVIDER: 'staging-mock',
+      REKOGNITION_REGION: '',
+      REKOGNITION_ACCESS_KEY_ID: '',
+      REKOGNITION_SECRET_ACCESS_KEY: '',
+      REKOGNITION_S3_BUCKET: '',
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'staging-test@example.test',
+      STAGING_PHONE_RECIPIENT_ALLOWLIST: 'disabled',
+      STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
+      CLOUDFLARE_PROXY_CIDRS: '198.51.100.0/24,2001:db8::/32',
+    };
+
+    expect(() => validateEnvironment(railwayEnvironment)).toThrow(
+      'DATABASE_URL must use the nxqsocial_runtime credential in a Railway runtime',
+    );
+
+    expect(
+      validateEnvironment({
+        ...railwayEnvironment,
+        DATABASE_URL:
+          'postgresql://nxqsocial_runtime:password@db.internal:5432/nxqsocial',
+      }),
+    ).toMatchObject({ RUNTIME_DATABASE_ROLE: 'nxqsocial_runtime' });
+
+    expect(() =>
+      validateEnvironment({
+        ...railwayEnvironment,
+        RUNTIME_DATABASE_ROLE: 'nxqsocial_migrator',
+        DATABASE_URL:
+          'postgresql://nxqsocial_migrator:password@db.internal:5432/nxqsocial',
+      }),
+    ).toThrow(
+      /RUNTIME_DATABASE_ROLE must equal nxqsocial_runtime[\s\S]*DATABASE_URL must use the nxqsocial_runtime credential/,
     );
   });
 

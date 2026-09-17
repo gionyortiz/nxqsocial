@@ -57,8 +57,8 @@ verifyCliVersion(executable, cliEnvironment);
 verifyRailwayTarget(executable, cliEnvironment);
 const sourceCommit = verifyGitSource();
 verifyGreenCi(sourceCommit, cliEnvironment);
-const sharedVariables = verifySharedVariables(executable, cliEnvironment);
-verifyReleaseConfiguration(sharedVariables);
+verifySharedVariables(executable, cliEnvironment);
+verifyReleaseConfiguration();
 
 const approvedEnvironment = {
   ...cliEnvironment,
@@ -92,18 +92,22 @@ const createLines = planOutput
   .sort();
 if (
   summaryLines.length !== 1 ||
-  summaryLines[0] !== "Plan: 2 to add, 0 to change, 0 to destroy" ||
+  summaryLines[0] !== "Plan: 3 to add, 0 to change, 0 to destroy" ||
   JSON.stringify(createLines) !==
-    JSON.stringify(["+ Create service backend", "+ Create service frontend"])
+    JSON.stringify([
+      "+ Create service backend",
+      "+ Create service frontend",
+      "+ Create service migration-job",
+    ])
 ) {
   throw new Error(
-    "Refusing to apply because the final plan is not exactly two service additions.",
+    "Refusing to apply because the final plan is not exactly three service additions.",
   );
 }
 
 verifyRailwayTarget(executable, cliEnvironment);
 console.error(
-  "Verified NXQSocial staging target, remote source, provider configuration, and 2-add/0-change/0-destroy plan. Review the CLI plan once more before confirming its interactive prompt.",
+  "Verified NXQSocial staging target, remote source, provider configuration shape, and 3-add/0-change/0-destroy plan. Review the CLI plan once more before confirming its interactive prompt.",
 );
 const applyResult = spawnSync(
   executable,
@@ -297,38 +301,35 @@ function verifySharedVariables(executablePath, environment) {
     throw new Error("Railway environment configuration returned invalid JSON.");
   }
   const shared = configuration?.sharedVariables ?? {};
-  const missingOrInvalid = requiredSharedVariables.filter((name) => {
-    const configured = shared[name]?.value;
-    return (
-      typeof configured !== "string" ||
-      configured.trim() === "" ||
-      placeholder.test(configured.trim())
-    );
-  });
-  if (missingOrInvalid.length > 0) {
+  const missing = requiredSharedVariables.filter(
+    (name) => !hasConfiguredSharedVariable(shared[name]),
+  );
+  if (missing.length > 0) {
     throw new Error(
-      `Refusing to apply; missing or placeholder staging shared variables: ${missingOrInvalid.join(", ")}`,
+      `Refusing to apply; missing staging shared variables: ${missing.join(", ")}`,
     );
   }
-  const tooShort = [
-    ["JWT_SECRET", 32],
-    ["OTP_PEPPER", 32],
-  ]
-    .filter(([name, minimum]) => shared[name].value.trim().length < minimum)
-    .map(([name]) => name);
-  if (tooShort.length > 0) {
-    throw new Error(
-      `Refusing to apply; staging shared variables fail minimum-length requirements: ${tooShort.join(", ")}`,
-    );
-  }
-  return Object.fromEntries(
-    requiredSharedVariables.map((name) => [name, shared[name].value]),
+}
+
+/**
+ * Sealed Railway variables intentionally do not disclose their values to the
+ * CLI. Treat a sealed variable as present, then rely on the application's
+ * in-service preflight for exact value validation. This wrapper never copies
+ * real provider credentials into a local child process.
+ */
+function hasConfiguredSharedVariable(variable) {
+  if (!variable || typeof variable !== "object") return false;
+  if (variable.isSealed === true) return true;
+  const configured = variable.value;
+  return (
+    typeof configured === "string" &&
+    configured.trim() !== "" &&
+    !placeholder.test(configured.trim())
   );
 }
 
-function verifyReleaseConfiguration(shared) {
+function verifyReleaseConfiguration() {
   const releaseEnvironment = createChildEnvironment({
-    ...shared,
     NODE_ENV: "production",
     NXQ_RELEASE_TARGET: "staging",
     RAILWAY_PROJECT_ID: expectedProject.id,
@@ -346,10 +347,30 @@ function verifyReleaseConfiguration(shared) {
     S3_PUBLIC_BASE_URL: "https://media-staging.nxqsocial.com",
     AWS_REGION: "auto",
     MEDIA_MODERATION_PROVIDER: "staging-mock",
-    DATABASE_URL: shared.RUNTIME_DATABASE_URL,
-    MIGRATION_DATABASE_URL: shared.MIGRATION_DATABASE_URL,
-    CLOUDFLARE_PROXY_CIDRS: shared.CLOUDFLARE_PROXY_CIDRS,
-    LIVEKIT_EXPECTED_STAGING_URL: shared.LIVEKIT_URL,
+    JWT_SECRET: "a".repeat(64),
+    OTP_PEPPER: "b".repeat(64),
+    TURNSTILE_SECRET_KEY: "0x4AAAAAAA_staging_fixture",
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: "1x00000000000000000000AA",
+    AWS_ACCESS_KEY_ID: "staging_r2_access_key",
+    AWS_SECRET_ACCESS_KEY: "staging_r2_secret_key_value_0123456789",
+    RESEND_API_KEY: "re_staging_fixture_key",
+    EMAIL_FROM: "NXQ Social <staging@mail.nxqsocial.com>",
+    STAGING_EMAIL_RECIPIENT_ALLOWLIST: "operator@nxqsocial.test",
+    STAGING_PHONE_RECIPIENT_ALLOWLIST: "disabled",
+    STAGING_PUSH_TOKEN_ALLOWLIST: "disabled",
+    STRIPE_SECRET_KEY: "sk_test_staging_fixture_key",
+    STRIPE_WEBHOOK_SECRET: "whsec_staging_fixture_secret",
+    LIVEKIT_URL: "wss://staging.livekit.nxqsocial.com",
+    LIVEKIT_API_KEY: "staging_livekit_key",
+    LIVEKIT_API_SECRET: "staging_livekit_secret_value",
+    CLOUDFLARE_PROXY_CIDRS: "173.245.48.0/20,2400:cb00::/32",
+    DATABASE_URL:
+      "postgresql://nxqsocial_runtime:runtime_fixture_password@db.internal:5432/nxqsocial",
+    RUNTIME_DATABASE_ROLE: "nxqsocial_runtime",
+    MIGRATION_DATABASE_URL:
+      "postgresql://nxqsocial_migrator:migration_fixture_password@db.internal:5432/nxqsocial",
+    MIGRATION_DATABASE_ROLE: "nxqsocial_migrator",
+    LIVEKIT_EXPECTED_STAGING_URL: "wss://staging.livekit.nxqsocial.com",
     NEXT_PUBLIC_APP_URL: "https://staging.nxqsocial.com",
     NEXT_PUBLIC_API_URL: "https://api-staging.nxqsocial.com/api",
     NEXT_PUBLIC_CALLS_ENABLED: "true",
@@ -391,6 +412,28 @@ function verifyReleaseConfiguration(shared) {
     );
   }
 
+  const migrationJobEnvironment = createChildEnvironment({
+    NXQ_RELEASE_TARGET: "staging",
+    MIGRATION_DATABASE_ROLE: "nxqsocial_migrator",
+    MIGRATION_DATABASE_URL:
+      "postgresql://nxqsocial_migrator:migration_fixture_password@db.internal:5432/nxqsocial",
+  });
+  const migrationJobPreflight = spawnSync(
+    npmExecutable,
+    ["--prefix", "backend", "run", "release:migration-job:preflight:dev"],
+    {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: migrationJobEnvironment,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  if (migrationJobPreflight.error || migrationJobPreflight.status !== 0) {
+    throw new Error(
+      "Refusing to apply because the isolated migration job failed offline validation.",
+    );
+  }
+
   const frontendPreflight = spawnSync(
     process.execPath,
     [
@@ -411,6 +454,28 @@ function verifyReleaseConfiguration(shared) {
   if (frontendPreflight.error || frontendPreflight.status !== 0) {
     throw new Error(
       "Refusing to apply because staging frontend configuration failed offline validation.",
+    );
+  }
+
+  const runtimeSchemaEnvironment = createChildEnvironment({
+    NXQ_RELEASE_TARGET: "staging",
+    RUNTIME_DATABASE_ROLE: "nxqsocial_runtime",
+    DATABASE_URL:
+      "postgresql://nxqsocial_runtime:runtime_fixture_password@db.internal:5432/nxqsocial",
+  });
+  const runtimeSchemaPreflight = spawnSync(
+    npmExecutable,
+    ["--prefix", "backend", "run", "release:runtime-schema:preflight:dev"],
+    {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: runtimeSchemaEnvironment,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  if (runtimeSchemaPreflight.error || runtimeSchemaPreflight.status !== 0) {
+    throw new Error(
+      "Refusing to apply because API runtime schema authority failed offline validation.",
     );
   }
 }

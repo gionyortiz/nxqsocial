@@ -55,6 +55,9 @@ const applyWrapper = readFileSync(
 assert.match(applyWrapper, /"RUNTIME_DATABASE_URL"/);
 assert.match(applyWrapper, /"MIGRATION_DATABASE_URL"/);
 assert.match(applyWrapper, /release:migration:preflight:dev/);
+assert.match(applyWrapper, /release:migration-job:preflight:dev/);
+assert.match(applyWrapper, /release:runtime-schema:preflight:dev/);
+assert.match(applyWrapper, /migration-job/);
 
 const syntheticParentSecrets = {
   CLOUDFLARE_API_TOKEN: "x",
@@ -98,6 +101,7 @@ assert.deepEqual(
     "Redis",
     "backend",
     "frontend",
+    "migration-job",
     "postgres-volume",
     "redis-volume",
   ].sort(),
@@ -105,15 +109,21 @@ assert.deepEqual(
 
 const backend = resources.find((resource) => resource.name === "backend");
 const frontend = resources.find((resource) => resource.name === "frontend");
+const migrationJob = resources.find(
+  (resource) => resource.name === "migration-job",
+);
 assert.ok(backend);
 assert.ok(frontend);
+assert.ok(migrationJob);
 assert.equal(backend.source.branch, expectedStagingBranch);
 assert.equal(frontend.source.branch, expectedStagingBranch);
-assert.equal(backend.source.checkSuites, undefined);
-assert.equal(frontend.source.checkSuites, undefined);
+assert.equal(backend.source.checkSuites, true);
+assert.equal(frontend.source.checkSuites, true);
+assert.equal(migrationJob.source.checkSuites, true);
 assert.deepEqual(backend.deploy.preDeployCommand, [
-  "node dist/scripts/release-provider-preflight.js && npm run db:migrate:release",
+  "node dist/scripts/release-provider-preflight.js && npm run db:migrate:verify-runtime",
 ]);
+assert.equal(backend.deploy.restartPolicyType, undefined);
 assert.equal(
   backend.variables.APP_BASE_URL?.value,
   expectedApplication.frontendOrigin,
@@ -154,6 +164,10 @@ assert.deepEqual(backend.variables.DATABASE_URL, {
   name: "RUNTIME_DATABASE_URL",
 });
 assert.equal(backend.variables.MIGRATION_DATABASE_URL, undefined);
+assert.equal(
+  backend.variables.RUNTIME_DATABASE_ROLE?.value,
+  "nxqsocial_runtime",
+);
 assert.deepEqual(backend.variables.LIVEKIT_EXPECTED_STAGING_URL, {
   type: "sharedReference",
   name: "LIVEKIT_URL",
@@ -196,6 +210,61 @@ assert.deepEqual(frontend.variables.NEXT_PUBLIC_TURNSTILE_SITE_KEY, {
 });
 assert.equal(frontend.variables.NEXT_PUBLIC_CALLS_ENABLED?.value, "true");
 assert.equal(frontend.variables.NEXT_PUBLIC_LIVE_ENABLED?.value, "true");
+assert.equal(migrationJob.source.branch, expectedStagingBranch);
+assert.equal(migrationJob.source.rootDirectory, "backend");
+assert.equal(migrationJob.deploy.startCommand, "npm run db:migrate:isolated");
+assert.equal(migrationJob.deploy.restartPolicyType, "NEVER");
+assert.equal(migrationJob.deploy.restartPolicyMaxRetries, 0);
+assert.deepEqual(migrationJob.variables.MIGRATION_DATABASE_URL, {
+  type: "sharedReference",
+  name: "MIGRATION_DATABASE_URL",
+});
+assert.equal(
+  migrationJob.variables.MIGRATION_DATABASE_ROLE?.value,
+  "nxqsocial_migrator",
+);
+assert.equal(migrationJob.variables.DATABASE_URL, undefined);
+for (const name of [
+  "RUNTIME_DATABASE_URL",
+  "RUNTIME_DATABASE_ROLE",
+  "REDIS_URL",
+  "JWT_SECRET",
+  "OTP_PEPPER",
+  "TURNSTILE_SECRET_KEY",
+  "AWS_ACCESS_KEY_ID",
+  "AWS_SECRET_ACCESS_KEY",
+  "RESEND_API_KEY",
+  "STRIPE_SECRET_KEY",
+  "STRIPE_WEBHOOK_SECRET",
+  "STRIPE_GIFTS_RESTRICTED_KEY",
+  "STRIPE_GIFTS_WEBHOOK_SECRET",
+  "LIVEKIT_URL",
+  "LIVEKIT_EXPECTED_STAGING_URL",
+  "LIVEKIT_API_KEY",
+  "LIVEKIT_API_SECRET",
+  "TWILIO_ACCOUNT_SID",
+  "TWILIO_AUTH_TOKEN",
+  "TWILIO_FROM_NUMBER",
+  "REKOGNITION_REGION",
+  "REKOGNITION_ACCESS_KEY_ID",
+  "REKOGNITION_SECRET_ACCESS_KEY",
+  "REKOGNITION_S3_BUCKET",
+  "S3_ENDPOINT",
+  "S3_BUCKET",
+  "S3_BUCKET_NAME",
+  "S3_QUARANTINE_BUCKET",
+  "S3_PUBLIC_BASE_URL",
+  "S3_PUBLIC_BASE",
+  "CLOUDFLARE_API_TOKEN",
+  "CLOUDFLARE_TUNNEL_TOKEN",
+  "OPENAI_API_KEY",
+]) {
+  assert.equal(
+    migrationJob.variables[name],
+    undefined,
+    `${name} leaked to migration-job IaC`,
+  );
+}
 
 for (const invalidContext of [
   { ...expected, projectId: "wrong-project" },

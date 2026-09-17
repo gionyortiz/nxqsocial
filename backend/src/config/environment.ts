@@ -5,6 +5,11 @@ type Environment = Record<string, unknown>;
 
 const TRUE_VALUES = new Set(['1', 'true', 'yes', 'on']);
 const FALSE_VALUES = new Set(['0', 'false', 'no', 'off']);
+// This is deliberately a code-level release contract, rather than accepting
+// an arbitrary value from Railway. Otherwise an operator could point both the
+// runtime and migration URLs at the migrator role and still satisfy a
+// self-attested environment variable.
+const RAILWAY_RUNTIME_DATABASE_ROLE = 'nxqsocial_runtime';
 const PLACEHOLDER_VALUE =
   /(change[-_ ]?me|replace[-_ ]?with|placeholder|your[-_ ])/i;
 
@@ -23,6 +28,7 @@ export function validateEnvironment(environment: Environment): Environment {
 
   if (railwayRuntime) {
     requireRailwayReleaseTarget(environment, errors);
+    requireRailwayRuntimeDatabaseRole(environment, errors);
   }
 
   if (nodeEnv !== 'production' && !railwayRuntime) {
@@ -397,12 +403,52 @@ function requireRailwayReleaseTarget(
   }
 }
 
+/**
+ * The Railway API service must use the restricted application role. The
+ * separately deployed migration job owns its own credential, so this check
+ * prevents an owner/default connection from quietly reaching the long-lived
+ * web process.
+ */
+function requireRailwayRuntimeDatabaseRole(
+  environment: Environment,
+  errors: string[],
+) {
+  const expectedRole = readString(environment, 'RUNTIME_DATABASE_ROLE');
+  if (expectedRole !== RAILWAY_RUNTIME_DATABASE_ROLE) {
+    errors.push(
+      `RUNTIME_DATABASE_ROLE must equal ${RAILWAY_RUNTIME_DATABASE_ROLE} in a Railway runtime`,
+    );
+  }
+
+  const databaseUrl = readString(environment, 'DATABASE_URL');
+  if (!databaseUrl) return;
+  try {
+    const parsed = new URL(databaseUrl);
+    const actualRole = decodeUrlComponent(parsed.username);
+    if (actualRole !== RAILWAY_RUNTIME_DATABASE_ROLE) {
+      errors.push(
+        `DATABASE_URL must use the ${RAILWAY_RUNTIME_DATABASE_ROLE} credential in a Railway runtime`,
+      );
+    }
+  } catch {
+    // `requireUrl` reports the malformed URL consistently below.
+  }
+}
+
 function isRailwayRuntime(environment: Environment): boolean {
   return Boolean(
     readString(environment, 'RAILWAY_ENVIRONMENT_ID') ||
     readString(environment, 'RAILWAY_PROJECT_ID') ||
     readString(environment, 'RAILWAY_SERVICE_ID'),
   );
+}
+
+function decodeUrlComponent(value: string): string {
+  try {
+    return decodeURIComponent(value);
+  } catch {
+    return value;
+  }
 }
 
 function validateIpList(
