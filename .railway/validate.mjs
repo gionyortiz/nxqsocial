@@ -104,7 +104,7 @@ assert.equal(frontend.source.branch, expectedStagingBranch);
 assert.equal(backend.source.checkSuites, undefined);
 assert.equal(frontend.source.checkSuites, undefined);
 assert.deepEqual(backend.deploy.preDeployCommand, [
-  "node dist/scripts/release-provider-preflight.js && npm run db:migrate:deploy",
+  "node dist/scripts/release-provider-preflight.js && npm run db:migrate:release",
 ]);
 assert.equal(
   backend.variables.APP_BASE_URL?.value,
@@ -135,6 +135,7 @@ for (const name of [
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
   "CLOUDFLARE_PROXY_CIDRS",
+  "MIGRATION_DATABASE_URL",
 ]) {
   assert.deepEqual(backend.variables[name], {
     type: "sharedReference",

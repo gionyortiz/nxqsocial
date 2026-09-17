@@ -77,7 +77,7 @@ export default defineRailway((ctx) => {
       dockerfilePath: "Dockerfile",
     },
     preDeployCommand:
-      "node dist/scripts/release-provider-preflight.js && npm run db:migrate:deploy",
+      "node dist/scripts/release-provider-preflight.js && npm run db:migrate:release",
     deploy: {
       healthcheckPath: "/api/health/ready",
       healthcheckTimeout: 300,
@@ -96,6 +96,12 @@ export default defineRailway((ctx) => {
       // preflight refuses to start unless it is present and valid, which keeps
       // per-client controls from treating every Cloudflare request as one IP.
       CLOUDFLARE_PROXY_CIDRS: shared.CLOUDFLARE_PROXY_CIDRS,
+      // The release script passes this reference only to Prisma's one-shot
+      // migration child process. Application code continues to use
+      // DATABASE_URL. This declaration cannot create PostgreSQL roles or make
+      // a Railway variable predeploy-only; provider-side credential scope is a
+      // separately documented operational gate before any production cutover.
+      MIGRATION_DATABASE_URL: shared.MIGRATION_DATABASE_URL,
       DATABASE_URL: Postgres.env.DATABASE_URL,
       REDIS_URL: Redis.env.REDIS_URL,
       JWT_SECRET: shared.JWT_SECRET,

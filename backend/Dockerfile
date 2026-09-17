@@ -27,14 +27,16 @@ COPY package*.json ./
 COPY prisma.config.ts ./
 COPY prisma ./prisma
 
-# Prisma is an explicit production dependency so Railway's pre-deploy command
-# stays lockfile-pinned without shipping the compiler, linter, or test toolchain.
+# Prisma is an explicit production dependency so Railway's separate release
+# migration command stays lockfile-pinned without shipping the compiler, linter,
+# or test toolchain.
 RUN npm ci --omit=dev && npm run prisma:generate && npm cache clean --force
 
 COPY --from=builder /app/dist ./dist
 
 EXPOSE 3000
 
-# Railway runs `npm run db:migrate:deploy` as a pre-deploy command. Keeping the
-# web process migration-free avoids concurrent migration attempts when scaling.
+# Railway runs `npm run db:migrate:release` as a pre-deploy command. Keeping
+# the web process migration-free avoids concurrent migration attempts when
+# scaling and keeps the API on DATABASE_URL rather than the migration URL.
 CMD ["npm", "run", "start:prod"]

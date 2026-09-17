@@ -38,6 +38,7 @@ const requiredSharedVariables = [
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
   "CLOUDFLARE_PROXY_CIDRS",
+  "MIGRATION_DATABASE_URL",
 ];
 const placeholder =
   /(?:change[-_ ]?me|replace|placeholder|example|dummy|todo|tbd|required|your[-_ ]|__[^_]+__|\.\.\.$)/i;

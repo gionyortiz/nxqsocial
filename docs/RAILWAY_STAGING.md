@@ -138,7 +138,7 @@ rather than allowing a service deployment to decide the database version.
   graph requires Node 22; keep the build and runtime major aligned and do not
   downgrade to Node 20 without a clean install, migration, and startup smoke
   test.
-- Pre-deploy command: `node dist/scripts/release-provider-preflight.js && npm run db:migrate:deploy`.
+- Pre-deploy command: `node dist/scripts/release-provider-preflight.js && npm run db:migrate:release`.
   Railway accepts one pre-deploy command; `&&` keeps provider preflight first
   and prevents migrations from starting if it fails.
 - Start command: leave unset (`npm run start:prod` is the image command)
@@ -150,11 +150,15 @@ rather than allowing a service deployment to decide the database version.
 - Draining time: at least 20 seconds
 
 The pre-deploy container has no persistent volume. Its only permitted sequence
-is the offline, read-only provider/application-target preflight followed by
-Prisma migrations; a preflight failure must prevent the migration command from
-starting. Never run the local-media migration or video backfill as a pre-deploy
-command. The Windows Compose deployment deliberately uses
-`npm run start:with-migrations` for its existing single backend instance.
+is the offline, read-only provider/application-target preflight followed by the
+release migration command; a preflight failure must prevent the migration
+command from starting. `db:migrate:release` fails closed without a separate
+`MIGRATION_DATABASE_URL`, rejects an equal runtime/migration credential, and
+passes the migration URL only to Prisma's one-shot child process. The runtime
+Docker command remains migration-free and uses `DATABASE_URL`. Never run the
+local-media migration or video backfill as a pre-deploy command. The Windows
+Compose deployment deliberately uses `npm run start:with-migrations` for its
+existing single backend instance.
 
 The project IaC pins the non-secret staging target and application origins and
 uses Railway references for private database/Redis URLs:
@@ -163,6 +167,7 @@ uses Railway references for private database/Redis URLs:
 NODE_ENV=production
 NXQ_RELEASE_TARGET=staging
 DATABASE_URL=${{Postgres.DATABASE_URL}}
+MIGRATION_DATABASE_URL=${{shared.MIGRATION_DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
 FRONTEND_URL=https://staging.nxqsocial.com
 APP_BASE_URL=https://staging.nxqsocial.com
@@ -187,6 +192,7 @@ STRIPE_WEBHOOK_SECRET
 LIVEKIT_URL
 LIVEKIT_API_KEY
 LIVEKIT_API_SECRET
+MIGRATION_DATABASE_URL
 
 # Current Cloudflare published proxy CIDRs, reviewed before the release.
 CLOUDFLARE_PROXY_CIDRS
@@ -209,6 +215,16 @@ The approved staging target deliberately uses `MEDIA_MODERATION_PROVIDER=staging
 Do not add production Rekognition credentials just to make staging look like
 production; real moderation credentials and the separate private moderation
 bucket are a later production-release gate.
+
+`MIGRATION_DATABASE_URL` is a separately governed PostgreSQL credential for
+the one-shot Prisma migration command; it must not equal the runtime
+`DATABASE_URL`. The repository cannot create PostgreSQL roles/grants or prove
+that Railway scopes a secret to pre-deploy only. Before any production
+cutover, complete a provider-side role/grant rehearsal and prove that the API
+runtime has only its restricted `DATABASE_URL`. If Railway cannot provide that
+pre-deploy-only scope, run the migration through an isolated one-shot
+migration service/job. This is a hard operational gate, not a claim made by
+this IaC file.
 
 The application origins are not free-form staging inputs. They must remain this
 single approved set; the release preflight rejects missing, alternate,
@@ -347,8 +363,11 @@ for the sanitized application staging copy.
    Railway plan. Do not add web domains yet.
 2. Record the source backup checksum, source commit, schema version, row-count
    manifest, local-upload inventory, and restore owner.
-3. Restore into a fresh private database and run `npm run db:migrate:deploy`.
-   Compare the integrity manifest. Delete nothing from Windows.
+3. Restore into a fresh private database and run `npm run db:migrate:deploy`
+   only in that controlled offline restore exercise. This is not the Railway
+   web runtime path; the Railway release path uses the separately validated
+   migration authority. Compare the integrity manifest. Delete nothing from
+   Windows.
 4. Create the application staging database from the verified restore, run the
    audited sanitizer, clear outbound/provider/token state, and create dedicated
    test accounts. If no sanitizer exists, use a synthetic database.

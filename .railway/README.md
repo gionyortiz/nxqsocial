@@ -115,6 +115,7 @@ The following shared-variable names must all exist before an apply:
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
 - `CLOUDFLARE_PROXY_CIDRS`
+- `MIGRATION_DATABASE_URL`
 
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are the standard S3-compatible
 environment names consumed by the SDK, but in this staging definition they are
@@ -133,6 +134,25 @@ the backend can distinguish a Cloudflare edge request from an end user and
 enforce per-client controls correctly. Do not hard-code a copied range list in
 source or substitute a broad catch-all range; record the source and review date
 with the staging release evidence.
+
+## Database migration authority
+
+The backend runtime keeps using `DATABASE_URL`. The Railway pre-deploy command
+runs `npm run db:migrate:release`, which requires a second
+`MIGRATION_DATABASE_URL`, verifies that it is a valid PostgreSQL URL for the
+same named database, and fails closed if its credential matches
+`DATABASE_URL`. It then supplies that URL only to the one-shot Prisma migration
+child process. The normal Docker command remains `npm run start:prod` and does
+not run migrations.
+
+This source/IaC boundary does **not** create PostgreSQL roles, grants, or a
+pre-deploy-only Railway secret scope. Before any production cutover, an
+operator must create and test a restricted runtime role plus a separately
+governed migration role, and prove that the provider's runtime service cannot
+use the migration credential outside the authorized pre-deploy job. If Railway
+cannot scope that secret to pre-deploy, use an isolated one-shot migration
+service/job instead. Do not treat a successful source test as evidence that
+those provider-side controls exist.
 
 ## Migration notes
 
