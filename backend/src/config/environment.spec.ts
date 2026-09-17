@@ -74,6 +74,41 @@ describe('validateEnvironment', () => {
     );
   });
 
+  it('requires an explicit release target and Cloudflare ranges in Railway runtimes', () => {
+    const railwayEnvironment = {
+      ...validProductionEnvironment(),
+      RAILWAY_PROJECT_ID: 'railway-project',
+      RAILWAY_ENVIRONMENT_ID: 'railway-environment',
+      RAILWAY_SERVICE_ID: 'railway-service',
+      RAILWAY_ENVIRONMENT_NAME: 'staging',
+      NXQ_RELEASE_TARGET: 'staging',
+      MEDIA_MODERATION_PROVIDER: 'staging-mock',
+      REKOGNITION_REGION: '',
+      REKOGNITION_ACCESS_KEY_ID: '',
+      REKOGNITION_SECRET_ACCESS_KEY: '',
+      REKOGNITION_S3_BUCKET: '',
+    };
+
+    expect(() => validateEnvironment(railwayEnvironment)).toThrow(
+      /CLOUDFLARE_PROXY_CIDRS is required in a Railway runtime/,
+    );
+
+    const configured = {
+      ...railwayEnvironment,
+      CLOUDFLARE_PROXY_CIDRS: '198.51.100.0/24,2001:db8::/32',
+    };
+    expect(validateEnvironment(configured)).toBe(configured);
+
+    expect(() =>
+      validateEnvironment({
+        ...configured,
+        NXQ_RELEASE_TARGET: 'preview',
+      }),
+    ).toThrow(
+      /NXQ_RELEASE_TARGET must explicitly equal staging or production in a Railway runtime/,
+    );
+  });
+
   it('rejects an invalid NODE_ENV before returning from non-production validation', () => {
     expect(() => validateEnvironment({ NODE_ENV: 'staging' })).toThrow(
       /NODE_ENV must be development, test, or production/,

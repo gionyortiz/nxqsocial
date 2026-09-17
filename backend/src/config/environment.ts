@@ -10,11 +10,7 @@ const PLACEHOLDER_VALUE =
 export function validateEnvironment(environment: Environment): Environment {
   const errors: string[] = [];
   const nodeEnv = readString(environment, 'NODE_ENV') || 'development';
-  const railwayRuntime = Boolean(
-    readString(environment, 'RAILWAY_ENVIRONMENT_ID') ||
-    readString(environment, 'RAILWAY_PROJECT_ID') ||
-    readString(environment, 'RAILWAY_SERVICE_ID'),
-  );
+  const railwayRuntime = isRailwayRuntime(environment);
 
   if (!['development', 'test', 'production'].includes(nodeEnv)) {
     errors.push('NODE_ENV must be development, test, or production');
@@ -22,6 +18,10 @@ export function validateEnvironment(environment: Environment): Environment {
 
   if (railwayRuntime && nodeEnv !== 'production') {
     errors.push('NODE_ENV must be production in a Railway runtime');
+  }
+
+  if (railwayRuntime) {
+    requireRailwayReleaseTarget(environment, errors);
   }
 
   if (nodeEnv !== 'production' && !railwayRuntime) {
@@ -374,7 +374,33 @@ function validateProxyConfiguration(
 ) {
   validateIpList(environment, 'TRUSTED_PROXY_IPS', errors);
   validateCidrList(environment, 'TRUSTED_PROXY_CIDRS', errors);
+  const cloudflareRanges = readString(environment, 'CLOUDFLARE_PROXY_CIDRS');
+  if (isRailwayRuntime(environment) && !cloudflareRanges) {
+    errors.push(
+      'CLOUDFLARE_PROXY_CIDRS is required in a Railway runtime to preserve per-client controls behind Cloudflare',
+    );
+  }
   validateCidrList(environment, 'CLOUDFLARE_PROXY_CIDRS', errors);
+}
+
+function requireRailwayReleaseTarget(
+  environment: Environment,
+  errors: string[],
+) {
+  const target = readString(environment, 'NXQ_RELEASE_TARGET');
+  if (!['staging', 'production'].includes(target)) {
+    errors.push(
+      'NXQ_RELEASE_TARGET must explicitly equal staging or production in a Railway runtime',
+    );
+  }
+}
+
+function isRailwayRuntime(environment: Environment): boolean {
+  return Boolean(
+    readString(environment, 'RAILWAY_ENVIRONMENT_ID') ||
+      readString(environment, 'RAILWAY_PROJECT_ID') ||
+      readString(environment, 'RAILWAY_SERVICE_ID'),
+  );
 }
 
 function validateIpList(

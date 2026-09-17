@@ -57,15 +57,18 @@ Use one of these reviewed patterns:
    sanitized data on the public staging API. Never expose production password
    hashes, contact data, provider references, push tokens, or private content.
 
-Use staging-only resources and credentials throughout:
+Use staging-only resources and credentials throughout. The active IaC preserves
+the already-imported Railway PostgreSQL and Redis resources and proposes only
+the `backend` and `frontend` services. Do not create, replace, resize, or
+change either data resource unless a separately reviewed read-only plan proves
+that it is safe:
 
-- a fresh Railway PostgreSQL service; never point staging at production;
-- a fresh Railway Redis service; do not restore production Redis keys, OTPs,
+- the retained Railway PostgreSQL service must never point at production and
+  must remain on its verified image/version and volume;
+- the retained Railway Redis service must not receive production keys, OTPs,
   throttles, locks, queues, sessions, or push-token state;
 - separate R2 public and quarantine buckets, a staging media hostname, and an
   R2 token scoped only to those staging buckets;
-- a separate private AWS moderation bucket/prefix and least-privilege IAM
-  credentials for Rekognition;
 - Stripe test mode, a staging LiveKit project, staging Turnstile hostnames, and
   sandbox/allowlisted email, SMS, and push delivery.
 
@@ -75,7 +78,7 @@ outbound sink are not ready, use synthetic data instead.
 
 ## Service layout
 
-Create four services in one Railway staging environment:
+Use four resources in one Railway staging environment:
 
 | Service    | Source/root                     | Public exposure                                          | Deployment check                    |
 | ---------- | ------------------------------- | -------------------------------------------------------- | ----------------------------------- |
@@ -114,6 +117,11 @@ Planning is read-only. `railway config apply`, service creation, variable
 injection, domains, and deployment remain separate operational actions.
 
 ## Backend deployment settings
+
+Before any apply, reconcile the retained PostgreSQL image/version with the IaC.
+The current configuration and historical backup evidence must agree exactly.
+If a plan proposes any PostgreSQL, Redis, volume, image, or domain change, stop
+rather than allowing a service deployment to decide the database version.
 
 - Root directory: `/backend`
 - Builder: Dockerfile
@@ -168,14 +176,12 @@ LIVEKIT_URL
 LIVEKIT_API_KEY
 LIVEKIT_API_SECRET
 
+# Current Cloudflare published proxy CIDRs, reviewed before the release.
+CLOUDFLARE_PROXY_CIDRS
+
 # Staging R2 object storage credentials
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
-
-# Separate AWS moderation account/bucket
-REKOGNITION_REGION
-REKOGNITION_ACCESS_KEY_ID
-REKOGNITION_SECRET_ACCESS_KEY
 ```
 
 The IaC sets `JWT_EXPIRES_IN`, `SIGNUP_HARDENING_ENABLED`,
@@ -186,6 +192,11 @@ binds `LIVEKIT_EXPECTED_STAGING_URL` to the same shared `LIVEKIT_URL` reference
 so the backend preflight still requires an exact staging match without
 duplicating a secret-store value. Direct Railway staging traffic leaves the
 trusted-proxy override variables unset.
+
+The approved staging target deliberately uses `MEDIA_MODERATION_PROVIDER=staging-mock`.
+Do not add production Rekognition credentials just to make staging look like
+production; real moderation credentials and the separate private moderation
+bucket are a later production-release gate.
 
 The application origins are not free-form staging inputs. They must remain this
 single approved set; the release preflight rejects missing, alternate,
@@ -260,13 +271,11 @@ fetch/canvas behavior requires it; do not make the quarantine bucket public to
 solve a CORS error. Never add `processing/media-finalizing/` to a browser PUT
 policy or presigned client-upload path.
 
-The AWS moderation bucket is a third, separate bucket. It must be private,
-block public access, reside in `REKOGNITION_REGION`, and have no public domain.
-Scope IAM to the required Rekognition Detect/Start/Get actions and S3
-Put/Get/Delete access only for the moderation prefix. Add a short lifecycle rule
-for `nxq-social/` so a crashed worker cannot retain moderation copies forever.
-Confirm the R2 public bucket, R2 quarantine bucket, and AWS moderation bucket
-are all staging resources before the first upload test.
+The approved staging target uses the deterministic moderation mock and therefore
+does not create or require an AWS moderation bucket. Do not silently substitute
+production moderation credentials. A later production gate must create and
+verify its own private moderation bucket, least-privilege IAM policy, and
+lifecycle controls.
 
 ## Client IP and Cloudflare semantics
 
@@ -322,7 +331,8 @@ full release gate passed.
 Perform the restore twice: once as an offline backup-integrity exercise and once
 for the sanitized application staging copy.
 
-1. Create private PostgreSQL and Redis services. Do not add web domains yet.
+1. Verify the retained private PostgreSQL and Redis resources from a read-only
+   Railway plan. Do not add web domains yet.
 2. Record the source backup checksum, source commit, schema version, row-count
    manifest, local-upload inventory, and restore owner.
 3. Restore into a fresh private database and run `npm run db:migrate:deploy`.

@@ -29,6 +29,7 @@ const mockPrisma = {
     findFirst: jest.fn(),
     create: jest.fn(),
     update: jest.fn(),
+    updateMany: jest.fn(),
   },
   user: {
     findUniqueOrThrow: jest.fn(),
@@ -172,6 +173,24 @@ describe('VerificationService', () => {
       data: { status: 'CONSUMED' },
     });
     expect(mockTrustEngine.recalculate).toHaveBeenCalledWith('user1');
+  });
+
+  it('marks a canceled Identity attempt rejected without consuming its payment, including replay', async () => {
+    mockWebhooksConstructEvent.mockReturnValue({
+      type: 'identity.verification_session.canceled',
+      data: { object: { id: 'vs_canceled' } },
+    });
+
+    await service.handleStripeWebhook(Buffer.from('{}'), 'sig_test');
+    await service.handleStripeWebhook(Buffer.from('{}'), 'sig_test');
+
+    expect(mockPrisma.verification.updateMany).toHaveBeenCalledTimes(2);
+    expect(mockPrisma.verification.updateMany).toHaveBeenNthCalledWith(1, {
+      where: { providerRef: 'vs_canceled' },
+      data: { status: 'REJECTED' },
+    });
+    expect(mockPrisma.payment.updateMany).not.toHaveBeenCalled();
+    expect(mockPrisma.user.update).not.toHaveBeenCalled();
   });
 
   it('checkout.session.completed webhook: marks the matching payment PAID, idempotently', async () => {

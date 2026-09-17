@@ -227,8 +227,11 @@ export class VerificationService {
 
     if (event.type === 'identity.verification_session.verified') {
       await this.onStripeVerified(event.data.object as any);
-    } else if (event.type === 'identity.verification_session.requires_input') {
-      await this.onStripeRequiresInput(event.data.object as any);
+    } else if (
+      event.type === 'identity.verification_session.requires_input' ||
+      event.type === 'identity.verification_session.canceled'
+    ) {
+      await this.onStripeUnsuccessful(event.data.object as any);
     } else if (event.type === 'checkout.session.completed') {
       await this.onCheckoutSessionCompleted(event.data.object as any);
     }
@@ -289,12 +292,18 @@ export class VerificationService {
     this.logger.log(`User ${userId} verified at tier ${tier} via Stripe`);
   }
 
-  private async onStripeRequiresInput(session: any) {
+  /**
+   * A failed or canceled Identity attempt does not consume its funding payment.
+   * `updateMany` makes Stripe's at-least-once webhook delivery safe to replay.
+   */
+  private async onStripeUnsuccessful(session: any) {
     await this.prisma.verification.updateMany({
       where: { providerRef: session.id },
       data: { status: 'REJECTED' },
     });
-    this.logger.log(`Stripe verification failed for session ${session.id}`);
+    this.logger.log(
+      `Stripe verification attempt did not complete for session ${session.id}`,
+    );
   }
 
   private extractAgeBand(session: any): string | null {
@@ -348,4 +357,3 @@ export class VerificationService {
     });
   }
 }
-
