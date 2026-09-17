@@ -147,8 +147,8 @@ jobs:
       NXQ_RELEASE_TARGET: staging
       NEXT_PUBLIC_APP_URL: https://staging.nxqsocial.com
       NEXT_PUBLIC_API_URL: https://api-staging.nxqsocial.com/api
-      NEXT_PUBLIC_CALLS_ENABLED: "false"
-      NEXT_PUBLIC_LIVE_ENABLED: "false"
+      NEXT_PUBLIC_CALLS_ENABLED: "true"
+      NEXT_PUBLIC_LIVE_ENABLED: "true"
       # Cloudflare's documented public Turnstile test site key; it cannot
       # authorize production traffic or reveal a secret.
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: 1x00000000000000000000AA
@@ -179,8 +179,8 @@ jobs:
           --build-arg NXQ_RELEASE_TARGET=staging
           --build-arg NEXT_PUBLIC_APP_URL=https://staging.nxqsocial.com
           --build-arg NEXT_PUBLIC_API_URL=https://api-staging.nxqsocial.com/api
-          --build-arg NEXT_PUBLIC_CALLS_ENABLED=false
-          --build-arg NEXT_PUBLIC_LIVE_ENABLED=false
+          --build-arg NEXT_PUBLIC_CALLS_ENABLED=true
+          --build-arg NEXT_PUBLIC_LIVE_ENABLED=true
           --build-arg NEXT_PUBLIC_TURNSTILE_SITE_KEY=1x00000000000000000000AA
           frontend
 

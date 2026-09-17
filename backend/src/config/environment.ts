@@ -400,8 +400,8 @@ function requireRailwayReleaseTarget(
 function isRailwayRuntime(environment: Environment): boolean {
   return Boolean(
     readString(environment, 'RAILWAY_ENVIRONMENT_ID') ||
-      readString(environment, 'RAILWAY_PROJECT_ID') ||
-      readString(environment, 'RAILWAY_SERVICE_ID'),
+    readString(environment, 'RAILWAY_PROJECT_ID') ||
+    readString(environment, 'RAILWAY_SERVICE_ID'),
   );
 }
 

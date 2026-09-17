@@ -60,6 +60,18 @@ describe('requireReleaseMigrationAuthority', () => {
     );
   });
 
+  it('rejects a different password when the migration URL reuses the runtime role', () => {
+    const environment = {
+      ...validEnvironment(),
+      MIGRATION_DATABASE_URL:
+        'postgresql://nxq_runtime:a_different_password@migration-gateway.internal:5432/nxqsocial?sslmode=require',
+    };
+
+    expect(() => requireReleaseMigrationAuthority(environment)).toThrow(
+      'MIGRATION_DATABASE_URL must use a PostgreSQL role distinct from DATABASE_URL',
+    );
+  });
+
   it('rejects an encoded spelling of the runtime password', () => {
     const environment = {
       ...validEnvironment(),

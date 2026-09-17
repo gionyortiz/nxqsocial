@@ -57,6 +57,15 @@ export function requireReleaseMigrationAuthority(
       );
     }
 
+    // A separate password alone does not create a separate authority. The
+    // migrator and long-lived API must use different PostgreSQL roles so the
+    // runtime role can be granted only application privileges.
+    if (roleIdentity(runtime) === roleIdentity(migration)) {
+      issues.push(
+        'MIGRATION_DATABASE_URL must use a PostgreSQL role distinct from DATABASE_URL',
+      );
+    }
+
     // URL usernames/passwords are the only credential identity available in a
     // connection string. If they are the same, a cosmetic host/query change
     // must not make one credential appear to be two authorities.
@@ -155,6 +164,10 @@ function databaseName(url: URL): string {
 
 function credentialIdentity(url: URL): string {
   return `${decodeUrlComponent(url.username)}\u0000${decodeUrlComponent(url.password)}`;
+}
+
+function roleIdentity(url: URL): string {
+  return decodeUrlComponent(url.username);
 }
 
 function decodeUrlComponent(value: string): string {
