@@ -15,7 +15,7 @@ const expectedEnvironment = {
   id: "6f3d73f8-2712-4736-9b4b-8383ec21cac3",
   name: "staging",
 };
-const stagingBranch = "release/railway-staging-20260823";
+const stagingBranch = "release/railway-staging-20260916";
 const expectedOrigin = "https://github.com/gionyortiz/nxqsocial.git";
 const githubRepository = "gionyortiz/nxqsocial";
 const expectedR2Endpoint =
@@ -34,6 +34,7 @@ const requiredSharedVariables = [
   "LIVEKIT_URL",
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
+  "CLOUDFLARE_PROXY_CIDRS",
 ];
 const placeholder =
   /(?:change[-_ ]?me|replace|placeholder|example|dummy|todo|tbd|required|your[-_ ]|__[^_]+__|\.\.\.$)/i;
@@ -337,6 +338,7 @@ function verifyReleaseConfiguration(shared) {
     S3_PUBLIC_BASE_URL: "https://media-staging.nxqsocial.com",
     AWS_REGION: "auto",
     MEDIA_MODERATION_PROVIDER: "staging-mock",
+    CLOUDFLARE_PROXY_CIDRS: shared.CLOUDFLARE_PROXY_CIDRS,
     LIVEKIT_EXPECTED_STAGING_URL: shared.LIVEKIT_URL,
     NEXT_PUBLIC_APP_URL: "https://staging.nxqsocial.com",
     NEXT_PUBLIC_API_URL: "https://api-staging.nxqsocial.com/api",

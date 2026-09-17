@@ -1,4 +1,5 @@
 import { NXQ_SOCIAL_STAGING_TARGET } from './staging-target';
+import { isIP } from 'net';
 
 type ReleaseEnvironment = Record<string, string | undefined>;
 
@@ -48,6 +49,7 @@ export function validateFullStagingReleaseProviders(
 
   validateRailwayTarget(environment, issues);
   validateApplicationOrigins(environment, issues);
+  validateCloudflareProxyRanges(environment, issues);
   validateR2(environment, issues);
   validateStagingModeration(environment, issues);
   validateResend(environment, issues);
@@ -63,6 +65,51 @@ export function validateFullStagingReleaseProviders(
     ok: true,
     checkedGroups: [...FULL_STAGING_PROVIDER_GROUPS],
   };
+}
+
+/**
+ * The staging frontend and API are intended to be Cloudflare-proxied hosts.
+ * Without an explicit current proxy range list, Railway's X-Real-IP is the
+ * Cloudflare edge address and per-client throttles lose their meaning. The
+ * list is deliberately a managed shared value so the published ranges can be
+ * refreshed without baking a stale provider list into source.
+ */
+function validateCloudflareProxyRanges(
+  environment: ReleaseEnvironment,
+  issues: string[],
+) {
+  const configured = value(environment, 'CLOUDFLARE_PROXY_CIDRS');
+  if (!configured) {
+    issues.push(
+      '[Cloudflare proxy] CLOUDFLARE_PROXY_CIDRS is required for the approved proxied staging hosts',
+    );
+    return;
+  }
+
+  const ranges = configured.split(',').map((item) => item.trim());
+  for (const range of ranges) {
+    const [network, rawPrefix, ...extra] = range.split('/');
+    const family = isIP(
+      network?.startsWith('::ffff:') ? network.slice(7) : (network ?? ''),
+    );
+    const prefix = Number(rawPrefix);
+    const maximum = family === 4 ? 32 : 128;
+    if (
+      !range ||
+      PLACEHOLDER.test(range) ||
+      extra.length > 0 ||
+      !/^\d+$/.test(rawPrefix ?? '') ||
+      family === 0 ||
+      !Number.isInteger(prefix) ||
+      prefix < 1 ||
+      prefix > maximum
+    ) {
+      issues.push(
+        '[Cloudflare proxy] CLOUDFLARE_PROXY_CIDRS must contain only valid non-catch-all IPv4 or IPv6 CIDR ranges',
+      );
+      return;
+    }
+  }
 }
 
 function validateApplicationOrigins(

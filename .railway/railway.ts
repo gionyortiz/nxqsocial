@@ -13,7 +13,10 @@ const EXPECTED_PROJECT_ID = "1cf84772-c0bd-44a6-bd6c-f652955ac0d8";
 const EXPECTED_PROJECT_NAME = "nxq-social-staging";
 const EXPECTED_ENVIRONMENT_ID = "6f3d73f8-2712-4736-9b4b-8383ec21cac3";
 const EXPECTED_ENVIRONMENT_NAME = "staging";
-const STAGING_BRANCH = "release/railway-staging-20260823";
+// This branch does not become remotely deployable until an explicit release
+// review approves and pushes this exact candidate. The apply wrapper also
+// refuses every other branch, so local preparation cannot trigger a deploy.
+const STAGING_BRANCH = "release/railway-staging-20260916";
 const SOURCE_REPOSITORY = "gionyortiz/nxqsocial";
 
 export default defineRailway((ctx) => {
@@ -85,9 +88,14 @@ export default defineRailway((ctx) => {
     env: {
       NODE_ENV: "production",
       NXQ_RELEASE_TARGET: "staging",
-      APP_BASE_URL: "https://frontend-staging-f129.up.railway.app",
-      FRONTEND_URL: "https://frontend-staging-f129.up.railway.app",
-      API_BASE_URL: "https://backend-staging-4ceb.up.railway.app/api",
+      APP_BASE_URL: "https://staging.nxqsocial.com",
+      FRONTEND_URL: "https://staging.nxqsocial.com",
+      API_BASE_URL: "https://api-staging.nxqsocial.com/api",
+      // This is a reviewed shared value, not a hard-coded list: Cloudflare
+      // publishes and occasionally changes its proxy ranges. The release
+      // preflight refuses to start unless it is present and valid, which keeps
+      // per-client controls from treating every Cloudflare request as one IP.
+      CLOUDFLARE_PROXY_CIDRS: shared.CLOUDFLARE_PROXY_CIDRS,
       DATABASE_URL: Postgres.env.DATABASE_URL,
       REDIS_URL: Redis.env.REDIS_URL,
       JWT_SECRET: shared.JWT_SECRET,
@@ -96,7 +104,7 @@ export default defineRailway((ctx) => {
       SIGNUP_HARDENING_ENABLED: "true",
       TURNSTILE_TEST_BYPASS: "false",
       TURNSTILE_SECRET_KEY: shared.TURNSTILE_SECRET_KEY,
-      TURNSTILE_ALLOWED_HOSTNAMES: "frontend-staging-f129.up.railway.app",
+      TURNSTILE_ALLOWED_HOSTNAMES: "staging.nxqsocial.com",
       S3_ENDPOINT:
         "https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com",
       S3_BUCKET_NAME: "nxqsocial-staging-public",
@@ -136,8 +144,8 @@ export default defineRailway((ctx) => {
     env: {
       NODE_ENV: "production",
       NXQ_RELEASE_TARGET: "staging",
-      NEXT_PUBLIC_APP_URL: "https://frontend-staging-f129.up.railway.app",
-      NEXT_PUBLIC_API_URL: "https://backend-staging-4ceb.up.railway.app/api",
+      NEXT_PUBLIC_APP_URL: "https://staging.nxqsocial.com",
+      NEXT_PUBLIC_API_URL: "https://api-staging.nxqsocial.com/api",
       NEXT_PUBLIC_CALLS_ENABLED: "true",
       NEXT_PUBLIC_LIVE_ENABLED: "true",
       NEXT_PUBLIC_TURNSTILE_SITE_KEY: shared.NEXT_PUBLIC_TURNSTILE_SITE_KEY,

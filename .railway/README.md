@@ -4,14 +4,14 @@
 existing `nxq-social-staging` Railway project and its `staging` environment.
 It preserves the existing Postgres, Redis, and volume resources and proposes
 the `backend` and `frontend` services from
-`release/railway-staging-20260823`.
+`release/railway-staging-20260916`.
 
 The configuration intentionally contains no custom domains, provider secrets,
 production resources, or deployment authorization. The backend provider
 preflight is a fail-closed pre-deploy command; future deployments cannot pass
 until the separately managed staging credentials are complete.
 
-A remote revision of `release/railway-staging-20260823` is **not eligible for
+A remote revision of `release/railway-staging-20260916` is **not eligible for
 an IaC apply** unless one reviewed atomic commit contains all of the following
 and has been pushed to that branch together:
 
@@ -111,6 +111,7 @@ The following shared-variable names must all exist before an apply:
 - `LIVEKIT_URL`
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
+- `CLOUDFLARE_PROXY_CIDRS`
 
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are the standard S3-compatible
 environment names consumed by the SDK, but in this staging definition they are
@@ -122,6 +123,13 @@ The public staging origins, exact NXQSocial R2 account endpoint, staging bucket
 identities, Turnstile hostname, feature flags, and R2 region are non-secret and
 remain pinned in the IaC definition. Never substitute production provider
 credentials for missing staging variables.
+
+`CLOUDFLARE_PROXY_CIDRS` must be populated from Cloudflare's currently
+published proxy ranges before a proxied staging deployment. It is required so
+the backend can distinguish a Cloudflare edge request from an end user and
+enforce per-client controls correctly. Do not hard-code a copied range list in
+source or substitute a broad catch-all range; record the source and review date
+with the staging release evidence.
 
 ## Migration notes
 

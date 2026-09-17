@@ -12,6 +12,7 @@ const validEnvironment = () => ({
   APP_BASE_URL: NXQ_SOCIAL_STAGING_TARGET.application.frontendOrigin,
   FRONTEND_URL: NXQ_SOCIAL_STAGING_TARGET.application.frontendOrigin,
   API_BASE_URL: NXQ_SOCIAL_STAGING_TARGET.application.apiBaseUrl,
+  CLOUDFLARE_PROXY_CIDRS: '203.0.113.0/24,2001:db8::/32',
   S3_ENDPOINT: NXQ_SOCIAL_STAGING_TARGET.resources.r2Endpoint,
   S3_BUCKET: NXQ_SOCIAL_STAGING_TARGET.resources.publicBucket,
   S3_QUARANTINE_BUCKET: NXQ_SOCIAL_STAGING_TARGET.resources.quarantineBucket,
@@ -92,6 +93,21 @@ describe('validateFullStagingReleaseProviders', () => {
     expect(() => validateFullStagingReleaseProviders(environment)).toThrow(
       /APP_BASE_URL must equal the approved NXQ Social staging frontend origin[\s\S]*FRONTEND_URL must equal the approved NXQ Social staging frontend origin only[\s\S]*API_BASE_URL must equal the approved NXQ Social staging API URL ending in \/api/,
     );
+  });
+
+  it('requires explicit, non-catch-all Cloudflare proxy CIDR ranges', () => {
+    const missing = { ...validEnvironment() };
+    delete missing.CLOUDFLARE_PROXY_CIDRS;
+    expect(() => validateFullStagingReleaseProviders(missing)).toThrow(
+      'CLOUDFLARE_PROXY_CIDRS is required',
+    );
+
+    expect(() =>
+      validateFullStagingReleaseProviders({
+        ...validEnvironment(),
+        CLOUDFLARE_PROXY_CIDRS: '0.0.0.0/0,not-a-cidr',
+      }),
+    ).toThrow('CLOUDFLARE_PROXY_CIDRS must contain only valid non-catch-all');
   });
 
   it('requires distinct public and quarantine buckets', () => {

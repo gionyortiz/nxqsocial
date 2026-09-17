@@ -10,6 +10,39 @@ const expected = {
   environmentId: "6f3d73f8-2712-4736-9b4b-8383ec21cac3",
   environment: "staging",
 };
+const expectedApplication = {
+  frontendOrigin: "https://staging.nxqsocial.com",
+  apiBaseUrl: "https://api-staging.nxqsocial.com/api",
+  turnstileHostname: "staging.nxqsocial.com",
+};
+const expectedStagingBranch = "release/railway-staging-20260916";
+
+const { NXQ_SOCIAL_STAGING_TARGET } = await import(
+  "../backend/src/release/staging-target.ts"
+);
+const { validateReleaseConfig } = await import(
+  "../frontend/scripts/validate-release-config.mjs"
+);
+
+assert.deepEqual(NXQ_SOCIAL_STAGING_TARGET.application, {
+  frontendOrigin: expectedApplication.frontendOrigin,
+  apiBaseUrl: expectedApplication.apiBaseUrl,
+});
+assert.equal(
+  NXQ_SOCIAL_STAGING_TARGET.resources.turnstileHostname,
+  expectedApplication.turnstileHostname,
+);
+assert.deepEqual(
+  validateReleaseConfig({
+    NXQ_RELEASE_TARGET: "staging",
+    NEXT_PUBLIC_APP_URL: expectedApplication.frontendOrigin,
+    NEXT_PUBLIC_API_URL: expectedApplication.apiBaseUrl,
+    NEXT_PUBLIC_TURNSTILE_SITE_KEY: "staging-test-site-key",
+    NEXT_PUBLIC_CALLS_ENABLED: "true",
+    NEXT_PUBLIC_LIVE_ENABLED: "true",
+  }),
+  { releaseTarget: "staging" },
+);
 
 const providerPreflightEntrypoint = readFileSync(
   new URL("../backend/scripts/release-provider-preflight.ts", import.meta.url),
@@ -68,6 +101,8 @@ const backend = resources.find((resource) => resource.name === "backend");
 const frontend = resources.find((resource) => resource.name === "frontend");
 assert.ok(backend);
 assert.ok(frontend);
+assert.equal(backend.source.branch, expectedStagingBranch);
+assert.equal(frontend.source.branch, expectedStagingBranch);
 assert.equal(backend.source.checkSuites, undefined);
 assert.equal(frontend.source.checkSuites, undefined);
 assert.deepEqual(backend.deploy.preDeployCommand, [
@@ -75,15 +110,15 @@ assert.deepEqual(backend.deploy.preDeployCommand, [
 ]);
 assert.equal(
   backend.variables.APP_BASE_URL?.value,
-  "https://frontend-staging-f129.up.railway.app",
+  expectedApplication.frontendOrigin,
 );
 assert.equal(
   backend.variables.FRONTEND_URL?.value,
-  "https://frontend-staging-f129.up.railway.app",
+  expectedApplication.frontendOrigin,
 );
 assert.equal(
   backend.variables.API_BASE_URL?.value,
-  "https://backend-staging-4ceb.up.railway.app/api",
+  expectedApplication.apiBaseUrl,
 );
 for (const name of [
   "JWT_SECRET",
@@ -98,6 +133,7 @@ for (const name of [
   "LIVEKIT_URL",
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
+  "CLOUDFLARE_PROXY_CIDRS",
 ]) {
   assert.deepEqual(backend.variables[name], {
     type: "sharedReference",
@@ -110,7 +146,7 @@ assert.deepEqual(backend.variables.LIVEKIT_EXPECTED_STAGING_URL, {
 });
 assert.equal(
   backend.variables.TURNSTILE_ALLOWED_HOSTNAMES?.value,
-  "frontend-staging-f129.up.railway.app",
+  expectedApplication.turnstileHostname,
 );
 assert.equal(backend.variables.SIGNUP_HARDENING_ENABLED?.value, "true");
 assert.equal(backend.variables.JWT_EXPIRES_IN?.value, "7d");
@@ -131,11 +167,11 @@ assert.equal(backend.variables.MEDIA_MODERATION_PROVIDER?.value, "staging-mock")
 assert.equal(frontend.variables.NXQ_RELEASE_TARGET?.value, "staging");
 assert.equal(
   frontend.variables.NEXT_PUBLIC_APP_URL?.value,
-  "https://frontend-staging-f129.up.railway.app",
+  expectedApplication.frontendOrigin,
 );
 assert.equal(
   frontend.variables.NEXT_PUBLIC_API_URL?.value,
-  "https://backend-staging-4ceb.up.railway.app/api",
+  expectedApplication.apiBaseUrl,
 );
 assert.deepEqual(frontend.variables.NEXT_PUBLIC_TURNSTILE_SITE_KEY, {
   type: "sharedReference",

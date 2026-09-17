@@ -10,6 +10,16 @@
  *   npx prisma migrate deploy
  */
 export default async function globalSetup() {
+  // E2E runs must never depend on a developer's local production-like .env
+  // file. These deterministic values are test-only and may be overridden by a
+  // CI job when it deliberately exercises a different configuration.
+  process.env.NODE_ENV = 'test';
+  process.env.JWT_SECRET ??=
+    'e2e-test-jwt-secret-not-for-production-0123456789abcdef';
+  process.env.OTP_PEPPER ??=
+    'e2e-test-otp-pepper-not-for-production-0123456789abcdef';
+  process.env.STRIPE_SECRET_KEY ??= 'sk_test_e2e_placeholder';
+
   const testDbUrl =
     process.env.DATABASE_URL_TEST ??
     'postgresql://postgres:postgres@localhost:5432/nexasocial_test';
@@ -18,12 +28,14 @@ export default async function globalSetup() {
   process.env.DATABASE_URL = testDbUrl;
 
   // Set a known Stripe webhook secret for E2E tests
-  if (!process.env.STRIPE_WEBHOOK_SECRET || process.env.STRIPE_WEBHOOK_SECRET.startsWith('whsec_REPLACE')) {
+  if (
+    !process.env.STRIPE_WEBHOOK_SECRET ||
+    process.env.STRIPE_WEBHOOK_SECRET.startsWith('whsec_REPLACE')
+  ) {
     process.env.STRIPE_WEBHOOK_SECRET = 'whsec_e2e_test_secret_nexasocial';
   }
 
-  // Silence noisy env warnings during tests
-  process.env.NODE_ENV = 'test';
-
-  console.log(`[E2E] Using test database: ${testDbUrl.replace(/:[^@]+@/, ':***@')}`);
+  console.log(
+    `[E2E] Using test database: ${testDbUrl.replace(/:[^@]+@/, ':***@')}`,
+  );
 }

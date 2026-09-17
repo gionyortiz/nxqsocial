@@ -5,8 +5,8 @@ export const NXQ_SOCIAL_STAGING_TARGET = {
     environmentName: 'staging',
   },
   application: {
-    frontendOrigin: 'https://frontend-staging-f129.up.railway.app',
-    apiBaseUrl: 'https://backend-staging-4ceb.up.railway.app/api',
+    frontendOrigin: 'https://staging.nxqsocial.com',
+    apiBaseUrl: 'https://api-staging.nxqsocial.com/api',
   },
   resources: {
     r2Endpoint:
@@ -15,7 +15,7 @@ export const NXQ_SOCIAL_STAGING_TARGET = {
     quarantineBucket: 'nxqsocial-staging-quarantine',
     moderationProvider: 'staging-mock',
     publicMediaOrigin: 'https://media-staging.nxqsocial.com',
-    turnstileHostname: 'frontend-staging-f129.up.railway.app',
+    turnstileHostname: 'staging.nxqsocial.com',
     emailDomain: 'mail.nxqsocial.com',
   },
 } as const;
