@@ -3,6 +3,8 @@ import { existsSync } from "node:fs";
 import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createChildEnvironment } from "./child-environment.mjs";
+import { assertExistingStagingServicePlan } from "./plan-contract.mjs";
+import { missingStagingSharedVariables } from "./shared-variable-contract.mjs";
 
 const railwayDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(railwayDirectory, "..");
@@ -20,32 +22,6 @@ const expectedOrigin = "https://github.com/gionyortiz/nxqsocial.git";
 const githubRepository = "gionyortiz/nxqsocial";
 const expectedR2Endpoint =
   "https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com";
-const requiredSharedVariables = [
-  "JWT_SECRET",
-  "OTP_PEPPER",
-  "TURNSTILE_SECRET_KEY",
-  "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
-  "AWS_ACCESS_KEY_ID",
-  "AWS_SECRET_ACCESS_KEY",
-  "RESEND_API_KEY",
-  "EMAIL_FROM",
-  "STAGING_EMAIL_RECIPIENT_ALLOWLIST",
-  "STAGING_PHONE_RECIPIENT_ALLOWLIST",
-  "STAGING_PUSH_TOKEN_ALLOWLIST",
-  "STRIPE_SECRET_KEY",
-  "STRIPE_WEBHOOK_SECRET",
-  "LIVEKIT_URL",
-  "LIVEKIT_API_KEY",
-  "LIVEKIT_API_SECRET",
-  "CLOUDFLARE_PROXY_CIDRS",
-  // This is validated locally before an apply but intentionally not declared
-  // in backend.env. A provider-side predeploy-only scope or isolated migrator
-  // job must supply it to the migration command.
-  "MIGRATION_DATABASE_URL",
-  "RUNTIME_DATABASE_URL",
-];
-const placeholder =
-  /(?:change[-_ ]?me|replace|placeholder|example|dummy|todo|tbd|required|your[-_ ]|__[^_]+__|\.\.\.$)/i;
 
 if (process.argv.length !== 2) {
   throw new Error("The verified staging apply wrapper accepts no arguments.");
@@ -82,32 +58,11 @@ if (planResult.error || planResult.status !== 0) {
   throw new Error("Unable to obtain the final NXQSocial staging apply plan.");
 }
 const planOutput = `${planResult.stdout}\n${planResult.stderr}`;
-const summaryLines = planOutput
-  .split(/\r?\n/)
-  .filter((line) => /^Plan:/.test(line));
-const createLines = planOutput
-  .split(/\r?\n/)
-  .map((line) => line.trim())
-  .filter((line) => line.startsWith("+ Create "))
-  .sort();
-if (
-  summaryLines.length !== 1 ||
-  summaryLines[0] !== "Plan: 3 to add, 0 to change, 0 to destroy" ||
-  JSON.stringify(createLines) !==
-    JSON.stringify([
-      "+ Create service backend",
-      "+ Create service frontend",
-      "+ Create service migration-job",
-    ])
-) {
-  throw new Error(
-    "Refusing to apply because the final plan is not exactly three service additions.",
-  );
-}
+assertExistingStagingServicePlan(planOutput);
 
 verifyRailwayTarget(executable, cliEnvironment);
 console.error(
-  "Verified NXQSocial staging target, remote source, provider configuration shape, and 3-add/0-change/0-destroy plan. Review the CLI plan once more before confirming its interactive prompt.",
+  "Verified NXQSocial staging target, remote source, provider configuration shape, and reviewed in-place adoption plan. Review the CLI plan once more before confirming its interactive prompt.",
 );
 const applyResult = spawnSync(
   executable,
@@ -301,31 +256,12 @@ function verifySharedVariables(executablePath, environment) {
     throw new Error("Railway environment configuration returned invalid JSON.");
   }
   const shared = configuration?.sharedVariables ?? {};
-  const missing = requiredSharedVariables.filter(
-    (name) => !hasConfiguredSharedVariable(shared[name]),
-  );
+  const missing = missingStagingSharedVariables(shared);
   if (missing.length > 0) {
     throw new Error(
       `Refusing to apply; missing staging shared variables: ${missing.join(", ")}`,
     );
   }
-}
-
-/**
- * Sealed Railway variables intentionally do not disclose their values to the
- * CLI. Treat a sealed variable as present, then rely on the application's
- * in-service preflight for exact value validation. This wrapper never copies
- * real provider credentials into a local child process.
- */
-function hasConfiguredSharedVariable(variable) {
-  if (!variable || typeof variable !== "object") return false;
-  if (variable.isSealed === true) return true;
-  const configured = variable.value;
-  return (
-    typeof configured === "string" &&
-    configured.trim() !== "" &&
-    !placeholder.test(configured.trim())
-  );
 }
 
 function verifyReleaseConfiguration() {

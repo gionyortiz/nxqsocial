@@ -2,8 +2,9 @@
 
 [`railway.ts`](./railway.ts) is the single project-level definition for the
 existing `nxq-social-staging` Railway project and its `staging` environment.
-It preserves the existing Postgres, Redis, and volume resources and proposes
-the `backend`, `frontend`, and one-shot `migration-job` services from
+It must adopt and update the existing `backend` and `frontend` services,
+preserve the existing Postgres, Redis, and volume resources, and may create
+only the one-shot `migration-job` service from
 `release/railway-staging-20260916`.
 
 The configuration intentionally contains no custom domains, provider secrets,
@@ -53,12 +54,19 @@ mismatched identities even when invoked directly. The wrapper rejects
 value-decryption/display flags, never prints status JSON, and never calls
 `railway config apply`.
 
-After every required staging shared variable exists and the reviewed commit is
-clean, pushed, and green in CI, the separate apply wrapper performs the same
-exact target and CLI checks again. It additionally proves the local commit
-equals the remote staging branch, refuses missing shared variables (including
-sealed values), and reruns the exact `3 add, 0 change, 0 destroy` plan before
-opening Railway's interactive resource apply:
+Before an apply can be considered, use Railway's supported `railway config
+pull` flow with the approved CLI in a temporary review workspace. Reconcile
+that import so it updates the existing `backend` and `frontend` services rather
+than creating replacements. Do not hard-code service IDs or overwrite the
+reviewed source from an unreviewed import.
+
+After every required staging shared variable exists, the existing-service
+adoption has been reviewed, and the reviewed commit is clean, pushed, and
+green in CI, the separate apply wrapper performs the same exact target and CLI
+checks again. It additionally proves the local commit equals the remote
+staging branch, refuses missing shared variables (including sealed values),
+and reruns the exact in-place plan before opening Railway's interactive
+resource apply:
 
 ```powershell
 $env:RAILWAY_CLI_PATH = 'C:\Tools\Railway\v5.43.3\railway.exe'
@@ -72,29 +80,31 @@ succeeded, and passes only a minimal operating-system environment to every
 child process so unrelated provider credentials are not inherited. The release
 preflight also does not auto-load repository `.env` files. It rechecks the
 target immediately before opening Railway's own interactive apply prompt;
-confirm only after that final displayed plan is still exactly three service
-additions with no other changes. Railway can schedule independent services in
-parallel, so service creation itself is not evidence of schema order: the API
-has a read-only pre-deploy migration-status gate and cannot become healthy
-until the migration job has completed successfully. After that job exits,
-redeploy backend/frontend and require the schema gate to pass.
+confirm only after that final displayed plan creates only `migration-job` and
+updates only the existing `backend` and `frontend` services. Railway can
+schedule independent services in parallel, so service creation itself is not
+evidence of schema order: the API has a read-only pre-deploy migration-status
+gate and cannot become healthy until the migration job has completed
+successfully. After that job exits, redeploy backend/frontend and require the
+schema gate to pass.
 
 The offline CI check executes `npm --prefix .railway run validate`. That parses
 and evaluates the TypeScript definition with the exact approved context,
 asserts its resource inventory, and proves that missing or incorrect target
 identities fail closed without authentication or network access.
 
-The expected pre-apply plan is:
+The only acceptable pre-apply plan is:
 
 ```text
-Plan: 3 to add, 0 to change, 0 to destroy
-  + Create service backend
-  + Create service frontend
+Plan: 1 to add, 2 to change, 0 to destroy
   + Create service migration-job
+  ~ Update service backend
+  ~ Update service frontend
 ```
 
-Do not apply if the plan contains a database or volume change, a domain, a
-deletion, or any resource outside this staging project. Applying this plan,
+Do not apply if the plan creates `backend` or `frontend`, contains a database
+or volume change, a domain, a deletion, or any resource outside this staging
+project. Applying this plan,
 adding credentials, assigning domains, or deploying services all require a
 separate authorization and operational review.
 
@@ -130,11 +140,12 @@ scoped Cloudflare R2 credentials. They do not authorize or require an AWS
 account. Staging moderation is pinned to the non-secret `staging-mock` provider;
 no Rekognition, AWS S3 bucket, or IAM credential is used.
 
-The wrapper treats a sealed Railway variable as present without reading its
-value. It runs only synthetic, structurally valid fixtures locally; exact
-secret validation happens inside the staged service preflight. This keeps real
-provider credentials out of local child processes and supports sealed Railway
-variables.
+The wrapper refuses an apply unless every credential and database URL is
+sealed. It treats sealed variables as present without reading their values,
+runs only synthetic structurally valid fixtures locally, and leaves exact
+secret validation to the staged service preflight. This keeps real provider
+credentials out of local child processes. Public endpoints and controlled
+recipient-policy values may remain readable configuration.
 
 The public staging origins, exact NXQSocial R2 account endpoint, staging bucket
 identities, Turnstile hostname, feature flags, and R2 region are non-secret and

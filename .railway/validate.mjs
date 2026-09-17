@@ -3,6 +3,15 @@ import { spawnSync } from "node:child_process";
 import { readFileSync } from "node:fs";
 import { createRailwayContext, project } from "railway/iac";
 import { createChildEnvironment } from "./child-environment.mjs";
+import {
+  assertExistingStagingServicePlan,
+  EXISTING_STAGING_SERVICE_PLAN,
+} from "./plan-contract.mjs";
+import {
+  missingStagingSharedVariables,
+  REQUIRED_STAGING_SHARED_VARIABLES,
+  SEALED_STAGING_SHARED_VARIABLES,
+} from "./shared-variable-contract.mjs";
 
 const expected = {
   projectId: "1cf84772-c0bd-44a6-bd6c-f652955ac0d8",
@@ -52,12 +61,78 @@ const applyWrapper = readFileSync(
   new URL("./apply.mjs", import.meta.url),
   "utf8",
 );
-assert.match(applyWrapper, /"RUNTIME_DATABASE_URL"/);
-assert.match(applyWrapper, /"MIGRATION_DATABASE_URL"/);
+const sharedVariableContract = readFileSync(
+  new URL("./shared-variable-contract.mjs", import.meta.url),
+  "utf8",
+);
+assert.match(sharedVariableContract, /"RUNTIME_DATABASE_URL"/);
+assert.match(sharedVariableContract, /"MIGRATION_DATABASE_URL"/);
 assert.match(applyWrapper, /release:migration:preflight:dev/);
 assert.match(applyWrapper, /release:migration-job:preflight:dev/);
 assert.match(applyWrapper, /release:runtime-schema:preflight:dev/);
 assert.match(applyWrapper, /migration-job/);
+assert.match(applyWrapper, /assertExistingStagingServicePlan/);
+assert.match(applyWrapper, /missingStagingSharedVariables/);
+
+assert.doesNotThrow(() =>
+  assertExistingStagingServicePlan(
+    [
+      EXISTING_STAGING_SERVICE_PLAN.summary,
+      ...EXISTING_STAGING_SERVICE_PLAN.creates,
+      ...EXISTING_STAGING_SERVICE_PLAN.changes,
+    ].join("\n"),
+  ),
+);
+for (const unsafePlan of [
+  [
+    "Plan: 3 to add, 0 to change, 0 to destroy",
+    "+ Create service backend",
+    "+ Create service frontend",
+    "+ Create service migration-job",
+  ].join("\n"),
+  [
+    "Plan: 1 to add, 2 to change, 1 to destroy",
+    "+ Create service migration-job",
+    "~ Update service backend",
+    "~ Update service frontend",
+    "- Delete volume postgres-volume",
+  ].join("\n"),
+  [
+    "Plan: 1 to add, 2 to change, 0 to destroy",
+    "+ Create service backend",
+    "~ Update service frontend",
+    "~ Update service migration-job",
+  ].join("\n"),
+  [
+    "Plan: 1 to add, 2 to change, 0 to destroy",
+    "+ Create service migration-job",
+    "~ Update service backend",
+    "~ Update database Postgres",
+  ].join("\n"),
+]) {
+  assert.throws(() => assertExistingStagingServicePlan(unsafePlan));
+}
+
+const sealedFixture = Object.fromEntries(
+  REQUIRED_STAGING_SHARED_VARIABLES.map((name) => [name, { isSealed: true }]),
+);
+assert.deepEqual(missingStagingSharedVariables(sealedFixture), []);
+assert.deepEqual(
+  missingStagingSharedVariables({
+    ...sealedFixture,
+    RUNTIME_DATABASE_URL: { value: "postgresql://runtime@example/db" },
+  }),
+  ["RUNTIME_DATABASE_URL"],
+);
+for (const name of SEALED_STAGING_SHARED_VARIABLES) {
+  assert.deepEqual(
+    missingStagingSharedVariables({
+      ...sealedFixture,
+      [name]: { value: "unsealed-value" },
+    }),
+    [name],
+  );
+}
 
 const syntheticParentSecrets = {
   CLOUDFLARE_API_TOKEN: "x",
