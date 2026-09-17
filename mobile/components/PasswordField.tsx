@@ -5,6 +5,7 @@ import { Platform, Pressable, StyleSheet, Text, TextInput, TextInputProps, View 
 type PasswordFieldProps = Omit<TextInputProps, 'secureTextEntry'> & {
   label?: string;
   newPassword?: boolean;
+  disableAutofill?: boolean;
 };
 
 // Mirrors the backend's StrongPassword rule (min 12, upper, lower, digit, special).
@@ -15,6 +16,7 @@ const PASSWORD_RULES = 'minlength: 12; required: lower; required: upper; require
 export function PasswordField({
   label = 'Password',
   newPassword = false,
+  disableAutofill = false,
   placeholder = 'Enter your password',
   ...inputProps
 }: PasswordFieldProps) {
@@ -34,10 +36,10 @@ export function PasswordField({
           autoCapitalize="none"
           autoCorrect={false}
           spellCheck={false}
-          autoComplete={Platform.OS === 'ios' ? undefined : (newPassword ? 'new-password' : 'current-password')}
-          textContentType={Platform.OS === 'ios' ? (newPassword ? 'newPassword' : 'password') : undefined}
-          passwordRules={Platform.OS === 'ios' && newPassword ? PASSWORD_RULES : undefined}
-          importantForAutofill="yes"
+          autoComplete={disableAutofill ? 'off' : (Platform.OS === 'ios' ? undefined : (newPassword ? 'new-password' : 'current-password'))}
+          textContentType={disableAutofill ? 'none' : (Platform.OS === 'ios' ? (newPassword ? 'newPassword' : 'password') : undefined)}
+          passwordRules={!disableAutofill && Platform.OS === 'ios' && newPassword ? PASSWORD_RULES : undefined}
+          importantForAutofill={disableAutofill ? 'no' : 'yes'}
           style={styles.input}
           onFocus={(event) => {
             setFocused(true);
