@@ -6,6 +6,7 @@ import { REDIS_CLIENT } from '../redis/redis.module';
 import {
   filterStagingPushTokens,
   isStagingEmailRecipientAllowed,
+  isStagingPhoneRecipientAllowed,
   isStagingOutboundRestricted,
 } from '../common/outbound/staging-outbound-policy';
 
@@ -193,6 +194,15 @@ export class NotificationsService {
    * so we don't add another dependency.
    */
   async sendPhoneOtp(to: string, code: string) {
+    if (!isStagingPhoneRecipientAllowed(to, this.outboundEnvironment())) {
+      this.logger.warn(
+        'Staging phone OTP delivery blocked by recipient allowlist.',
+      );
+      throw new Error(
+        'Phone OTP delivery is disabled for this staging recipient',
+      );
+    }
+
     const accountSid = this.config.get<string>('TWILIO_ACCOUNT_SID', '');
     const authToken = this.config.get<string>('TWILIO_AUTH_TOKEN', '');
     const from = this.config.get<string>('TWILIO_FROM_NUMBER', '');
@@ -233,6 +243,9 @@ export class NotificationsService {
       ),
       STAGING_EMAIL_RECIPIENT_ALLOWLIST: this.config.get<string>(
         'STAGING_EMAIL_RECIPIENT_ALLOWLIST',
+      ),
+      STAGING_PHONE_RECIPIENT_ALLOWLIST: this.config.get<string>(
+        'STAGING_PHONE_RECIPIENT_ALLOWLIST',
       ),
       STAGING_PUSH_TOKEN_ALLOWLIST: this.config.get<string>(
         'STAGING_PUSH_TOKEN_ALLOWLIST',

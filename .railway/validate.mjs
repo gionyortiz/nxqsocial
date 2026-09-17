@@ -17,12 +17,10 @@ const expectedApplication = {
 };
 const expectedStagingBranch = "release/railway-staging-20260916";
 
-const { NXQ_SOCIAL_STAGING_TARGET } = await import(
-  "../backend/src/release/staging-target.ts"
-);
-const { validateReleaseConfig } = await import(
-  "../frontend/scripts/validate-release-config.mjs"
-);
+const { NXQ_SOCIAL_STAGING_TARGET } =
+  await import("../backend/src/release/staging-target.ts");
+const { validateReleaseConfig } =
+  await import("../frontend/scripts/validate-release-config.mjs");
 
 assert.deepEqual(NXQ_SOCIAL_STAGING_TARGET.application, {
   frontendOrigin: expectedApplication.frontendOrigin,
@@ -128,6 +126,9 @@ for (const name of [
   "AWS_SECRET_ACCESS_KEY",
   "RESEND_API_KEY",
   "EMAIL_FROM",
+  "STAGING_EMAIL_RECIPIENT_ALLOWLIST",
+  "STAGING_PHONE_RECIPIENT_ALLOWLIST",
+  "STAGING_PUSH_TOKEN_ALLOWLIST",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "LIVEKIT_URL",
@@ -163,7 +164,10 @@ assert.equal(
   backend.variables.S3_QUARANTINE_BUCKET?.value,
   "nxqsocial-staging-quarantine",
 );
-assert.equal(backend.variables.MEDIA_MODERATION_PROVIDER?.value, "staging-mock");
+assert.equal(
+  backend.variables.MEDIA_MODERATION_PROVIDER?.value,
+  "staging-mock",
+);
 assert.equal(frontend.variables.NXQ_RELEASE_TARGET?.value, "staging");
 assert.equal(
   frontend.variables.NEXT_PUBLIC_APP_URL?.value,

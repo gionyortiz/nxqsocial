@@ -120,6 +120,8 @@ export default defineRailway((ctx) => {
       // malformed value blocks release preflight and runtime delivery.
       STAGING_EMAIL_RECIPIENT_ALLOWLIST:
         shared.STAGING_EMAIL_RECIPIENT_ALLOWLIST,
+      STAGING_PHONE_RECIPIENT_ALLOWLIST:
+        shared.STAGING_PHONE_RECIPIENT_ALLOWLIST,
       STAGING_PUSH_TOKEN_ALLOWLIST: shared.STAGING_PUSH_TOKEN_ALLOWLIST,
       STRIPE_SECRET_KEY: shared.STRIPE_SECRET_KEY,
       STRIPE_WEBHOOK_SECRET: shared.STRIPE_WEBHOOK_SECRET,

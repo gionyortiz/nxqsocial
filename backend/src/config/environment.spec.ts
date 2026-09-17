@@ -44,6 +44,7 @@ describe('validateEnvironment', () => {
       NXQ_RELEASE_TARGET: 'staging',
       RAILWAY_ENVIRONMENT_NAME: 'staging',
       STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+      STAGING_PHONE_RECIPIENT_ALLOWLIST: 'disabled',
       STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
       MEDIA_MODERATION_PROVIDER: 'staging-mock',
       REKOGNITION_REGION: '',
@@ -162,6 +163,7 @@ describe('validateEnvironment', () => {
       NXQ_RELEASE_TARGET: 'staging',
       RAILWAY_ENVIRONMENT_NAME: 'staging',
       STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+      STAGING_PHONE_RECIPIENT_ALLOWLIST: 'disabled',
       STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
     };
 
@@ -171,10 +173,11 @@ describe('validateEnvironment', () => {
       validateEnvironment({
         ...environment,
         STAGING_EMAIL_RECIPIENT_ALLOWLIST: '',
+        STAGING_PHONE_RECIPIENT_ALLOWLIST: 'restored-phone',
         STAGING_PUSH_TOKEN_ALLOWLIST: 'restored-device-token',
       }),
     ).toThrow(
-      /STAGING_EMAIL_RECIPIENT_ALLOWLIST must contain unique, valid test-recipient email addresses[\s\S]*STAGING_PUSH_TOKEN_ALLOWLIST must be disabled or contain unique Expo push tokens/,
+      /STAGING_EMAIL_RECIPIENT_ALLOWLIST must contain unique, valid test-recipient email addresses[\s\S]*STAGING_PHONE_RECIPIENT_ALLOWLIST must be disabled or contain unique E\.164 test phone numbers[\s\S]*STAGING_PUSH_TOKEN_ALLOWLIST must be disabled or contain unique Expo push tokens/,
     );
   });
 

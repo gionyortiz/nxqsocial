@@ -24,6 +24,7 @@ const validEnvironment = () => ({
   RESEND_API_KEY: 're_staging_1234567890',
   EMAIL_FROM: 'NXQ Social Staging <staging@mail.nxqsocial.com>',
   STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+  STAGING_PHONE_RECIPIENT_ALLOWLIST: 'disabled',
   STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
   SIGNUP_HARDENING_ENABLED: 'true',
   TURNSTILE_SECRET_KEY: 'turnstile_secret_1234567890',
@@ -76,10 +77,11 @@ describe('validateFullStagingReleaseProviders', () => {
       validateFullStagingReleaseProviders({
         ...validEnvironment(),
         STAGING_EMAIL_RECIPIENT_ALLOWLIST: '',
+        STAGING_PHONE_RECIPIENT_ALLOWLIST: 'not-a-phone',
         STAGING_PUSH_TOKEN_ALLOWLIST: 'ExponentPushToken[test],invalid',
       }),
     ).toThrow(
-      /STAGING_EMAIL_RECIPIENT_ALLOWLIST must contain unique, valid test-recipient email addresses[\s\S]*STAGING_PUSH_TOKEN_ALLOWLIST must be disabled or contain unique Expo push tokens/,
+      /STAGING_EMAIL_RECIPIENT_ALLOWLIST must contain unique, valid test-recipient email addresses[\s\S]*STAGING_PHONE_RECIPIENT_ALLOWLIST must be disabled or contain unique E\.164 test phone numbers[\s\S]*STAGING_PUSH_TOKEN_ALLOWLIST must be disabled or contain unique Expo push tokens/,
     );
   });
 

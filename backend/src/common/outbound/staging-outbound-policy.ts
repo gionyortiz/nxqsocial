@@ -1,7 +1,8 @@
 export type OutboundEnvironment = Record<string, unknown>;
 
 const EMAIL_PATTERN = /^[^@\s]+@[^@\s]+\.[^@\s]+$/;
-const DISABLED_PUSH_ALLOWLIST = 'disabled';
+const E164_PHONE_PATTERN = /^\+[1-9]\d{7,14}$/;
+const DISABLED_ALLOWLIST = 'disabled';
 
 /**
  * Staging is an external-delivery boundary, not a weaker production mode.
@@ -31,6 +32,22 @@ export function isStagingEmailRecipientAllowed(
   if (!EMAIL_PATTERN.test(normalizedRecipient)) return false;
 
   return stagingEmailAllowlist(environment).has(normalizedRecipient);
+}
+
+/**
+ * Staging SMS follows the same exact-recipient rule as staging email. The
+ * `disabled` sentinel keeps a normal staging run unable to contact any phone.
+ */
+export function isStagingPhoneRecipientAllowed(
+  recipient: string,
+  environment: OutboundEnvironment,
+): boolean {
+  if (!isStagingOutboundRestricted(environment)) return true;
+
+  const normalizedRecipient = normalizedPhone(recipient);
+  if (!E164_PHONE_PATTERN.test(normalizedRecipient)) return false;
+
+  return stagingPhoneAllowlist(environment).has(normalizedRecipient);
 }
 
 /**
@@ -71,14 +88,34 @@ export function validateStagingOutboundDeliveryConfiguration(
     );
   }
 
+  const rawPhones = environment.STAGING_PHONE_RECIPIENT_ALLOWLIST;
+  const phones = splitList(rawPhones).map(normalizedPhone);
+  if (
+    phones.length === 0 ||
+    (phones.length === 1 && normalized(phones[0]) === DISABLED_ALLOWLIST)
+  ) {
+    if (normalized(rawPhones) !== DISABLED_ALLOWLIST) {
+      issues.push(
+        'STAGING_PHONE_RECIPIENT_ALLOWLIST must be disabled or contain unique E.164 test phone numbers',
+      );
+    }
+  } else if (
+    phones.some((phone) => !E164_PHONE_PATTERN.test(phone)) ||
+    new Set(phones).size !== phones.length
+  ) {
+    issues.push(
+      'STAGING_PHONE_RECIPIENT_ALLOWLIST must be disabled or contain unique E.164 test phone numbers',
+    );
+  }
+
   const rawPushTokens = environment.STAGING_PUSH_TOKEN_ALLOWLIST;
   const pushTokens = splitList(rawPushTokens);
   if (
     pushTokens.length === 0 ||
     (pushTokens.length === 1 &&
-      normalized(pushTokens[0]) === DISABLED_PUSH_ALLOWLIST)
+      normalized(pushTokens[0]) === DISABLED_ALLOWLIST)
   ) {
-    if (normalized(rawPushTokens) !== DISABLED_PUSH_ALLOWLIST) {
+    if (normalized(rawPushTokens) !== DISABLED_ALLOWLIST) {
       issues.push(
         'STAGING_PUSH_TOKEN_ALLOWLIST must be disabled or contain unique Expo push tokens',
       );
@@ -105,13 +142,20 @@ function stagingPushTokenAllowlist(
   environment: OutboundEnvironment,
 ): Set<string> {
   const tokens = splitList(environment.STAGING_PUSH_TOKEN_ALLOWLIST);
-  if (
-    tokens.length === 1 &&
-    normalized(tokens[0]) === DISABLED_PUSH_ALLOWLIST
-  ) {
+  if (tokens.length === 1 && normalized(tokens[0]) === DISABLED_ALLOWLIST) {
     return new Set();
   }
   return new Set(tokens);
+}
+
+function stagingPhoneAllowlist(environment: OutboundEnvironment): Set<string> {
+  const phones = splitList(environment.STAGING_PHONE_RECIPIENT_ALLOWLIST).map(
+    normalizedPhone,
+  );
+  if (phones.length === 1 && normalized(phones[0]) === DISABLED_ALLOWLIST) {
+    return new Set();
+  }
+  return new Set(phones);
 }
 
 function splitList(value: unknown): string[] {
@@ -123,6 +167,10 @@ function splitList(value: unknown): string[] {
 
 function normalized(value: unknown): string {
   return typeof value === 'string' ? value.trim().toLowerCase() : '';
+}
+
+function normalizedPhone(value: unknown): string {
+  return typeof value === 'string' ? value.trim() : '';
 }
 
 function isExpoPushToken(token: string): boolean {

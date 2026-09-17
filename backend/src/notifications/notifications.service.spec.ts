@@ -80,4 +80,26 @@ describe('NotificationsService email delivery', () => {
     expect(fetchSpy).not.toHaveBeenCalled();
     fetchSpy.mockRestore();
   });
+
+  it('does not call Twilio for a non-allowlisted staging phone recipient', async () => {
+    const { service } = buildService({
+      NXQ_RELEASE_TARGET: 'staging',
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+      STAGING_PHONE_RECIPIENT_ALLOWLIST: 'disabled',
+      STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
+      TWILIO_ACCOUNT_SID: 'ACtest',
+      TWILIO_AUTH_TOKEN: 'twilio-test-token',
+      TWILIO_FROM_NUMBER: '+15550000000',
+    });
+    const fetchSpy = jest.spyOn(global, 'fetch');
+
+    await expect(
+      service.sendPhoneOtp('+15551234567', '123456'),
+    ).rejects.toThrow(
+      'Phone OTP delivery is disabled for this staging recipient',
+    );
+
+    expect(fetchSpy).not.toHaveBeenCalled();
+    fetchSpy.mockRestore();
+  });
 });

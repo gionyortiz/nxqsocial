@@ -1,6 +1,7 @@
 import {
   filterStagingPushTokens,
   isStagingEmailRecipientAllowed,
+  isStagingPhoneRecipientAllowed,
   isStagingOutboundRestricted,
   validateStagingOutboundDeliveryConfiguration,
 } from './staging-outbound-policy';
@@ -8,6 +9,7 @@ import {
 const stagingEnvironment = {
   NXQ_RELEASE_TARGET: 'staging',
   STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'operator@nxqsocial.test',
+  STAGING_PHONE_RECIPIENT_ALLOWLIST: 'disabled',
   STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
 };
 
@@ -51,6 +53,23 @@ describe('staging outbound delivery policy', () => {
     ).toEqual([]);
   });
 
+  it('denies all SMS recipients when staging SMS delivery is disabled', () => {
+    expect(
+      isStagingPhoneRecipientAllowed('+15551234567', stagingEnvironment),
+    ).toBe(false);
+    expect(
+      isStagingPhoneRecipientAllowed('+15551234567', {
+        ...stagingEnvironment,
+        STAGING_PHONE_RECIPIENT_ALLOWLIST: '+15551234567',
+      }),
+    ).toBe(true);
+    expect(
+      isStagingPhoneRecipientAllowed('+15551234567', {
+        NXQ_RELEASE_TARGET: 'production',
+      }),
+    ).toBe(true);
+  });
+
   it('filters staging push delivery to explicit test-device tokens only', () => {
     const allowed = 'ExponentPushToken[test-device]';
     expect(
@@ -68,6 +87,7 @@ describe('staging outbound delivery policy', () => {
       }),
     ).toEqual([
       'STAGING_EMAIL_RECIPIENT_ALLOWLIST must contain unique, valid test-recipient email addresses',
+      'STAGING_PHONE_RECIPIENT_ALLOWLIST must be disabled or contain unique E.164 test phone numbers',
       'STAGING_PUSH_TOKEN_ALLOWLIST must be disabled or contain unique Expo push tokens',
     ]);
 
@@ -76,9 +96,10 @@ describe('staging outbound delivery policy', () => {
         ...stagingEnvironment,
         STAGING_EMAIL_RECIPIENT_ALLOWLIST:
           'operator@nxqsocial.test,operator@nxqsocial.test',
+        STAGING_PHONE_RECIPIENT_ALLOWLIST: 'not-a-phone',
         STAGING_PUSH_TOKEN_ALLOWLIST: 'not-a-push-token',
       }),
-    ).toHaveLength(2);
+    ).toHaveLength(3);
   });
 
   it('accepts an explicit test recipient and disabled push delivery', () => {
