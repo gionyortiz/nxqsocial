@@ -48,6 +48,14 @@ const providerPreflightEntrypoint = readFileSync(
 );
 assert.doesNotMatch(providerPreflightEntrypoint, /dotenv(?:\/config)?/i);
 
+const applyWrapper = readFileSync(
+  new URL("./apply.mjs", import.meta.url),
+  "utf8",
+);
+assert.match(applyWrapper, /"RUNTIME_DATABASE_URL"/);
+assert.match(applyWrapper, /"MIGRATION_DATABASE_URL"/);
+assert.match(applyWrapper, /release:migration:preflight:dev/);
+
 const syntheticParentSecrets = {
   CLOUDFLARE_API_TOKEN: "x",
   GH_TOKEN: "x",
@@ -135,13 +143,17 @@ for (const name of [
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
   "CLOUDFLARE_PROXY_CIDRS",
-  "MIGRATION_DATABASE_URL",
 ]) {
   assert.deepEqual(backend.variables[name], {
     type: "sharedReference",
     name,
   });
 }
+assert.deepEqual(backend.variables.DATABASE_URL, {
+  type: "sharedReference",
+  name: "RUNTIME_DATABASE_URL",
+});
+assert.equal(backend.variables.MIGRATION_DATABASE_URL, undefined);
 assert.deepEqual(backend.variables.LIVEKIT_EXPECTED_STAGING_URL, {
   type: "sharedReference",
   name: "LIVEKIT_URL",

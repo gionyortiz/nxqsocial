@@ -96,13 +96,11 @@ export default defineRailway((ctx) => {
       // preflight refuses to start unless it is present and valid, which keeps
       // per-client controls from treating every Cloudflare request as one IP.
       CLOUDFLARE_PROXY_CIDRS: shared.CLOUDFLARE_PROXY_CIDRS,
-      // The release script passes this reference only to Prisma's one-shot
-      // migration child process. Application code continues to use
-      // DATABASE_URL. This declaration cannot create PostgreSQL roles or make
-      // a Railway variable predeploy-only; provider-side credential scope is a
-      // separately documented operational gate before any production cutover.
-      MIGRATION_DATABASE_URL: shared.MIGRATION_DATABASE_URL,
-      DATABASE_URL: Postgres.env.DATABASE_URL,
+      // Do not expose the Railway database service's default/owner URL to the
+      // API. Runtime DATABASE_URL must instead be a separately provisioned,
+      // restricted application role. The release migration validator refuses a
+      // matching migration credential before Prisma can run.
+      DATABASE_URL: shared.RUNTIME_DATABASE_URL,
       REDIS_URL: Redis.env.REDIS_URL,
       JWT_SECRET: shared.JWT_SECRET,
       JWT_EXPIRES_IN: "7d",

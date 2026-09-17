@@ -160,14 +160,14 @@ local-media migration or video backfill as a pre-deploy command. The Windows
 Compose deployment deliberately uses `npm run start:with-migrations` for its
 existing single backend instance.
 
-The project IaC pins the non-secret staging target and application origins and
-uses Railway references for private database/Redis URLs:
+The project IaC pins the non-secret staging target and application origins,
+maps the restricted database runtime credential from a shared variable, and
+uses a Railway reference for Redis:
 
 ```text
 NODE_ENV=production
 NXQ_RELEASE_TARGET=staging
-DATABASE_URL=${{Postgres.DATABASE_URL}}
-MIGRATION_DATABASE_URL=${{shared.MIGRATION_DATABASE_URL}}
+DATABASE_URL=${{shared.RUNTIME_DATABASE_URL}}
 REDIS_URL=${{Redis.REDIS_URL}}
 FRONTEND_URL=https://staging.nxqsocial.com
 APP_BASE_URL=https://staging.nxqsocial.com
@@ -192,7 +192,7 @@ STRIPE_WEBHOOK_SECRET
 LIVEKIT_URL
 LIVEKIT_API_KEY
 LIVEKIT_API_SECRET
-MIGRATION_DATABASE_URL
+RUNTIME_DATABASE_URL
 
 # Current Cloudflare published proxy CIDRs, reviewed before the release.
 CLOUDFLARE_PROXY_CIDRS
@@ -201,6 +201,9 @@ CLOUDFLARE_PROXY_CIDRS
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 ```
+
+`MIGRATION_DATABASE_URL` is separately required and locally validated by the
+apply wrapper, but must not be added to the backend service environment above.
 
 The IaC sets `JWT_EXPIRES_IN`, `SIGNUP_HARDENING_ENABLED`,
 `TURNSTILE_ALLOWED_HOSTNAMES`, `TURNSTILE_TEST_BYPASS`, the exact NXQSocial R2
@@ -216,14 +219,20 @@ Do not add production Rekognition credentials just to make staging look like
 production; real moderation credentials and the separate private moderation
 bucket are a later production-release gate.
 
-`MIGRATION_DATABASE_URL` is a separately governed PostgreSQL credential for
-the one-shot Prisma migration command; it must not equal the runtime
-`DATABASE_URL`. The repository cannot create PostgreSQL roles/grants or prove
-that Railway scopes a secret to pre-deploy only. Before any production
-cutover, complete a provider-side role/grant rehearsal and prove that the API
-runtime has only its restricted `DATABASE_URL`. If Railway cannot provide that
-pre-deploy-only scope, run the migration through an isolated one-shot
-migration service/job. This is a hard operational gate, not a claim made by
+`RUNTIME_DATABASE_URL` is mapped to the API's `DATABASE_URL` and must be a
+restricted application role, not the Railway Postgres service's default/owner
+credential. `MIGRATION_DATABASE_URL` is a separately governed PostgreSQL
+credential for the one-shot Prisma migration command; it must not equal the
+runtime credential. It is deliberately absent from the backend service's IaC
+environment binding. The apply wrapper validates the separately governed
+shared secret locally; it does not map it into the API runtime. The repository
+cannot create PostgreSQL roles/grants or prove that Railway scopes a secret to
+pre-deploy only. Before any production cutover, complete a provider-side
+role/grant rehearsal and prove that the API runtime has only its restricted
+`DATABASE_URL`. If Railway cannot provide that pre-deploy-only scope, run the
+migration through an isolated one-shot migration service/job; the checked-in
+pre-deploy command will otherwise fail closed without
+`MIGRATION_DATABASE_URL`. This is a hard operational gate, not a claim made by
 this IaC file.
 
 The application origins are not free-form staging inputs. They must remain this

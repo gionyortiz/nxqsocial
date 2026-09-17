@@ -38,7 +38,11 @@ const requiredSharedVariables = [
   "LIVEKIT_API_KEY",
   "LIVEKIT_API_SECRET",
   "CLOUDFLARE_PROXY_CIDRS",
+  // This is validated locally before an apply but intentionally not declared
+  // in backend.env. A provider-side predeploy-only scope or isolated migrator
+  // job must supply it to the migration command.
   "MIGRATION_DATABASE_URL",
+  "RUNTIME_DATABASE_URL",
 ];
 const placeholder =
   /(?:change[-_ ]?me|replace|placeholder|example|dummy|todo|tbd|required|your[-_ ]|__[^_]+__|\.\.\.$)/i;
@@ -342,6 +346,8 @@ function verifyReleaseConfiguration(shared) {
     S3_PUBLIC_BASE_URL: "https://media-staging.nxqsocial.com",
     AWS_REGION: "auto",
     MEDIA_MODERATION_PROVIDER: "staging-mock",
+    DATABASE_URL: shared.RUNTIME_DATABASE_URL,
+    MIGRATION_DATABASE_URL: shared.MIGRATION_DATABASE_URL,
     CLOUDFLARE_PROXY_CIDRS: shared.CLOUDFLARE_PROXY_CIDRS,
     LIVEKIT_EXPECTED_STAGING_URL: shared.LIVEKIT_URL,
     NEXT_PUBLIC_APP_URL: "https://staging.nxqsocial.com",
@@ -363,6 +369,25 @@ function verifyReleaseConfiguration(shared) {
   if (backendPreflight.error || backendPreflight.status !== 0) {
     throw new Error(
       "Refusing to apply because staging provider configuration failed offline validation.",
+    );
+  }
+
+  const migrationAuthorityPreflight = spawnSync(
+    npmExecutable,
+    ["--prefix", "backend", "run", "release:migration:preflight:dev"],
+    {
+      cwd: repositoryRoot,
+      encoding: "utf8",
+      env: releaseEnvironment,
+      stdio: ["ignore", "pipe", "pipe"],
+    },
+  );
+  if (
+    migrationAuthorityPreflight.error ||
+    migrationAuthorityPreflight.status !== 0
+  ) {
+    throw new Error(
+      "Refusing to apply because Railway runtime and migration database authorities failed offline validation.",
     );
   }
 

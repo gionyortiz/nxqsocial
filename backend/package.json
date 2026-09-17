@@ -28,6 +28,8 @@
     "migrate:local-media:dev": "ts-node -r tsconfig-paths/register scripts/migrate-local-media-to-object-storage.ts",
     "release:providers:preflight": "node dist/scripts/release-provider-preflight.js",
     "release:providers:preflight:dev": "ts-node -r tsconfig-paths/register scripts/release-provider-preflight.ts",
+    "release:migration:preflight": "node dist/scripts/release-migration-authority-preflight.js",
+    "release:migration:preflight:dev": "ts-node -r tsconfig-paths/register scripts/release-migration-authority-preflight.ts",
     "staging:fixtures:seed": "node dist/scripts/seed-staging-fixtures.js",
     "staging:fixtures:seed:dev": "ts-node -r tsconfig-paths/register scripts/seed-staging-fixtures.ts",
     "restore:manifest": "node dist/scripts/create-restore-manifest.js",

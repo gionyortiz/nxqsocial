@@ -115,13 +115,17 @@ The following shared-variable names must all exist before an apply:
 - `LIVEKIT_API_KEY`
 - `LIVEKIT_API_SECRET`
 - `CLOUDFLARE_PROXY_CIDRS`
-- `MIGRATION_DATABASE_URL`
+- `RUNTIME_DATABASE_URL`
 
 `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are the standard S3-compatible
 environment names consumed by the SDK, but in this staging definition they are
 scoped Cloudflare R2 credentials. They do not authorize or require an AWS
 account. Staging moderation is pinned to the non-secret `staging-mock` provider;
 no Rekognition, AWS S3 bucket, or IAM credential is used.
+
+`MIGRATION_DATABASE_URL` is also required before an apply, but is deliberately
+listed separately: the apply wrapper validates it without mapping it into the
+backend service's IaC environment.
 
 The public staging origins, exact NXQSocial R2 account endpoint, staging bucket
 identities, Turnstile hostname, feature flags, and R2 region are non-secret and
@@ -137,13 +141,18 @@ with the staging release evidence.
 
 ## Database migration authority
 
-The backend runtime keeps using `DATABASE_URL`. The Railway pre-deploy command
-runs `npm run db:migrate:release`, which requires a second
+Railway maps the separately provisioned `RUNTIME_DATABASE_URL` to the API's
+`DATABASE_URL`; it must be a restricted application role, not the Railway
+database service's default/owner connection. The pre-deploy command runs
+`npm run db:migrate:release`, which requires a second
 `MIGRATION_DATABASE_URL`, verifies that it is a valid PostgreSQL URL for the
-same named database, and fails closed if its credential matches
-`DATABASE_URL`. It then supplies that URL only to the one-shot Prisma migration
+same named database, and fails closed if its credential matches the runtime
+credential. It then supplies that URL only to the one-shot Prisma migration
 child process. The normal Docker command remains `npm run start:prod` and does
-not run migrations.
+not run migrations. `MIGRATION_DATABASE_URL` is intentionally **not** a
+backend service/IaC environment binding: the apply wrapper validates the
+separately governed shared secret locally, but it must be injected only into
+an approved pre-deploy scope or an isolated one-shot migration job.
 
 This source/IaC boundary does **not** create PostgreSQL roles, grants, or a
 pre-deploy-only Railway secret scope. Before any production cutover, an
