@@ -51,6 +51,9 @@ describe('validateEnvironment', () => {
       REKOGNITION_ACCESS_KEY_ID: '',
       REKOGNITION_SECRET_ACCESS_KEY: '',
       REKOGNITION_S3_BUCKET: '',
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'staging-test@example.test',
+      STAGING_PHONE_RECIPIENT_ALLOWLIST: 'disabled',
+      STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
     };
     expect(validateEnvironment(environment)).toBe(environment);
 
@@ -90,6 +93,9 @@ describe('validateEnvironment', () => {
       REKOGNITION_ACCESS_KEY_ID: '',
       REKOGNITION_SECRET_ACCESS_KEY: '',
       REKOGNITION_S3_BUCKET: '',
+      STAGING_EMAIL_RECIPIENT_ALLOWLIST: 'staging-test@example.test',
+      STAGING_PHONE_RECIPIENT_ALLOWLIST: 'disabled',
+      STAGING_PUSH_TOKEN_ALLOWLIST: 'disabled',
     };
 
     expect(() => validateEnvironment(railwayEnvironment)).toThrow(
