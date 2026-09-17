@@ -168,10 +168,13 @@ those provider-side controls exist.
 - The legacy `backend/railway.json` and `frontend/railway.json` files were
   removed because Railway does not allow one service to be managed by both the
   deprecated Config-as-Code system and project-level IaC.
-- Railway's importer represented the custom Postgres service with the generic
-  `postgres()` helper, which planned an unintended Postgres 16 to 18 image
-  change. The checked-in definition uses `database()` with the exact imported
-  `ghcr.io/railwayapp-templates/postgres-ssl:16` image instead.
+- A read-only Railway dashboard inventory on 2026-09-16 confirmed that the
+  retained staging service is actively running
+  `ghcr.io/railwayapp-templates/postgres-ssl:18`. Older Postgres 16 entries
+  are removed deployment history, not the current service state. The checked-in
+  definition therefore pins the verified Postgres 18 image. Re-run the
+  read-only plan before every apply; never infer the active database version
+  from historical backup records.
 - Railway IaC is currently beta. Re-run the plan after any CLI/SDK upgrade and
   review the complete diff before considering an apply.
 - Railway CLI 5.43.3 is intentionally **not** an npm dependency here. Its npm

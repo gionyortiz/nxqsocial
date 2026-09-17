@@ -128,9 +128,12 @@ injection, domains, and deployment remain separate operational actions.
 ## Backend deployment settings
 
 Before any apply, reconcile the retained PostgreSQL image/version with the IaC.
-The current configuration and historical backup evidence must agree exactly.
-If a plan proposes any PostgreSQL, Redis, volume, image, or domain change, stop
-rather than allowing a service deployment to decide the database version.
+A read-only Railway dashboard inventory on 2026-09-16 confirmed the active
+staging image is `ghcr.io/railwayapp-templates/postgres-ssl:18`; older
+Postgres 16 entries are removed deployment history. Treat the current provider
+inventory—not historical backup records—as the version authority. If a plan
+proposes any PostgreSQL, Redis, volume, image, or domain change, stop rather
+than allowing a service deployment to decide the database version.
 
 - Root directory: `/backend`
 - Builder: Dockerfile
@@ -153,9 +156,10 @@ The pre-deploy container has no persistent volume. Its only permitted sequence
 is the offline, read-only provider/application-target preflight followed by the
 release migration command; a preflight failure must prevent the migration
 command from starting. `db:migrate:release` fails closed without a separate
-`MIGRATION_DATABASE_URL`, rejects an equal runtime/migration credential, and
-passes the migration URL only to Prisma's one-shot child process. The runtime
-Docker command remains migration-free and uses `DATABASE_URL`. Never run the
+`MIGRATION_DATABASE_URL`, rejects an equal runtime/migration credential or a
+reused PostgreSQL role, and passes the migration URL only to Prisma's one-shot
+child process. The runtime Docker command remains migration-free and uses
+`DATABASE_URL`. Never run the
 local-media migration or video backfill as a pre-deploy command. The Windows
 Compose deployment deliberately uses `npm run start:with-migrations` for its
 existing single backend instance.
