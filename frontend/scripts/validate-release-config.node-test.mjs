@@ -18,9 +18,26 @@ function validEnvironment(target = 'staging') {
 }
 
 test('accepts only the exact approved staging origin pair', () => {
+  assert.deepEqual(RELEASE_TARGETS.staging, {
+    appUrl: 'https://staging.nxqsocial.com',
+    apiUrl: 'https://api-staging.nxqsocial.com/api',
+  });
+
   assert.deepEqual(validateReleaseConfig(validEnvironment()), {
     releaseTarget: 'staging',
   });
+});
+
+test('rejects the retired Railway-generated staging origin pair', () => {
+  assert.throws(
+    () =>
+      validateReleaseConfig({
+        ...validEnvironment(),
+        NEXT_PUBLIC_APP_URL: 'https://frontend-staging-f129.up.railway.app',
+        NEXT_PUBLIC_API_URL: 'https://backend-staging-4ceb.up.railway.app/api',
+      }),
+    /NEXT_PUBLIC_APP_URL must equal the approved staging frontend origin[\s\S]*NEXT_PUBLIC_API_URL must equal the approved staging API URL ending in \/api/,
+  );
 });
 
 test('rejects a staging build that targets production', () => {
