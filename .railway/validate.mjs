@@ -266,7 +266,7 @@ assert.equal(backend.variables.JWT_EXPIRES_IN?.value, "7d");
 assert.equal(backend.variables.TURNSTILE_TEST_BYPASS?.value, "false");
 assert.equal(
   backend.variables.S3_ENDPOINT?.value,
-  "https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com",
+  "https://6e2f626a593adacb44b2efdbad66d8ce.r2.cloudflarestorage.com",
 );
 assert.equal(
   backend.variables.S3_BUCKET_NAME?.value,

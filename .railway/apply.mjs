@@ -24,7 +24,7 @@ const stagingBranch = "release/railway-staging-20260916";
 const expectedOrigin = "https://github.com/gionyortiz/nxqsocial.git";
 const githubRepository = "gionyortiz/nxqsocial";
 const expectedR2Endpoint =
-  "https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com";
+  "https://6e2f626a593adacb44b2efdbad66d8ce.r2.cloudflarestorage.com";
 
 if (process.argv.length !== 2) {
   throw new Error("The verified staging apply wrapper accepts no arguments.");

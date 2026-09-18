@@ -10,7 +10,7 @@ export const NXQ_SOCIAL_STAGING_TARGET = {
   },
   resources: {
     r2Endpoint:
-      'https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com',
+      'https://6e2f626a593adacb44b2efdbad66d8ce.r2.cloudflarestorage.com',
     publicBucket: 'nxqsocial-staging-public',
     quarantineBucket: 'nxqsocial-staging-quarantine',
     moderationProvider: 'staging-mock',

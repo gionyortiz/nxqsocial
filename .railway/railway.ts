@@ -125,7 +125,7 @@ export default defineRailway((ctx) => {
       TURNSTILE_SECRET_KEY: shared.TURNSTILE_SECRET_KEY,
       TURNSTILE_ALLOWED_HOSTNAMES: "staging.nxqsocial.com",
       S3_ENDPOINT:
-        "https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com",
+        "https://6e2f626a593adacb44b2efdbad66d8ce.r2.cloudflarestorage.com",
       S3_BUCKET_NAME: "nxqsocial-staging-public",
       S3_QUARANTINE_BUCKET: "nxqsocial-staging-quarantine",
       S3_PUBLIC_BASE_URL: "https://media-staging.nxqsocial.com",

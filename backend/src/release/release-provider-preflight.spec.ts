@@ -160,6 +160,18 @@ describe('validateFullStagingReleaseProviders', () => {
     );
   });
 
+  it('rejects the retired staging R2 account endpoint', () => {
+    expect(() =>
+      validateFullStagingReleaseProviders({
+        ...validEnvironment(),
+        S3_ENDPOINT:
+          'https://07a14429304a4b400dfcaf6d09213b6e.r2.cloudflarestorage.com',
+      }),
+    ).toThrow(
+      'S3_ENDPOINT must match the approved NXQSocial Cloudflare account',
+    );
+  });
+
   it('rejects placeholder values and a non-staging moderation provider', () => {
     const environment = validEnvironment();
     environment.RESEND_API_KEY = '__REQUIRED__';
