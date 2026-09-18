@@ -1,14 +1,17 @@
 import { spawnSync } from "node:child_process";
-import { existsSync } from "node:fs";
-import { delimiter, dirname, isAbsolute, join, resolve } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createChildEnvironment } from "./child-environment.mjs";
+import { resolvePathExecutable } from "./executable-resolution.mjs";
 import { assertExistingStagingServicePlan } from "./plan-contract.mjs";
+import {
+  resolveApprovedRailwayExecutable,
+  verifyReviewedRailwayCli,
+} from "./railway-cli-verification.mjs";
 import { missingStagingSharedVariables } from "./shared-variable-contract.mjs";
 
 const railwayDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(railwayDirectory, "..");
-const requiredCliVersion = "5.43.3";
 const expectedProject = {
   id: "1cf84772-c0bd-44a6-bd6c-f652955ac0d8",
   name: "nxq-social-staging",
@@ -27,9 +30,9 @@ if (process.argv.length !== 2) {
   throw new Error("The verified staging apply wrapper accepts no arguments.");
 }
 
-const executable = resolveRailwayExecutable();
+const executable = resolveApprovedRailwayExecutable();
 const cliEnvironment = createChildEnvironment({ _: executable });
-verifyCliVersion(executable, cliEnvironment);
+verifyReviewedRailwayCli(executable, cliEnvironment, repositoryRoot);
 verifyRailwayTarget(executable, cliEnvironment);
 const sourceCommit = verifyGitSource();
 verifyGreenCi(sourceCommit, cliEnvironment);
@@ -75,24 +78,6 @@ const applyResult = spawnSync(
 );
 if (applyResult.error) throw applyResult.error;
 process.exitCode = applyResult.status ?? 1;
-
-function verifyCliVersion(executablePath, environment) {
-  const result = spawnSync(executablePath, ["--version"], {
-    cwd: repositoryRoot,
-    encoding: "utf8",
-    env: environment,
-    stdio: ["ignore", "pipe", "pipe"],
-  });
-  if (
-    result.error ||
-    result.status !== 0 ||
-    result.stdout.trim() !== `railway ${requiredCliVersion}`
-  ) {
-    throw new Error(
-      `Railway CLI ${requiredCliVersion} is required; refusing an unverified executable.`,
-    );
-  }
-}
 
 function verifyRailwayTarget(executablePath, environment) {
   const jsonResult = spawnSync(executablePath, ["status", "--json"], {
@@ -353,6 +338,7 @@ function verifyReleaseConfiguration() {
     MIGRATION_DATABASE_ROLE: "nxqsocial_migrator",
     MIGRATION_DATABASE_URL:
       "postgresql://nxqsocial_migrator:migration_fixture_password@db.internal:5432/nxqsocial",
+    MIGRATION_JOB_MAX_RUNTIME_MS: "600000",
   });
   const migrationJobPreflight = spawnSync(
     npmExecutable,
@@ -427,40 +413,4 @@ function runGit(arguments_) {
     throw new Error("Unable to verify the staging Git source.");
   }
   return result.stdout.trim();
-}
-
-function resolveRailwayExecutable() {
-  const configuredPath = process.env.RAILWAY_CLI_PATH?.trim();
-  if (configuredPath) {
-    if (!isAbsolute(configuredPath)) {
-      throw new Error("RAILWAY_CLI_PATH must be an absolute path.");
-    }
-    if (!existsSync(configuredPath)) {
-      throw new Error("RAILWAY_CLI_PATH does not identify an executable file.");
-    }
-    return configuredPath;
-  }
-
-  const executableNames =
-    process.platform === "win32"
-      ? ["railway.exe", "railway.cmd", "railway"]
-      : ["railway"];
-  const resolved = resolvePathExecutable(executableNames, false);
-  if (resolved) return resolved;
-  throw new Error(
-    `Railway CLI ${requiredCliVersion} was not found. Set an absolute RAILWAY_CLI_PATH or add the official binary to PATH.`,
-  );
-}
-
-function resolvePathExecutable(executableNames, required = true) {
-  for (const rawDirectory of (process.env.PATH ?? "").split(delimiter)) {
-    const directory = rawDirectory.replace(/^"|"$/g, "").trim();
-    if (!directory) continue;
-    for (const name of executableNames) {
-      const candidate = resolve(directory, name);
-      if (existsSync(candidate)) return candidate;
-    }
-  }
-  if (!required) return undefined;
-  throw new Error("GitHub CLI was not found on PATH; CI cannot be verified.");
 }

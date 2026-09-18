@@ -5,9 +5,14 @@ import {
   IsolatedMigrationJobAuthorityError,
   requireIsolatedMigrationJobAuthority,
 } from '../src/release/migration-job-authority';
+import {
+  migrationJobSpawnOptions,
+  requireFixedMigrationJobRuntimeLimit,
+} from '../src/release/migration-job-runtime-limit';
 
 try {
   const authority = requireIsolatedMigrationJobAuthority(process.env);
+  const maxRuntimeMs = requireFixedMigrationJobRuntimeLimit(process.env);
   const migrationEnvironment = createIsolatedMigrationJobEnvironment(
     process.env,
     authority,
@@ -20,12 +25,19 @@ try {
   // migration service; the API image never receives this URL.
   const prismaCli = require.resolve('prisma/build/index.js');
   const result = spawnSync(process.execPath, [prismaCli, 'migrate', 'deploy'], {
-    env: migrationEnvironment,
-    stdio: 'inherit',
+    ...migrationJobSpawnOptions(migrationEnvironment),
   });
 
   if (result.error) {
-    console.error('Unable to start the lockfile-pinned Prisma migration CLI.');
+    if ((result.error as NodeJS.ErrnoException).code === 'ETIMEDOUT') {
+      console.error(
+        `Lockfile-pinned Prisma migration exceeded the reviewed ${maxRuntimeMs}ms runtime limit.`,
+      );
+    } else {
+      console.error(
+        'Unable to start the lockfile-pinned Prisma migration CLI.',
+      );
+    }
     process.exitCode = 1;
   } else if (result.status !== 0) {
     process.exitCode = result.status ?? 1;

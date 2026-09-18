@@ -6,6 +6,7 @@
     "apply": "node apply.mjs",
     "plan": "node plan.mjs",
     "plan:verbose": "node plan.mjs --verbose",
+    "test": "node --test railway-cli-verification.test.mjs",
     "validate": "node --import tsx validate.mjs"
   },
   "engines": {

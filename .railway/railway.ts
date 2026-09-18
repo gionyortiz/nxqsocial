@@ -18,6 +18,13 @@ const EXPECTED_ENVIRONMENT_NAME = "staging";
 // refuses every other branch, so local preparation cannot trigger a deploy.
 const STAGING_BRANCH = "release/railway-staging-20260916";
 const SOURCE_REPOSITORY = "gionyortiz/nxqsocial";
+const MIGRATION_JOB_TRIGGER_PATH = "/backend/.railway-migration-job.trigger";
+const MIGRATION_JOB_MAX_RUNTIME_MS = 10 * 60 * 1_000;
+const MIGRATION_JOB_LIMITS = Object.freeze({
+  cpu: 1,
+  memoryBytes: 1_073_741_824,
+  diskBytes: 1_073_741_824,
+});
 
 export default defineRailway((ctx) => {
   const targetProjectId =
@@ -157,11 +164,18 @@ export default defineRailway((ctx) => {
     build: {
       builder: "DOCKERFILE",
       dockerfilePath: "Dockerfile",
+      // The marker is intentionally the only watch path. Ordinary application
+      // changes must not create a new deployment for the privileged job.
+      watchPatterns: [MIGRATION_JOB_TRIGGER_PATH],
     },
     deploy: {
       startCommand: "npm run db:migrate:isolated",
       restartPolicyType: "NEVER",
       restartPolicyMaxRetries: 0,
+      cronSchedule: null,
+      // These are reviewed hard ceilings. Railway bills actual use, but the
+      // caps prevent an unexpectedly large migration process from scaling up.
+      limitOverride: { containers: MIGRATION_JOB_LIMITS },
     },
     replicas: { "us-west2": 1 },
     env: {
@@ -169,6 +183,7 @@ export default defineRailway((ctx) => {
       NXQ_RELEASE_TARGET: "staging",
       MIGRATION_DATABASE_ROLE: "nxqsocial_migrator",
       MIGRATION_DATABASE_URL: shared.MIGRATION_DATABASE_URL,
+      MIGRATION_JOB_MAX_RUNTIME_MS: String(MIGRATION_JOB_MAX_RUNTIME_MS),
     },
   });
 

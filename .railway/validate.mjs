@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { spawnSync } from "node:child_process";
-import { readFileSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import { createRailwayContext, project } from "railway/iac";
 import { createChildEnvironment } from "./child-environment.mjs";
 import {
@@ -61,6 +61,10 @@ const applyWrapper = readFileSync(
   new URL("./apply.mjs", import.meta.url),
   "utf8",
 );
+const planWrapper = readFileSync(
+  new URL("./plan.mjs", import.meta.url),
+  "utf8",
+);
 const sharedVariableContract = readFileSync(
   new URL("./shared-variable-contract.mjs", import.meta.url),
   "utf8",
@@ -73,6 +77,12 @@ assert.match(applyWrapper, /release:runtime-schema:preflight:dev/);
 assert.match(applyWrapper, /migration-job/);
 assert.match(applyWrapper, /assertExistingStagingServicePlan/);
 assert.match(applyWrapper, /missingStagingSharedVariables/);
+assert.match(
+  applyWrapper,
+  /resolvePathExecutable\s*\}\s*from\s*"\.\/executable-resolution\.mjs"/,
+);
+assert.match(applyWrapper, /verifyReviewedRailwayCli\(executable/);
+assert.match(planWrapper, /verifyReviewedRailwayCli\(executable/);
 
 assert.doesNotThrow(() =>
   assertExistingStagingServicePlan(
@@ -290,6 +300,31 @@ assert.equal(migrationJob.source.rootDirectory, "backend");
 assert.equal(migrationJob.deploy.startCommand, "npm run db:migrate:isolated");
 assert.equal(migrationJob.deploy.restartPolicyType, "NEVER");
 assert.equal(migrationJob.deploy.restartPolicyMaxRetries, 0);
+// The IaC SDK normalizes the explicit source `cronSchedule: null` to an
+// omitted runtime field. Both assertions matter: the evaluated deployment has
+// no schedule, and the reviewed source deliberately clears any schedule rather
+// than relying on an implicit provider default.
+assert.equal(migrationJob.deploy.cronSchedule, undefined);
+assert.match(
+  readFileSync(new URL("./railway.ts", import.meta.url), "utf8"),
+  /cronSchedule:\s*null/,
+);
+assert.deepEqual(migrationJob.build.watchPatterns, [
+  "/backend/.railway-migration-job.trigger",
+]);
+assert.deepEqual(migrationJob.deploy.limitOverride, {
+  containers: {
+    cpu: 1,
+    memoryBytes: 1_073_741_824,
+    diskBytes: 1_073_741_824,
+  },
+});
+assert.equal(
+  existsSync(
+    new URL("../backend/.railway-migration-job.trigger", import.meta.url),
+  ),
+  true,
+);
 assert.deepEqual(migrationJob.variables.MIGRATION_DATABASE_URL, {
   type: "sharedReference",
   name: "MIGRATION_DATABASE_URL",
@@ -297,6 +332,10 @@ assert.deepEqual(migrationJob.variables.MIGRATION_DATABASE_URL, {
 assert.equal(
   migrationJob.variables.MIGRATION_DATABASE_ROLE?.value,
   "nxqsocial_migrator",
+);
+assert.equal(
+  migrationJob.variables.MIGRATION_JOB_MAX_RUNTIME_MS?.value,
+  "600000",
 );
 assert.equal(migrationJob.variables.DATABASE_URL, undefined);
 for (const name of [

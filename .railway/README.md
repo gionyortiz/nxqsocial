@@ -33,19 +33,39 @@ Node.js 22 or newer is required. Install the IaC SDK from the lockfile:
 npm ci --prefix .railway
 ```
 
-Download the official prebuilt Railway CLI 5.43.3 binary from the
-[Railway CLI v5.43.3 release](https://github.com/railwayapp/cli/releases/tag/v5.43.3)
-and keep it outside this repository. Either place that binary on `PATH`, or
-provide its absolute path. For example, on Windows PowerShell:
+Use only the reviewed official prebuilt Railway CLI 5.43.3 artifact from the
+[Railway CLI v5.43.3 release](https://github.com/railwayapp/cli/releases/tag/v5.43.3).
+It is unsigned, so Windows Application Control approval must use the
+organization's normal exact-file-hash rule (or an approved signed catalog),
+not a publisher rule. Record the approval ID, approver, date, policy
+mechanism, official asset filename/source, and the independently verified
+SHA-256. The reviewed Windows artifact is:
+
+```text
+Path:    C:\Tools\Railway\v5.43.3\railway.exe
+SHA-256: 3788C728BE0D601DC55FDAA25F1708431DBD79F471F742E1CBE3FC7493652222
+Version: railway 5.43.3
+```
+
+Do not use the older npm-managed CLI, a `Temp`/cache copy, an executable found
+through `PATH`, or any binary that Windows Application Control blocks. The
+wrappers require an explicit absolute `RAILWAY_CLI_PATH` and verify both this
+hash and the exact version; they do not grant or prove Windows Application
+Control authorization. First record the normal policy approval, then verify
+the bytes without executing the binary:
 
 ```powershell
-$env:RAILWAY_CLI_PATH = 'C:\Tools\Railway\railway.exe'
+$env:RAILWAY_CLI_PATH = 'C:\Tools\Railway\v5.43.3\railway.exe'
+$expectedHash = '3788C728BE0D601DC55FDAA25F1708431DBD79F471F742E1CBE3FC7493652222'
+$actualHash = (Get-FileHash -LiteralPath $env:RAILWAY_CLI_PATH -Algorithm SHA256).Hash
+if ($actualHash -ne $expectedHash) { throw 'Reviewed Railway CLI hash mismatch.' }
+# Only after the documented Windows Application Control approval and hash check:
 & $env:RAILWAY_CLI_PATH --version
 npm --prefix .railway run plan:verbose
 ```
 
 The version command must print exactly `railway 5.43.3`. The plan wrapper
-accepts only that exact external version and either no plan flag or the
+accepts only that reviewed hash/version pair and either no plan flag or the
 non-secret `--verbose` flag. It invokes only `railway config plan` and points
 the SDK at the already verified executable. Before planning, it hard-verifies
 the linked project and environment IDs, then injects those non-secret
@@ -55,10 +75,17 @@ value-decryption/display flags, never prints status JSON, and never calls
 `railway config apply`.
 
 Before an apply can be considered, use Railway's supported `railway config
-pull` flow with the approved CLI in a temporary review workspace. Reconcile
-that import so it updates the existing `backend` and `frontend` services rather
-than creating replacements. Do not hard-code service IDs or overwrite the
-reviewed source from an unreviewed import.
+pull` flow only in a fresh, disposable review workspace outside this repository.
+After authenticating with the policy-approved, hash-verified CLI, link that temporary workspace to
+project `1cf84772-c0bd-44a6-bd6c-f652955ac0d8` and environment
+`6f3d73f8-2712-4736-9b4b-8383ec21cac3`, verify the human-readable staging
+status, then run `& $env:RAILWAY_CLI_PATH config pull`. Do not use `--force`,
+`--json`, or `--agent`; do not run the pull in the canonical repository or commit its
+output. Treat the generated file as potentially sensitive, compare it locally
+to the reviewed definition, retain only a redacted evidence summary, then
+dispose of the temporary workspace under policy. Reconcile the evidence so it
+adopts existing `backend` and `frontend` services rather than creating
+replacements. Do not hard-code service IDs.
 
 After every required staging shared variable exists, the existing-service
 adoption has been reviewed, and the reviewed commit is clean, pushed, and
@@ -87,6 +114,27 @@ evidence of schema order: the API has a read-only pre-deploy migration-status
 gate and cannot become healthy until the migration job has completed
 successfully. After that job exits, redeploy backend/frontend and require the
 schema gate to pass.
+
+## Migration-job cost and lifecycle boundary
+
+`migration-job` is an isolated, one-shot process—not an automatically deleted
+Railway service. Its source limits one replica, no domain, no volume, no cron
+schedule, `NEVER` restart with zero retries, a 10-minute bound on the direct
+Prisma child process using `SIGKILL` in the Linux job container, and reviewed
+runtime ceilings of 1 vCPU, 1 GiB memory, and 1 GiB ephemeral disk.
+Its only Git watch path is `/backend/.railway-migration-job.trigger`; changing
+that marker is a reviewed release action.
+
+Railway's service settings must still have GitHub autodeploy **disabled** for
+`migration-job` immediately after its initial, separately authorized creation.
+Infrastructure-as-Code cannot encode that provider setting. Before any apply,
+record the workspace compute hard limit, the expected stopped-job billing
+behavior, and the operator action that disables autodeploy before any routine
+branch update is permitted. The process bound and resource ceilings are not a
+substitute for provider confirmation: after the one authorized run, verify a
+successful exit, no restart, no new deployment trigger, and zero continuing
+compute. Do not delete the service without separate approval: that would cause
+the next IaC plan to recreate it.
 
 The offline CI check executes `npm --prefix .railway run validate`. That parses
 and evaluates the TypeScript definition with the exact approved context,

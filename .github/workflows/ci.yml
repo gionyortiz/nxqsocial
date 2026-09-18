@@ -235,7 +235,10 @@ jobs:
           test -s .railway/package-lock.json
           test -s .railway/apply.mjs
           test -s .railway/child-environment.mjs
+          test -s .railway/executable-resolution.mjs
           test -s .railway/plan.mjs
+          test -s .railway/railway-cli-verification.mjs
+          test -s .railway/railway-cli-verification.test.mjs
           test -s .railway/railway.ts
 
       - name: Install lockfile-pinned IaC dependencies
@@ -245,7 +248,12 @@ jobs:
         run: |
           node --check .railway/apply.mjs
           node --check .railway/child-environment.mjs
+          node --check .railway/executable-resolution.mjs
           node --check .railway/plan.mjs
+          node --check .railway/railway-cli-verification.mjs
+
+      - name: Test Railway CLI verification and wrapper helpers
+        run: npm --prefix .railway run test
 
       - name: Parse and evaluate the IaC definition offline
         run: npm --prefix .railway run validate

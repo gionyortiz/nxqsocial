@@ -93,7 +93,7 @@ Use five resources in one Railway staging environment:
 | --------------- | ------------------------------- | -------------------------------------------------------- | ----------------------------------------- |
 | `backend`       | GitHub, `/backend`, Dockerfile  | Access-gated custom domain or sanitized-data test domain | `/api/health/ready`                       |
 | `frontend`      | GitHub, `/frontend`, Dockerfile | Access-gated custom domain                               | `/health`                                 |
-| `migration-job` | GitHub, `/backend`, Dockerfile  | none                                                     | one successful `db:migrate:isolated` exit |
+| `migration-job` | GitHub, `/backend`, Dockerfile  | none                                                     | one successful `db:migrate:isolated` exit; no restart or recurring deployment |
 | PostgreSQL      | Railway PostgreSQL              | none                                                     | offline restore + backend readiness       |
 | Redis           | Railway Redis                   | none                                                     | backend readiness                         |
 
@@ -115,13 +115,14 @@ Before any apply:
    with the pinned external Railway CLI described in `.railway/README.md`.
 3. Require the wrapper to confirm the exact `nxq-social-staging` project and
    `staging` environment. Stop if it cannot prove both identities.
-4. Require the plan to be exactly `3 to add, 0 to change, 0 to destroy`, with
-   only the `backend`, `frontend`, and `migration-job` services added. Any
-   database, Redis, volume, domain, image, production resource, change, or
-   deletion stops the rollout.
-5. Keep Railway auto-deploy disabled while staging is stopped. A revision is
-   not eligible for a separately authorized manual deployment until CI passes
-   on that exact commit.
+4. Require the plan to be exactly `1 to add, 2 to change, 0 to destroy`: create
+   only `migration-job`, and update only the existing `backend` and `frontend`
+   services. Any database, Redis, volume, domain, image, production resource,
+   backend/frontend replacement, extra create, or deletion stops the rollout.
+5. Keep Railway auto-deploy disabled while staging is stopped, and specifically
+   keep it disabled for `migration-job` after creation. A revision is not
+   eligible for a separately authorized manual deployment until CI passes on
+   that exact commit.
 
 Planning is read-only. `railway config apply`, service creation, variable
 injection, domains, and deployment remain separate operational actions.
