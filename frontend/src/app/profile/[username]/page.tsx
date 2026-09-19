@@ -347,6 +347,15 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                       <Phone size={14} /> {startingCall ? 'Calling…' : 'Call'}
                     </button>
                   )}
+                  {me && (
+                    <button
+                      onClick={() => router.push(`/messages?with=${encodeURIComponent(profile.username)}`)}
+                      className="flex items-center gap-1.5 px-4 py-2 rounded-full border-2 border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-all"
+                      title={`Message ${profile.displayName}`}
+                    >
+                      <MessageCircle size={14} /> Message
+                    </button>
+                  )}
                   <Button
                     variant={following ? 'secondary' : 'primary'}
                     size="sm"

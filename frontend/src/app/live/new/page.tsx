@@ -1,18 +1,24 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { Radio, Video, Mic, Users, MessageSquare, ArrowRight } from 'lucide-react';
 import { AppShell } from '@/components/layout/AppShell';
 import { newLiveId, liveHref } from '@/lib/live';
 import { trackEvent, trackFirstEvent } from '@/lib/analytics';
+import { useAuthStore } from '@/store/auth';
 
 export default function NewLivePage() {
   const router = useRouter();
+  const user = useAuthStore((state) => state.user);
   const [starting, setStarting] = useState(false);
 
+  useEffect(() => {
+    if (!user) router.replace('/login');
+  }, [router, user]);
+
   const goLive = () => {
-    if (starting) return;
+    if (!user || starting) return;
     setStarting(true);
     const room = newLiveId();
     void trackEvent('live_started', { room, source: 'live_new_page' });
@@ -22,6 +28,10 @@ export default function NewLivePage() {
     });
     router.push(liveHref(room, true));
   };
+
+  // Do not render broadcast controls to an anonymous visitor while the
+  // client-side redirect to sign-in is taking effect.
+  if (!user) return null;
 
   return (
     <AppShell>
