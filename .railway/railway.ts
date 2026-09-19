@@ -93,7 +93,10 @@ export default defineRailway((ctx) => {
     preDeployCommand:
       "node dist/scripts/release-provider-preflight.js && npm run db:migrate:verify-runtime",
     deploy: {
-      healthcheckPath: "/api/health/ready",
+      // Railway must only determine whether this process has started. The
+      // dependency-aware readiness endpoint remains the explicit post-deploy
+      // qualification gate before any frontend promotion.
+      healthcheckPath: "/api/health",
       healthcheckTimeout: 300,
       restartPolicyMaxRetries: 5,
       drainingSeconds: 20,

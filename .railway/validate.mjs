@@ -208,6 +208,11 @@ assert.equal(migrationJob.source.checkSuites, true);
 assert.deepEqual(backend.deploy.preDeployCommand, [
   "node dist/scripts/release-provider-preflight.js && npm run db:migrate:verify-runtime",
 ]);
+assert.equal(
+  backend.deploy.healthcheckPath,
+  "/api/health",
+  "Railway startup must use liveness; /api/health/ready is the post-deploy qualification gate",
+);
 assert.equal(backend.deploy.restartPolicyType, undefined);
 assert.equal(
   backend.variables.APP_BASE_URL?.value,
