@@ -1,4 +1,5 @@
 import { StorageService } from './storage.service';
+import { ListObjectsV2Command } from '@aws-sdk/client-s3';
 import { mkdtemp, rm, writeFile } from 'fs/promises';
 import { createHash } from 'crypto';
 import * as os from 'os';
@@ -92,6 +93,26 @@ describe('StorageService production durability', () => {
     expect(storage.publicUrl('avatars/test.jpg')).toBe(
       'https://media.example.invalid/avatars/test.jpg',
     );
+  });
+
+  it('checks both buckets through scoped object-list access without listing objects', async () => {
+    const storage = configuredStorage();
+    const send = jest.fn().mockResolvedValue({});
+    (storage as any).client.send = send;
+
+    await expect(storage.checkReadiness()).resolves.toBeUndefined();
+
+    expect(send).toHaveBeenCalledTimes(2);
+    expect(send.mock.calls[0][0]).toBeInstanceOf(ListObjectsV2Command);
+    expect(send.mock.calls[0][0].input).toEqual({
+      Bucket: 'nxq-media',
+      MaxKeys: 0,
+    });
+    expect(send.mock.calls[1][0]).toBeInstanceOf(ListObjectsV2Command);
+    expect(send.mock.calls[1][0].input).toEqual({
+      Bucket: 'nxq-media-incoming',
+      MaxKeys: 0,
+    });
   });
 
   it('treats a Railway runtime as production even if NODE_ENV is omitted', () => {
