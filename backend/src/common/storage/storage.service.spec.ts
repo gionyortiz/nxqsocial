@@ -115,6 +115,24 @@ describe('StorageService production durability', () => {
     });
   });
 
+  it('logs a sanitized storage-readiness failure without exposing configuration', async () => {
+    const storage = configuredStorage();
+    const failure = {
+      name: 'AccessDenied',
+      $metadata: { httpStatusCode: 403 },
+    };
+    const warn = jest
+      .spyOn((storage as any).logger, 'warn')
+      .mockImplementation(() => undefined);
+    (storage as any).client.send = jest.fn().mockRejectedValue(failure);
+
+    await expect(storage.checkReadiness()).rejects.toBe(failure);
+
+    expect(warn).toHaveBeenCalledWith(
+      'Storage readiness check failed: AccessDenied (HTTP 403)',
+    );
+  });
+
   it('treats a Railway runtime as production even if NODE_ENV is omitted', () => {
     delete process.env.NODE_ENV;
     process.env.RAILWAY_PROJECT_ID = 'railway-project';

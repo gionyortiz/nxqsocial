@@ -72,6 +72,19 @@ function isProductionRuntime(): boolean {
   );
 }
 
+function readinessFailureSummary(error: unknown): string {
+  if (!error || typeof error !== 'object') return 'unknown error';
+
+  const candidate = error as {
+    name?: unknown;
+    $metadata?: { httpStatusCode?: unknown };
+  };
+  const name = typeof candidate.name === 'string' ? candidate.name : 'unknown error';
+  const status = candidate.$metadata?.httpStatusCode;
+
+  return typeof status === 'number' ? `${name} (HTTP ${status})` : name;
+}
+
 @Injectable()
 export class StorageService {
   private readonly logger = new Logger(StorageService.name);
@@ -199,17 +212,24 @@ export class StorageService {
     // these two buckets. Do not require bucket-administration permission just
     // to prove media storage is usable. MaxKeys: 0 verifies the scoped list
     // capability without enumerating or exposing stored object names.
-    await Promise.all([
-      this.client.send(
-        new ListObjectsV2Command({ Bucket: this.bucket, MaxKeys: 0 }),
-      ),
-      this.client.send(
-        new ListObjectsV2Command({
-          Bucket: this.quarantineBucket,
-          MaxKeys: 0,
-        }),
-      ),
-    ]);
+    try {
+      await Promise.all([
+        this.client.send(
+          new ListObjectsV2Command({ Bucket: this.bucket, MaxKeys: 0 }),
+        ),
+        this.client.send(
+          new ListObjectsV2Command({
+            Bucket: this.quarantineBucket,
+            MaxKeys: 0,
+          }),
+        ),
+      ]);
+    } catch (error) {
+      this.logger.warn(
+        `Storage readiness check failed: ${readinessFailureSummary(error)}`,
+      );
+      throw error;
+    }
   }
 
   /**
