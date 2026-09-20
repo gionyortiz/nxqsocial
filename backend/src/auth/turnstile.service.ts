@@ -1,6 +1,7 @@
 import {
   BadRequestException,
   Injectable,
+  Logger,
   ServiceUnavailableException,
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -13,6 +14,7 @@ interface TurnstileResponse {
   success: boolean;
   hostname?: string;
   action?: string;
+  errorCodes?: string[];
 }
 
 const SITEVERIFY_URL =
@@ -23,6 +25,8 @@ const VERIFY_TIMEOUT_MS = 5000;
 
 @Injectable()
 export class TurnstileService {
+  private readonly logger = new Logger(TurnstileService.name);
+
   constructor(private readonly config: ConfigService) {}
 
   async verifySignup(
@@ -93,6 +97,7 @@ export class TurnstileService {
         result.action !== EXPECTED_ACTION ||
         !hostnameAllowed
       ) {
+        this.logRejectedSiteverify(result, hostnameAllowed);
         throw turnstileError(
           400,
           'TURNSTILE_INVALID',
@@ -114,6 +119,33 @@ export class TurnstileService {
       clearTimeout(timer);
     }
   }
+
+  private logRejectedSiteverify(
+    result: TurnstileResponse,
+    hostnameAllowed: boolean,
+  ): void {
+    if (process.env.NXQ_RELEASE_TARGET !== 'staging') return;
+
+    const category =
+      result.success !== true
+        ? 'provider_rejected'
+        : result.action !== EXPECTED_ACTION
+          ? 'action_mismatch'
+          : !hostnameAllowed
+            ? 'hostname_mismatch'
+            : 'unknown';
+
+    this.logger.warn(
+      JSON.stringify({
+        event: 'turnstile_siteverify_rejected',
+        category,
+        success: result.success,
+        action: safeDiagnosticField(result.action),
+        hostname: safeDiagnosticField(result.hostname),
+        errorCodes: sanitizeDiagnosticErrorCodes(result.errorCodes),
+      }),
+    );
+  }
 }
 
 function parseTurnstileResponse(value: unknown): TurnstileResponse {
@@ -131,12 +163,45 @@ function parseTurnstileResponse(value: unknown): TurnstileResponse {
   if (result.action !== undefined && typeof result.action !== 'string') {
     throw new Error('Invalid Turnstile response');
   }
+  const rawErrorCodes = result['error-codes'];
+  let errorCodes: string[] | undefined;
+  if (rawErrorCodes !== undefined) {
+    if (!Array.isArray(rawErrorCodes)) {
+      throw new Error('Invalid Turnstile response');
+    }
+    const parsedErrorCodes = rawErrorCodes.filter(
+      (code): code is string => typeof code === 'string',
+    );
+    if (parsedErrorCodes.length !== rawErrorCodes.length) {
+      throw new Error('Invalid Turnstile response');
+    }
+    errorCodes = parsedErrorCodes;
+  }
 
   return {
     success: result.success,
     hostname: result.hostname,
     action: result.action,
+    errorCodes,
   };
+}
+
+function safeDiagnosticField(value: unknown): string | undefined {
+  if (typeof value !== 'string') return undefined;
+  const normalized = value.trim();
+  return normalized.length > 0 &&
+    normalized.length <= 128 &&
+    /^[A-Za-z0-9._:-]+$/.test(normalized)
+    ? normalized
+    : undefined;
+}
+
+function sanitizeDiagnosticErrorCodes(value: string[] | undefined): string[] {
+  if (!value) return [];
+  return value
+    .map(safeDiagnosticField)
+    .filter((code): code is string => code !== undefined)
+    .slice(0, 4);
 }
 
 function turnstileError(status: 400 | 503, code: string, message: string) {

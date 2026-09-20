@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { TurnstileService } from './turnstile.service';
 
@@ -7,6 +8,7 @@ describe('TurnstileService', () => {
     TURNSTILE_TEST_BYPASS: process.env.TURNSTILE_TEST_BYPASS,
     TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
     TURNSTILE_ALLOWED_HOSTNAMES: process.env.TURNSTILE_ALLOWED_HOSTNAMES,
+    NXQ_RELEASE_TARGET: process.env.NXQ_RELEASE_TARGET,
   };
   const originalFetch = global.fetch;
   let service: TurnstileService;
@@ -16,6 +18,7 @@ describe('TurnstileService', () => {
     delete process.env.TURNSTILE_TEST_BYPASS;
     process.env.TURNSTILE_SECRET_KEY = 'test-secret';
     process.env.TURNSTILE_ALLOWED_HOSTNAMES = 'nxqsocial.com,www.nxqsocial.com';
+    delete process.env.NXQ_RELEASE_TARGET;
     service = new TurnstileService(new ConfigService());
   });
 
@@ -27,6 +30,7 @@ describe('TurnstileService', () => {
       'TURNSTILE_ALLOWED_HOSTNAMES',
       original.TURNSTILE_ALLOWED_HOSTNAMES,
     );
+    restoreEnv('NXQ_RELEASE_TARGET', original.NXQ_RELEASE_TARGET);
     global.fetch = originalFetch;
     jest.restoreAllMocks();
   });
@@ -93,6 +97,104 @@ describe('TurnstileService', () => {
       );
     },
   );
+
+  it('logs redacted provider-rejection diagnostics in staging only', async () => {
+    process.env.NXQ_RELEASE_TARGET = 'staging';
+    const warning = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    const token = 'private-widget-token';
+    process.env.TURNSTILE_SECRET_KEY = 'private-secret-key';
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        success: false,
+        action: 'register',
+        hostname: 'nxqsocial.com',
+        'error-codes': ['invalid-input-secret', 'not safe!'],
+      }),
+    }) as typeof fetch;
+
+    await expectCode(
+      service.verifySignup(token, '203.0.113.10'),
+      400,
+      'TURNSTILE_INVALID',
+    );
+
+    expect(warning).toHaveBeenCalledTimes(1);
+    const record = JSON.parse(warning.mock.calls[0][0] as string);
+    expect(record).toEqual({
+      event: 'turnstile_siteverify_rejected',
+      category: 'provider_rejected',
+      success: false,
+      action: 'register',
+      hostname: 'nxqsocial.com',
+      errorCodes: ['invalid-input-secret'],
+    });
+    const serialized = JSON.stringify(warning.mock.calls);
+    expect(serialized).not.toContain(token);
+    expect(serialized).not.toContain('private-secret-key');
+    expect(serialized).not.toContain('203.0.113.10');
+  });
+
+  it.each([
+    [
+      'action mismatch',
+      { success: true, action: 'login', hostname: 'nxqsocial.com' },
+      'action_mismatch',
+    ],
+    [
+      'hostname mismatch',
+      { success: true, action: 'register', hostname: 'evil.example' },
+      'hostname_mismatch',
+    ],
+  ])(
+    'logs a distinct staging category for %s',
+    async (_label, result, category) => {
+      process.env.NXQ_RELEASE_TARGET = 'staging';
+      const warning = jest
+        .spyOn(Logger.prototype, 'warn')
+        .mockImplementation(() => undefined);
+      global.fetch = jest.fn().mockResolvedValue({
+        ok: true,
+        json: jest.fn().mockResolvedValue(result),
+      }) as typeof fetch;
+
+      await expectCode(
+        service.verifySignup('widget-token', '203.0.113.10'),
+        400,
+        'TURNSTILE_INVALID',
+      );
+
+      expect(JSON.parse(warning.mock.calls[0][0] as string)).toMatchObject({
+        category,
+      });
+    },
+  );
+
+  it('does not emit provider diagnostics outside staging', async () => {
+    process.env.NXQ_RELEASE_TARGET = 'production';
+    const warning = jest
+      .spyOn(Logger.prototype, 'warn')
+      .mockImplementation(() => undefined);
+    global.fetch = jest.fn().mockResolvedValue({
+      ok: true,
+      json: jest.fn().mockResolvedValue({
+        success: false,
+        action: 'register',
+        hostname: 'nxqsocial.com',
+        'error-codes': ['invalid-input-secret'],
+      }),
+    }) as typeof fetch;
+
+    await expectCode(
+      service.verifySignup('widget-token', '203.0.113.10'),
+      400,
+      'TURNSTILE_INVALID',
+    );
+
+    expect(warning).not.toHaveBeenCalled();
+  });
 
   it('distinguishes a missing token from unavailable server verification', async () => {
     await expectCode(
