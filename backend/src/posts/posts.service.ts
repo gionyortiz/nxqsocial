@@ -121,6 +121,9 @@ function mediaIsAvailable(media: any): boolean {
 }
 
 function postHasAvailableMedia(post: any): boolean {
+  // Text posts are intentionally media-free. Treating their empty media array
+  // as an unavailable asset hid valid published posts from feeds and profiles.
+  if (post?.type === 'TEXT') return true;
   if (!post.media?.length) return false;
   return post.media.some(mediaIsAvailable);
 }

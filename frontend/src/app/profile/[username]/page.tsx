@@ -552,6 +552,7 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 const src = first ? mediaSrc(first.url) : null;
                 const thumbnail = first?.thumbnailUrl ? mediaSrc(first.thumbnailUrl) : null;
                 const isVideo = first?.mimeType?.startsWith('video/');
+                const isTextPost = post.type === 'TEXT';
                 return (
                   <div
                     key={post.id}
@@ -567,7 +568,16 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                     className="group relative aspect-square bg-gray-100 overflow-hidden text-left cursor-zoom-in outline-none"
                     aria-label={`Open post by ${profile.username}`}
                   >
-                    {src && (isVideo ? (
+                    {isTextPost ? (
+                      <div className="flex h-full w-full flex-col justify-between bg-gradient-to-br from-violet-700 via-purple-600 to-fuchsia-500 p-4 text-white">
+                        <span className="w-fit rounded-full bg-white/15 px-2 py-1 text-[10px] font-bold uppercase tracking-[0.14em] backdrop-blur-sm">
+                          Text
+                        </span>
+                        <p className="line-clamp-5 text-sm font-semibold leading-relaxed drop-shadow-sm">
+                          {post.caption || 'Text post'}
+                        </p>
+                      </div>
+                    ) : src && (isVideo ? (
                       <>
                         {thumbnail ? (
                           <Image
@@ -662,7 +672,13 @@ export default function ProfilePage({ params }: { params: Promise<{ username: st
                 </button>
               </div>
               <div className="relative bg-black flex items-center justify-center max-h-[82vh]">
-                {src && isVideo ? (
+                {lightboxPost.type === 'TEXT' ? (
+                  <div className="flex min-h-[20rem] w-full items-center justify-center bg-gradient-to-br from-violet-700 via-purple-600 to-fuchsia-500 p-8 text-center text-white">
+                    <p className="max-w-2xl whitespace-pre-wrap text-xl font-semibold leading-relaxed sm:text-2xl">
+                      {lightboxPost.caption || 'Text post'}
+                    </p>
+                  </div>
+                ) : src && isVideo ? (
                   <video
                     src={src}
                     controls

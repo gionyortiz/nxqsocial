@@ -9,7 +9,11 @@ describe('PostsService production media durability', () => {
     post: {
       create: jest.fn(),
       findUnique: jest.fn(),
+      findMany: jest.fn(),
       delete: jest.fn(),
+    },
+    user: {
+      findUnique: jest.fn(),
     },
     mediaAsset: {
       deleteMany: jest.fn(),
@@ -301,5 +305,67 @@ describe('PostsService production media durability', () => {
     expect(prisma.mediaAsset.deleteMany).not.toHaveBeenCalled();
     expect(prisma.post.delete).toHaveBeenCalledWith({ where: { id: 'post-1' } });
     expect(storage.deleteManagedObject).not.toHaveBeenCalled();
+  });
+
+  it('returns published text-only posts in a user profile', async () => {
+    prisma.user.findUnique.mockResolvedValue({ id: 'author-1' });
+    prisma.post.findMany.mockResolvedValue([
+      {
+        id: 'text-post-1',
+        type: 'TEXT',
+        caption: 'A text-only staging fixture.',
+        createdAt: new Date('2026-09-20T00:00:00.000Z'),
+        likes: [],
+        media: [],
+        author: {
+          id: 'author-1',
+          username: 'staging_fixture_003',
+          profile: { displayName: 'Synthetic Viewer 003' },
+        },
+      },
+    ]);
+
+    await expect(
+      service.getUserPosts('staging_fixture_003', 'viewer-1'),
+    ).resolves.toMatchObject({
+      data: [
+        {
+          id: 'text-post-1',
+          type: 'TEXT',
+          media: [],
+        },
+      ],
+      nextCursor: null,
+    });
+  });
+
+  it('returns published text-only posts in the feed', async () => {
+    prisma.post.findMany.mockResolvedValue([
+      {
+        id: 'text-post-2',
+        type: 'TEXT',
+        caption: 'A visible text-only feed post.',
+        createdAt: new Date('2026-09-20T00:00:00.000Z'),
+        likes: [],
+        media: [],
+        author: {
+          id: 'author-2',
+          username: 'staging_fixture_002',
+          profile: { displayName: 'Synthetic Creator 002' },
+        },
+      },
+    ]);
+
+    await expect(service.getFeed('viewer-1')).resolves.toMatchObject({
+      data: [
+        {
+          id: 'text-post-2',
+          type: 'TEXT',
+          media: [],
+        },
+      ],
+      nextCursor: null,
+      mode: 'FOR_YOU',
+    });
   });
 });
