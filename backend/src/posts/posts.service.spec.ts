@@ -368,4 +368,28 @@ describe('PostsService production media durability', () => {
       mode: 'FOR_YOU',
     });
   });
+
+  it('still excludes media post types whose required media is unavailable', async () => {
+    prisma.post.findMany.mockResolvedValue([
+      {
+        id: 'photo-post-without-media',
+        type: 'PHOTO',
+        caption: 'This photo row has no surviving media asset.',
+        createdAt: new Date('2026-09-20T00:00:00.000Z'),
+        likes: [],
+        media: [],
+        author: {
+          id: 'author-3',
+          username: 'staging_fixture_001',
+          profile: { displayName: 'Synthetic Explorer 001' },
+        },
+      },
+    ]);
+
+    await expect(service.getFeed('viewer-1')).resolves.toMatchObject({
+      data: [],
+      nextCursor: null,
+      mode: 'FOR_YOU',
+    });
+  });
 });
