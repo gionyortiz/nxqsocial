@@ -130,6 +130,13 @@ assert.deepEqual(missingStagingSharedVariables(sealedFixture), []);
 assert.deepEqual(
   missingStagingSharedVariables({
     ...sealedFixture,
+    STAGING_EMAIL_RECIPIENT_ALLOWLIST_SUPPLEMENT: undefined,
+  }),
+  ["STAGING_EMAIL_RECIPIENT_ALLOWLIST_SUPPLEMENT"],
+);
+assert.deepEqual(
+  missingStagingSharedVariables({
+    ...sealedFixture,
     RUNTIME_DATABASE_URL: { value: "postgresql://runtime@example/db" },
   }),
   ["RUNTIME_DATABASE_URL"],
@@ -234,7 +241,6 @@ for (const name of [
   "AWS_SECRET_ACCESS_KEY",
   "RESEND_API_KEY",
   "EMAIL_FROM",
-  "STAGING_EMAIL_RECIPIENT_ALLOWLIST",
   "STAGING_PHONE_RECIPIENT_ALLOWLIST",
   "STAGING_PUSH_TOKEN_ALLOWLIST",
   "STRIPE_SECRET_KEY",
@@ -249,6 +255,11 @@ for (const name of [
     name,
   });
 }
+assert.deepEqual(backend.variables.STAGING_EMAIL_RECIPIENT_ALLOWLIST, {
+  type: "literal",
+  value:
+    "${{shared.STAGING_EMAIL_RECIPIENT_ALLOWLIST}},${{shared.STAGING_EMAIL_RECIPIENT_ALLOWLIST_SUPPLEMENT}}",
+});
 assert.deepEqual(backend.variables.DATABASE_URL, {
   type: "sharedReference",
   name: "RUNTIME_DATABASE_URL",

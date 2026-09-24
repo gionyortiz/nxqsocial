@@ -138,10 +138,13 @@ export default defineRailway((ctx) => {
       MEDIA_MODERATION_PROVIDER: "staging-mock",
       RESEND_API_KEY: shared.RESEND_API_KEY,
       EMAIL_FROM: shared.EMAIL_FROM,
-      // Staging may contact only an explicit test inbox/device. A missing or
-      // malformed value blocks release preflight and runtime delivery.
+      // Preserve the existing sealed recipient list and append only the
+      // separately sealed staging supplement. Railway resolves both shared
+      // references at deploy time; no recipient address belongs in source.
+      // IaC requires both references; release preflight checks the resolved
+      // list for invalid or duplicate entries.
       STAGING_EMAIL_RECIPIENT_ALLOWLIST:
-        shared.STAGING_EMAIL_RECIPIENT_ALLOWLIST,
+        "${{shared.STAGING_EMAIL_RECIPIENT_ALLOWLIST}},${{shared.STAGING_EMAIL_RECIPIENT_ALLOWLIST_SUPPLEMENT}}",
       STAGING_PHONE_RECIPIENT_ALLOWLIST:
         shared.STAGING_PHONE_RECIPIENT_ALLOWLIST,
       STAGING_PUSH_TOKEN_ALLOWLIST: shared.STAGING_PUSH_TOKEN_ALLOWLIST,
