@@ -11,6 +11,7 @@ export const REQUIRED_STAGING_SHARED_VARIABLES = Object.freeze([
   "RESEND_API_KEY",
   "EMAIL_FROM",
   "STAGING_EMAIL_RECIPIENT_ALLOWLIST",
+  "STAGING_EMAIL_RECIPIENT_ALLOWLIST_SUPPLEMENT",
   "STAGING_PHONE_RECIPIENT_ALLOWLIST",
   "STAGING_PUSH_TOKEN_ALLOWLIST",
   "STRIPE_SECRET_KEY",
@@ -23,8 +24,8 @@ export const REQUIRED_STAGING_SHARED_VARIABLES = Object.freeze([
   "RUNTIME_DATABASE_URL",
 ]);
 
-// Public endpoints and controlled recipient policy values are intentionally
-// readable configuration. All credentials and database URLs must remain
+// Public endpoints and non-sensitive recipient policy values may be readable.
+// Both email recipient lists and all credentials/database URLs must remain
 // sealed in Railway before an apply can proceed.
 export const SEALED_STAGING_SHARED_VARIABLES = new Set([
   "JWT_SECRET",
@@ -33,6 +34,8 @@ export const SEALED_STAGING_SHARED_VARIABLES = new Set([
   "AWS_ACCESS_KEY_ID",
   "AWS_SECRET_ACCESS_KEY",
   "RESEND_API_KEY",
+  "STAGING_EMAIL_RECIPIENT_ALLOWLIST",
+  "STAGING_EMAIL_RECIPIENT_ALLOWLIST_SUPPLEMENT",
   "STRIPE_SECRET_KEY",
   "STRIPE_WEBHOOK_SECRET",
   "LIVEKIT_API_KEY",

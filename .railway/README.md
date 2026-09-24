@@ -171,6 +171,7 @@ The following shared-variable names must all exist before an apply:
 - `RESEND_API_KEY`
 - `EMAIL_FROM`
 - `STAGING_EMAIL_RECIPIENT_ALLOWLIST`
+- `STAGING_EMAIL_RECIPIENT_ALLOWLIST_SUPPLEMENT`
 - `STAGING_PHONE_RECIPIENT_ALLOWLIST`
 - `STAGING_PUSH_TOKEN_ALLOWLIST`
 - `STRIPE_SECRET_KEY`
@@ -188,12 +189,25 @@ scoped Cloudflare R2 credentials. They do not authorize or require an AWS
 account. Staging moderation is pinned to the non-secret `staging-mock` provider;
 no Rekognition, AWS S3 bucket, or IAM credential is used.
 
-The wrapper refuses an apply unless every credential and database URL is
-sealed. It treats sealed variables as present without reading their values,
+The wrapper refuses an apply unless both email recipient lists, every
+credential, and every database URL are sealed. It treats sealed variables as
+present without reading their values,
 runs only synthetic structurally valid fixtures locally, and leaves exact
 secret validation to the staged service preflight. This keeps real provider
-credentials out of local child processes. Public endpoints and controlled
-recipient-policy values may remain readable configuration.
+credentials and recipient addresses out of local child processes. Public
+endpoints and non-sensitive recipient-policy values may remain readable.
+
+The backend's `STAGING_EMAIL_RECIPIENT_ALLOWLIST` resolves to the existing
+sealed shared `STAGING_EMAIL_RECIPIENT_ALLOWLIST` followed by a comma and the
+new sealed shared `STAGING_EMAIL_RECIPIENT_ALLOWLIST_SUPPLEMENT`. An operator
+must populate the supplement only in the exact `nxq-social-staging` / `staging`
+environment, using a reviewed test inbox not already in the base list. Do not
+replace or reveal the base list, commit recipient addresses, or use a
+production variable. A sealed variable's presence does not prove its value is
+nonempty; the operator must check that privately. Confirm the combined resolved
+value with staging release preflight and a redacted recipient-delivery check
+after the separately authorized backend update; duplicate or invalid entries
+fail preflight.
 
 The public staging origins, exact NXQSocial R2 account endpoint, staging bucket
 identities, Turnstile hostname, feature flags, and R2 region are non-secret and
