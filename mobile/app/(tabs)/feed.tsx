@@ -131,7 +131,7 @@ function PostCard({
   shouldPlayMedia: boolean;
 }) {
   const first = post.media?.[0];
-  return <View style={{borderBottomWidth:1,borderColor:colors.border,paddingBottom:16,marginBottom:16}}>
+  return <View style={{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:18,padding:14,marginBottom:16}}>
     <View style={{flexDirection:'row',alignItems:'center',gap:10,marginBottom:12}}>
       <Pressable accessibilityRole="button" accessibilityLabel={`View ${post.author.displayName}'s profile`} onPress={()=>onOpenAuthor(post.author.username)}>
         <Avatar src={post.author.avatarUrl} name={post.author.displayName || post.author.username} />
@@ -139,12 +139,12 @@ function PostCard({
       <Pressable onPress={()=>onOpenAuthor(post.author.username)} style={{flex:1}}>
         <View style={{flexDirection:'row',gap:6,alignItems:'center'}}><Text numberOfLines={1} style={{color:colors.text,fontWeight:'700',fontSize:15,flexShrink:1}}>{post.author.displayName}</Text>
           {post.author.verificationStatus && !['UNVERIFIED','BASIC'].includes(post.author.verificationStatus) && <MaterialCommunityIcons name="check-decagram" size={15} color={colors.verified} />}
-        </View><Text style={{color:colors.muted,fontSize:12,marginTop:3}}>@{post.author.username}</Text>
+        </View><Text style={{color:colors.muted,fontSize:12,marginTop:3}}>@{post.author.username} · {new Date(post.createdAt).toLocaleDateString(undefined,{month:'short',day:'numeric'})}</Text>
       </Pressable>
       <Pressable accessibilityLabel="Post actions" onPress={()=>onOpenActions(post)} disabled={deleting} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><MaterialCommunityIcons name="dots-horizontal" size={22} color={colors.muted} /></Pressable>
     </View>
     {post.caption ? <Text style={{color:colors.text,fontSize:15,lineHeight:23,marginBottom:14}}>{post.caption}</Text> : null}
-    {first && <PostMedia asset={first} style={{height:360,borderRadius:12}} shouldPlay={shouldPlayMedia} />}
+    {first && <PostMedia asset={first} style={{height:310,borderRadius:12}} shouldPlay={shouldPlayMedia} />}
     <View style={{flexDirection:'row',alignItems:'center',gap:12,marginTop:8}}>
       <Pressable accessibilityRole="button" accessibilityLabel={post.isLiked?'Unlike post':'Like post'} accessibilityState={{selected:post.isLiked}} onPress={()=>onLike(post)} style={{minHeight:44,flexDirection:'row',gap:6,alignItems:'center'}}><MaterialCommunityIcons name={post.isLiked?'heart':'heart-outline'} size={23} color={post.isLiked?colors.danger:colors.muted} /><Text style={{color:colors.muted,fontSize:12}}>{post._count?.likes ?? 0}</Text></Pressable>
       <Pressable accessibilityLabel="Comments" onPress={()=>onComment(post)} style={{minHeight:44,flexDirection:'row',gap:6,alignItems:'center'}}><MaterialCommunityIcons name="comment-outline" size={22} color={colors.muted} /><Text style={{color:colors.muted,fontSize:12}}>{post._count?.comments ?? 0}</Text></Pressable>
@@ -435,7 +435,7 @@ export default function FeedScreen() {
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#22d3ee" />
+          <ActivityIndicator color={colors.accent} />
         </View>
       ) : (
         <FlatList
@@ -449,10 +449,10 @@ export default function FeedScreen() {
             setActivePostId(null);
           }}
           contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 8, paddingBottom: 28 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#22d3ee" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.accent} />}
           ListHeaderComponent={(
-            <View style={{marginBottom:20}}>
-              <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:20}}>
+            <View style={{marginBottom:16}}>
+              <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between',marginBottom:2}}>
                 <Text style={{color:colors.text,fontSize:22,fontWeight:'800',letterSpacing:-.7}}>NXQ Social</Text>
                 <View style={{flexDirection:'row',gap:4}}>
                   <Pressable accessibilityLabel="Search creators" onPress={()=>router.push('/explore')} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><MaterialCommunityIcons name="magnify" size={24} color={colors.muted} /></Pressable>
@@ -460,12 +460,11 @@ export default function FeedScreen() {
                   <Pressable accessibilityLabel="Open menu" onPress={()=>router.push('/(tabs)/more')} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><MaterialCommunityIcons name="menu" size={24} color={colors.muted} /></Pressable>
                 </View>
               </View>
-              <Text style={{color:colors.text,fontSize:30,fontWeight:'800',letterSpacing:-.8}}>Home</Text>
               <View style={{flexDirection:'row',gap:28,borderBottomWidth:1,borderColor:colors.border,marginTop:8}}>
                 {(['FOR_YOU','FOLLOWING'] as const).map(value=><Pressable key={value} accessibilityRole="button" accessibilityState={{selected:mode===value}} onPress={()=>setMode(value)} style={{paddingVertical:14,borderBottomWidth:2,borderBottomColor:mode===value?colors.accent:'transparent'}}><Text style={{fontSize:14,fontWeight:mode===value?'700':'500',color:mode===value?colors.text:colors.muted}}>{value==='FOR_YOU'?'For you':'Following'}</Text></Pressable>)}
                 <Pressable accessibilityLabel="Toggle topics" onPress={()=>setShowInsights(value=>!value)} style={{marginLeft:'auto',width:44,alignItems:'center',justifyContent:'center'}}><MaterialCommunityIcons name="tune-variant" size={20} color={showInsights?colors.verified:colors.muted} /></Pressable>
               </View>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:16,paddingVertical:20}}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:14,paddingVertical:16}}>
                 <Pressable accessibilityLabel="Your story" onPress={()=>{const mine=storyFeed.find(group=>group.author.id===user?.id); if(mine) router.push({pathname:'/story-viewer' as never,params:{authorId:mine.author.id} as never}); else openCreateAction('story');}} style={{width:66,alignItems:'center',gap:7}}>
                   <View><Avatar src={user?.avatarUrl} name={user?.displayName || 'You'} size={62} /><View style={{position:'absolute',bottom:0,right:0,borderRadius:10,backgroundColor:colors.accent,borderWidth:2,borderColor:colors.background}}><MaterialCommunityIcons name="plus" size={16} color="white" /></View></View><Text style={{color:colors.muted,fontSize:11}}>Your story</Text>
                 </Pressable>
@@ -473,7 +472,12 @@ export default function FeedScreen() {
                 {storyFeed.length===0 && stories.filter(person=>person.username!==user?.username).map(person=><Pressable key={person.id} onPress={()=>person.isLive?openLiveRoom(person):openUserProfile(person.username)} style={{width:66,alignItems:'center',gap:7}}><Avatar src={person.avatarUrl} name={person.displayName || person.username} size={62} ring /><Text numberOfLines={1} style={{color:colors.muted,fontSize:11}}>{person.username}</Text></Pressable>)}
                 <Pressable accessibilityLabel="Discover creators" onPress={()=>router.push('/explore')} style={{width:66,alignItems:'center',gap:7}}><View style={{width:62,height:62,borderRadius:31,borderWidth:1,borderColor:colors.border,alignItems:'center',justifyContent:'center'}}><MaterialCommunityIcons name="compass-outline" size={25} color={colors.verified}/></View><Text style={{color:colors.muted,fontSize:11}}>Discover</Text></Pressable>
               </ScrollView>
-              <Pressable accessibilityLabel="Create post" onPress={()=>setShowCreateMenu(true)} style={{flexDirection:'row',alignItems:'center',gap:12,paddingVertical:14,borderTopWidth:1,borderBottomWidth:1,borderColor:colors.border}}><Avatar src={user?.avatarUrl} name={user?.displayName || 'You'} size={32}/><Text style={{color:colors.muted,fontSize:14,flex:1}}>What's on your mind?</Text><MaterialCommunityIcons name="image-outline" size={22} color={colors.verified}/></Pressable>
+              <View style={{backgroundColor:colors.surface,borderWidth:1,borderColor:colors.border,borderRadius:18,padding:12,gap:10}}>
+                <Pressable accessibilityRole="button" accessibilityLabel="Create post" onPress={()=>setShowCreateMenu(true)} style={{minHeight:44,flexDirection:'row',alignItems:'center',gap:12}}><Avatar src={user?.avatarUrl} name={user?.displayName||'You'} size={38}/><Text style={{color:colors.muted,fontSize:14,flex:1}}>What's on your mind?</Text><MaterialCommunityIcons name="pencil-outline" size={20} color={colors.verified}/></Pressable>
+                <View style={{flexDirection:'row',borderTopWidth:1,borderColor:colors.border,paddingTop:4}}>
+                  {([{mode:'photo',label:'Photo',icon:'image-outline'},{mode:'reel',label:'Video / Reel',icon:'movie-open-play-outline'},{mode:'story',label:'Story',icon:'circle-multiple-outline'},...(LIVE_NATIVE_ENABLED?[{mode:'live',label:'Live',icon:'broadcast'}]:[])] as const).map(action=><Pressable key={action.mode} accessibilityRole="button" onPress={()=>openCreateAction(action.mode as 'photo'|'reel'|'story'|'live')} style={({pressed})=>({flex:1,minHeight:48,alignItems:'center',justifyContent:'center',gap:4,borderRadius:10,backgroundColor:pressed?colors.raised:'transparent'})}><MaterialCommunityIcons name={action.icon as keyof typeof MaterialCommunityIcons.glyphMap} size={19} color={colors.verified}/><Text style={{color:colors.muted,fontSize:11,fontWeight:'600'}}>{action.label}</Text></Pressable>)}
+                </View>
+              </View>
               {liveNowCreators.length>0 && <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:12,paddingVertical:14}}>{liveNowCreators.map(person=><Pressable key={person.id} onPress={()=>openLiveRoom(person)} style={{flexDirection:'row',alignItems:'center',gap:8}}><MaterialCommunityIcons name="broadcast" size={18} color={colors.danger}/><Text style={{color:colors.text,fontSize:13}}>{person.displayName} is live</Text></Pressable>)}</ScrollView>}
               {showInsights && <View style={{paddingVertical:16,gap:14}}><Text style={{color:colors.text,fontWeight:'700'}}>Explore your interests</Text><ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{gap:8}}>{trendingTopics.map(topic=><Pressable key={topic} onPress={()=>setSelectedTopic(value=>value===topic?null:topic)} style={{padding:10,borderRadius:20,backgroundColor:selectedTopic===topic?colors.accentSoft:colors.surface}}><Text style={{color:colors.verified}}>{topic}</Text></Pressable>)}</ScrollView><Pressable onPress={()=>router.push('/explore')}><Text style={{color:colors.verified}}>Discover more creators</Text></Pressable></View>}
             </View>
