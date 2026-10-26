@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Image, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
@@ -157,7 +158,7 @@ export default function StoryViewerScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#fff" />
+        <ActivityIndicator color={colors.text} />
       </SafeAreaView>
     );
   }
@@ -165,7 +166,7 @@ export default function StoryViewerScreen() {
   if (notFound || !currentGroup || !currentStory) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
-        <Text style={{ color: '#94a3b8' }}>This story is no longer available.</Text>
+        <Text style={{ color: colors.muted }}>This story is no longer available.</Text>
       </SafeAreaView>
     );
   }
@@ -182,7 +183,7 @@ export default function StoryViewerScreen() {
                 style={{
                   height: '100%',
                   width: `${(i < storyIndex ? 1 : i === storyIndex ? progress : 0) * 100}%`,
-                  backgroundColor: '#fff',
+                  backgroundColor: colors.text,
                 }}
               />
             </View>
@@ -190,19 +191,19 @@ export default function StoryViewerScreen() {
         </View>
 
         <View style={{ position: 'absolute', top: 22, left: 10, right: 10, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: '#1f2937', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+          <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
             {currentGroup.author.avatarUrl ? (
               <Image source={{ uri: resolveMediaUrl(currentGroup.author.avatarUrl) }} style={{ width: '100%', height: '100%' }} />
             ) : (
               <Text style={{ color: '#d1d5db', fontWeight: '800', fontSize: 12 }}>{currentGroup.author.username.slice(0, 2).toUpperCase()}</Text>
             )}
           </View>
-          <Text style={{ color: '#fff', fontWeight: '800', flex: 1 }} numberOfLines={1}>{currentGroup.author.username}</Text>
+          <Text style={{ color: colors.text, fontWeight: '800', flex: 1 }} numberOfLines={1}>{currentGroup.author.username}</Text>
           <Pressable
             onPress={() => router.back()}
             style={{ width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center' }}
           >
-            <MaterialCommunityIcons name="close" size={22} color="#fff" />
+            <MaterialCommunityIcons name="close" size={22} color={colors.text} />
           </Pressable>
         </View>
 
@@ -218,7 +219,7 @@ export default function StoryViewerScreen() {
 
         {currentStory.caption ? (
           <View style={{ position: 'absolute', bottom: 24, left: 12, right: 12 }}>
-            <Text style={{ color: '#fff', fontSize: 14 }}>{currentStory.caption}</Text>
+            <Text style={{ color: colors.text, fontSize: 14 }}>{currentStory.caption}</Text>
           </View>
         ) : null}
       </View>

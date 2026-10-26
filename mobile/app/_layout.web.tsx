@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import 'react-native-reanimated';
 import { useFonts } from 'expo-font';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
@@ -47,12 +48,13 @@ function RootLayoutNav() {
 
 function RootLayoutInner({ colorScheme }: { colorScheme: string | null | undefined }) {
   return (
-    <ThemeProvider value={colorScheme === 'dark' ? DarkTheme : DefaultTheme}>
-      <Stack>
+    <ThemeProvider value={{...DarkTheme, colors: {...DarkTheme.colors, background: colors.background, card: colors.surface, border: colors.border, text: colors.text, primary: colors.accent}}}>
+      <Stack screenOptions={{headerStyle:{backgroundColor:colors.background},headerTintColor:colors.text,headerShadowVisible:false,contentStyle:{backgroundColor:colors.background}}}>
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="login" options={{ headerShown: false }} />
         <Stack.Screen name="register" options={{ headerShown: false }} />
         <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+        <Stack.Screen name="messages/[threadId]" options={{ headerShown: false }} />
         <Stack.Screen name="notifications" options={{ title: 'Notifications' }} />
         <Stack.Screen name="explore" options={{ title: 'Explore' }} />
         <Stack.Screen name="live" options={{ title: 'Live' }} />

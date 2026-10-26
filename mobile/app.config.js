@@ -74,6 +74,14 @@ module.exports = ({ config }) => {
   const variant = readVariant();
 
   if (variant === PRODUCTION_VARIANT) {
+    if (process.env.NXQ_TESTFLIGHT_BUILD === 'true') {
+      const betaIos = { ...config.ios };
+      delete betaIos.associatedDomains;
+      return {
+        ...config,
+        ios: betaIos,
+      };
+    }
     return config;
   }
 

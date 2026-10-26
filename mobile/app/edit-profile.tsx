@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useState } from 'react';
 import { ActivityIndicator, Alert, Image, KeyboardAvoidingView, Platform, Pressable, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
@@ -118,14 +119,14 @@ export default function EditProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : undefined} style={{ flex: 1 }}>
         <ScrollView contentContainerStyle={{ padding: 16, gap: 16 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable onPress={() => router.back()}>
-              <MaterialCommunityIcons name="chevron-left" size={28} color="#fff" />
+              <MaterialCommunityIcons name="chevron-left" size={28} color={colors.text} />
             </Pressable>
-            <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900' }}>Edit profile</Text>
+            <Text style={{ color: colors.text, fontSize: 18, fontWeight: '900' }}>Edit profile</Text>
             <View style={{ width: 28 }} />
           </View>
 
@@ -139,31 +140,31 @@ export default function EditProfileScreen() {
                 )}
                 {uploadingAvatar ? (
                   <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(0,0,0,0.5)', alignItems: 'center', justifyContent: 'center' }}>
-                    <ActivityIndicator color="#fff" />
+                    <ActivityIndicator color={colors.text} />
                   </View>
                 ) : null}
               </View>
-              <View style={{ position: 'absolute', bottom: -2, right: -2, width: 30, height: 30, borderRadius: 15, backgroundColor: '#4f46e5', borderWidth: 2, borderColor: '#0b1020', alignItems: 'center', justifyContent: 'center' }}>
-                <MaterialCommunityIcons name="camera" size={16} color="#fff" />
+              <View style={{ position: 'absolute', bottom: -2, right: -2, width: 30, height: 30, borderRadius: 15, backgroundColor: colors.accent, borderWidth: 2, borderColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
+                <MaterialCommunityIcons name="camera" size={16} color={colors.text} />
               </View>
             </Pressable>
-            <Text style={{ color: '#93a1bd', fontSize: 12 }}>Tap to change profile photo</Text>
+            <Text style={{ color: colors.muted, fontSize: 12 }}>Tap to change profile photo</Text>
           </View>
 
           <View style={{ gap: 6 }}>
-            <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>Display name</Text>
+            <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '700' }}>Display name</Text>
             <TextInput
               value={displayName}
               onChangeText={setDisplayName}
               maxLength={50}
               placeholder="Your name"
               placeholderTextColor="#5b6680"
-              style={{ backgroundColor: '#111827', borderRadius: 12, padding: 12, color: '#fff', borderWidth: 1, borderColor: '#1f2937' }}
+              style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12, color: colors.text, borderWidth: 1, borderColor: colors.raised }}
             />
           </View>
 
           <View style={{ gap: 6 }}>
-            <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>Bio</Text>
+            <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '700' }}>Bio</Text>
             <TextInput
               value={bio}
               onChangeText={setBio}
@@ -171,24 +172,24 @@ export default function EditProfileScreen() {
               multiline
               placeholder="Tell people about yourself"
               placeholderTextColor="#5b6680"
-              style={{ backgroundColor: '#111827', borderRadius: 12, padding: 12, color: '#fff', borderWidth: 1, borderColor: '#1f2937', minHeight: 80, textAlignVertical: 'top' }}
+              style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12, color: colors.text, borderWidth: 1, borderColor: colors.raised, minHeight: 80, textAlignVertical: 'top' }}
             />
           </View>
 
           <View style={{ gap: 6 }}>
-            <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>Location</Text>
+            <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '700' }}>Location</Text>
             <TextInput
               value={location}
               onChangeText={setLocation}
               maxLength={100}
               placeholder="City, Country"
               placeholderTextColor="#5b6680"
-              style={{ backgroundColor: '#111827', borderRadius: 12, padding: 12, color: '#fff', borderWidth: 1, borderColor: '#1f2937' }}
+              style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12, color: colors.text, borderWidth: 1, borderColor: colors.raised }}
             />
           </View>
 
           <View style={{ gap: 6 }}>
-            <Text style={{ color: '#93a1bd', fontSize: 12, fontWeight: '700' }}>Website</Text>
+            <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '700' }}>Website</Text>
             <TextInput
               value={website}
               onChangeText={setWebsite}
@@ -197,16 +198,16 @@ export default function EditProfileScreen() {
               keyboardType="url"
               placeholder="yoursite.com"
               placeholderTextColor="#5b6680"
-              style={{ backgroundColor: '#111827', borderRadius: 12, padding: 12, color: '#fff', borderWidth: 1, borderColor: '#1f2937' }}
+              style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12, color: colors.text, borderWidth: 1, borderColor: colors.raised }}
             />
           </View>
 
           <Pressable
             onPress={save}
             disabled={saving}
-            style={{ backgroundColor: '#4f46e5', borderRadius: 14, paddingVertical: 14, alignItems: 'center', opacity: saving ? 0.6 : 1 }}
+            style={{ backgroundColor: colors.accent, borderRadius: 14, paddingVertical: 14, alignItems: 'center', opacity: saving ? 0.6 : 1 }}
           >
-            {saving ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '900' }}>Save changes</Text>}
+            {saving ? <ActivityIndicator color={colors.text} /> : <Text style={{ color: colors.text, fontWeight: '900' }}>Save changes</Text>}
           </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>

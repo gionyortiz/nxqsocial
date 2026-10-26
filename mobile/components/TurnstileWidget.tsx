@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useMemo } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView, WebViewMessageEvent, WebViewNavigation } from 'react-native-webview';
@@ -157,7 +158,7 @@ const styles = StyleSheet.create({
     height: 360,
     overflow: 'hidden',
     borderRadius: 12,
-    backgroundColor: '#151d33',
+    backgroundColor: colors.raised,
   },
   webview: {
     flex: 1,

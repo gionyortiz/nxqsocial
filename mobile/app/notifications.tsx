@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, View } from 'react-native';
 import { useAuth } from '@/lib/auth';
@@ -75,19 +76,19 @@ export default function NotificationsScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#8b5cf6" />
+          <ActivityIndicator color={colors.accent} />
         </View>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, gap: 10, paddingBottom: 32 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.accent} />}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ color: '#fff', fontSize: 24, fontWeight: '900' }}>Notifications</Text>
-            <Pressable onPress={markAllRead} style={{ borderRadius: 10, borderWidth: 1, borderColor: '#334155', paddingVertical: 8, paddingHorizontal: 10 }}>
+            <Text style={{ color: colors.text, fontSize: 24, fontWeight: '900' }}>Notifications</Text>
+            <Pressable onPress={markAllRead} style={{ borderRadius: 10, borderWidth: 1, borderColor: colors.border, paddingVertical: 8, paddingHorizontal: 10 }}>
               <Text style={{ color: '#a5b4fc', fontWeight: '700' }}>Mark all read</Text>
             </Pressable>
           </View>
@@ -95,22 +96,22 @@ export default function NotificationsScreen() {
           {error ? <Text style={{ color: '#fca5a5' }}>{error}</Text> : null}
 
           {!error && items.length === 0 ? (
-            <Text style={{ color: '#93a1bd' }}>No notifications yet.</Text>
+            <Text style={{ color: colors.muted }}>No notifications yet.</Text>
           ) : null}
 
           {items.map((item) => (
             <View
               key={item.id}
               style={{
-                backgroundColor: item.read ? '#111827' : '#1b1f3a',
+                backgroundColor: item.read ? colors.surface : '#1b1f3a',
                 borderRadius: 12,
                 borderWidth: 1,
-                borderColor: item.read ? '#1f2937' : '#312e81',
+                borderColor: item.read ? colors.raised : '#312e81',
                 padding: 12,
               }}
             >
-              <Text style={{ color: '#e5e7eb', fontWeight: '700' }}>{describeNotification(item)}</Text>
-              <Text style={{ color: '#93a1bd', marginTop: 6, fontSize: 12 }}>{timeAgo(item.createdAt)}</Text>
+              <Text style={{ color: colors.text, fontWeight: '700' }}>{describeNotification(item)}</Text>
+              <Text style={{ color: colors.muted, marginTop: 6, fontSize: 12 }}>{timeAgo(item.createdAt)}</Text>
             </View>
           ))}
         </ScrollView>

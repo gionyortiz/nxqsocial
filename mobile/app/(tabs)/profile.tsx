@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useEffect, useState } from 'react';
@@ -131,15 +132,18 @@ export default function ProfileScreen() {
   const initials = (user?.displayName || user?.username || 'NX').slice(0, 2).toUpperCase();
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <ScrollView contentContainerStyle={{ paddingBottom: 40 }}>
-        <View style={{ height: 132, backgroundColor: '#1e1b4b', borderBottomLeftRadius: 26, borderBottomRightRadius: 26 }} />
+        <View style={{height:150,backgroundColor:colors.surface,borderBottomWidth:1,borderColor:colors.border}}>
+          {user?.bannerUrl && <Image source={{uri:resolveMediaUrl(user.bannerUrl)}} style={{width:'100%',height:'100%'}} resizeMode="cover" />}
+          <Pressable accessibilityLabel="Open account menu" onPress={()=>router.push('/(tabs)/more')} style={{position:'absolute',top:16,right:20,width:44,height:44,borderRadius:22,backgroundColor:colors.surface,alignItems:'center',justifyContent:'center'}}><MaterialCommunityIcons name="menu" size={23} color={colors.text}/></Pressable>
+        </View>
         <View style={{ paddingHorizontal: 16, marginTop: -48 }}>
           <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
             <View style={{ position: 'relative' }}>
               <Pressable
                 onPress={() => router.push('/edit-profile' as never)}
-                style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#312e81', borderWidth: 4, borderColor: '#0b1020', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
+                style={{ width: 96, height: 96, borderRadius: 48, backgroundColor: '#312e81', borderWidth: 4, borderColor: colors.background, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}
               >
                 {user?.avatarUrl ? (
                   <Image source={{ uri: resolveMediaUrl(user.avatarUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
@@ -152,56 +156,58 @@ export default function ProfileScreen() {
                 style={{
                   position: 'absolute', bottom: -2, right: -2,
                   width: 30, height: 30, borderRadius: 15,
-                  backgroundColor: '#4f46e5', borderWidth: 2, borderColor: '#0b1020',
+                  backgroundColor: colors.accent, borderWidth: 2, borderColor: colors.background,
                   alignItems: 'center', justifyContent: 'center',
                 }}
               >
-                <MaterialCommunityIcons name="plus" size={18} color="#fff" />
+                <MaterialCommunityIcons name="plus" size={18} color={colors.text} />
               </Pressable>
             </View>
             <View style={{ flex: 1, paddingBottom: 8 }}>
-              <Text style={{ color: '#fff', fontSize: 24, fontWeight: '900' }}>{user?.displayName || 'NXQ User'}</Text>
-              <Text style={{ color: '#93a1bd', marginTop: 3 }}>@{user?.username || 'username'}</Text>
+              <Text style={{ color: colors.text, fontSize: 26, fontWeight: '700' }}>{user?.displayName || 'NXQ User'}</Text>
+              <Text style={{ color: colors.muted, marginTop: 3 }}>@{user?.username || 'username'}</Text>
             </View>
           </View>
+
+          {user?.bio && <Text style={{color:colors.text,fontSize:15,lineHeight:23,marginTop:18}}>{user.bio}</Text>}
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-            <View style={{ flex: 1, backgroundColor: '#111827', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1f2937' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{stats?.posts ?? '—'}</Text>
-              <Text style={{ color: '#93a1bd', fontSize: 12 }}>posts</Text>
+            <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.raised }}>
+              <Text style={{ color: colors.text, fontWeight: '900', fontSize: 18 }}>{stats?.posts ?? '—'}</Text>
+              <Text style={{ color: colors.muted, fontSize: 12 }}>posts</Text>
             </View>
-            <View style={{ flex: 1, backgroundColor: '#111827', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1f2937' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{stats?.followers ?? '—'}</Text>
-              <Text style={{ color: '#93a1bd', fontSize: 12 }}>followers</Text>
+            <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.raised }}>
+              <Text style={{ color: colors.text, fontWeight: '900', fontSize: 18 }}>{stats?.followers ?? '—'}</Text>
+              <Text style={{ color: colors.muted, fontSize: 12 }}>followers</Text>
             </View>
-            <View style={{ flex: 1, backgroundColor: '#111827', borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: '#1f2937' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 18 }}>{stats?.following ?? '—'}</Text>
-              <Text style={{ color: '#93a1bd', fontSize: 12 }}>following</Text>
+            <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: colors.raised }}>
+              <Text style={{ color: colors.text, fontWeight: '900', fontSize: 18 }}>{stats?.following ?? '—'}</Text>
+              <Text style={{ color: colors.muted, fontSize: 12 }}>following</Text>
             </View>
           </View>
 
-          <View style={{ backgroundColor: '#111827', padding: 14, borderRadius: 18, borderWidth: 1, borderColor: '#1f2937', marginTop: 14 }}>
+          <View style={{ backgroundColor: colors.surface, padding: 14, borderRadius: 18, borderWidth: 1, borderColor: colors.raised, marginTop: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <MaterialCommunityIcons name="shield-check-outline" size={22} color="#a78bfa" />
-              <Text style={{ color: '#c4b5fd', fontWeight: '900' }}>Trust score: {user?.trustScore ?? 'N/A'}</Text>
+              <MaterialCommunityIcons name="shield-check-outline" size={22} color={colors.verified} />
+              <Text style={{ color: colors.verified, fontWeight: '900' }}>Trust score: {user?.trustScore ?? 'N/A'}</Text>
             </View>
-            <Text style={{ color: '#93a1bd', marginTop: 8 }}>{user?.email}</Text>
+            <Text style={{ color: colors.muted, marginTop: 8 }}>{user?.email}</Text>
           </View>
 
           <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
             <Pressable
               onPress={() => router.push('/edit-profile' as never)}
-              style={{ flex: 1, backgroundColor: '#2563eb', borderRadius: 14, padding: 12 }}
+              style={{ flex: 1, backgroundColor: colors.accent, borderRadius: 14, padding: 12 }}
             >
-              <Text style={{ color: '#fff', fontWeight: '900', textAlign: 'center' }}>Edit profile</Text>
+              <Text style={{ color: colors.text, fontWeight: '900', textAlign: 'center' }}>Edit profile</Text>
             </Pressable>
-            <Pressable onPress={shareProfile} style={{ flex: 1, backgroundColor: '#1f2937', borderRadius: 14, padding: 12 }}>
-              <Text style={{ color: '#fff', fontWeight: '900', textAlign: 'center' }}>Share profile</Text>
+            <Pressable onPress={shareProfile} style={{ flex: 1, backgroundColor: colors.raised, borderRadius: 14, padding: 12 }}>
+              <Text style={{ color: colors.text, fontWeight: '900', textAlign: 'center' }}>Share profile</Text>
             </Pressable>
           </View>
 
-          <View style={{ backgroundColor: '#111827', borderRadius: 18, borderWidth: 1, borderColor: '#1f2937', marginTop: 16, padding: 14 }}>
-            <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16, marginBottom: 10 }}>Account tools</Text>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 18, borderWidth: 1, borderColor: colors.raised, marginTop: 16, padding: 14 }}>
+            <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16, marginBottom: 10 }}>Account tools</Text>
 
             <Pressable
               onPress={async () => {
@@ -210,7 +216,7 @@ export default function ProfileScreen() {
               }}
               style={{ backgroundColor: '#7f1d1d', borderRadius: 12, padding: 12, marginBottom: 10 }}
             >
-              <Text style={{ color: '#fff', fontWeight: '800', textAlign: 'center' }}>Logout</Text>
+              <Text style={{ color: colors.text, fontWeight: '800', textAlign: 'center' }}>Logout</Text>
             </Pressable>
 
             <Pressable

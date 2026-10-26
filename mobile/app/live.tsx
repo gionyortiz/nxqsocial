@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { router } from 'expo-router';
@@ -115,21 +116,21 @@ export default function LiveScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#8b5cf6" />
+          <ActivityIndicator color={colors.accent} />
         </View>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 30 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.accent} />}
         >
-          <Text style={{ color: '#fff', fontSize: 24, fontWeight: '900' }}>Live</Text>
-          <Text style={{ color: '#93a1bd' }}>Active broadcasts and reliable host controls.</Text>
+          <Text style={{ color: colors.text, fontSize: 24, fontWeight: '900' }}>Live</Text>
+          <Text style={{ color: colors.muted }}>Active broadcasts and reliable host controls.</Text>
 
           {myRoom ? (
-            <View style={{ backgroundColor: '#1f2937', borderRadius: 12, borderWidth: 1, borderColor: '#065f46', padding: 12 }}>
+            <View style={{ backgroundColor: colors.raised, borderRadius: 12, borderWidth: 1, borderColor: '#065f46', padding: 12 }}>
               <Text style={{ color: '#a7f3d0', fontWeight: '800' }}>You are LIVE</Text>
               <Text style={{ color: '#d1fae5', marginTop: 6 }}>Room: {myRoom}</Text>
               <Pressable
@@ -137,7 +138,7 @@ export default function LiveScreen() {
                 disabled={ending}
                 style={{ marginTop: 10, borderRadius: 10, backgroundColor: ending ? '#4b5563' : '#7f1d1d', paddingVertical: 11 }}
               >
-                <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '800' }}>{ending ? 'Ending…' : 'End Live'}</Text>
+                <Text style={{ color: colors.text, textAlign: 'center', fontWeight: '800' }}>{ending ? 'Ending…' : 'End Live'}</Text>
               </Pressable>
               <Pressable
                 onPress={() => openNativeHost(myRoom)}
@@ -148,14 +149,14 @@ export default function LiveScreen() {
             </View>
           ) : null}
 
-          <View style={{ backgroundColor: '#111827', borderRadius: 12, padding: 12 }}>
-            <Text style={{ color: '#c7d2fe', fontWeight: '800', marginBottom: 8 }}>Start a broadcast</Text>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12 }}>
+            <Text style={{ color: colors.verified, fontWeight: '800', marginBottom: 8 }}>Start a broadcast</Text>
             <TextInput
               value={title}
               onChangeText={setTitle}
               placeholder="Live title"
-              placeholderTextColor="#93a1bd"
-              style={{ backgroundColor: '#0f172a', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#fff' }}
+              placeholderTextColor={colors.muted}
+              style={{ backgroundColor: colors.surface, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: colors.text }}
             />
             <Pressable
               onPress={startLive}
@@ -163,28 +164,28 @@ export default function LiveScreen() {
               style={{
                 marginTop: 10,
                 borderRadius: 10,
-                backgroundColor: starting || myRoom ? '#374151' : '#7c3aed',
+                backgroundColor: starting || myRoom ? '#374151' : colors.accent,
                 paddingVertical: 11,
               }}
             >
-              <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '800' }}>
+              <Text style={{ color: colors.text, textAlign: 'center', fontWeight: '800' }}>
                 {starting ? 'Starting…' : (myRoom ? 'Already Live' : 'Start Live')}
               </Text>
             </Pressable>
           </View>
 
-          <Text style={{ color: '#c7d2fe', fontWeight: '800' }}>Active now</Text>
+          <Text style={{ color: colors.verified, fontWeight: '800' }}>Active now</Text>
           {error ? <Text style={{ color: '#fca5a5' }}>{error}</Text> : null}
-          {!error && active.length === 0 ? <Text style={{ color: '#93a1bd' }}>No active live broadcasts right now.</Text> : null}
+          {!error && active.length === 0 ? <Text style={{ color: colors.muted }}>No active live broadcasts right now.</Text> : null}
 
           {active.map((item) => (
-            <View key={item.room} style={{ backgroundColor: '#111827', borderRadius: 12, padding: 12, borderWidth: 1, borderColor: '#1f2937' }}>
-              <Text style={{ color: '#fff', fontWeight: '800' }}>{item.title || 'Live on NXQ Social'}</Text>
+            <View key={item.room} style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 12, borderWidth: 1, borderColor: colors.raised }}>
+              <Text style={{ color: colors.text, fontWeight: '800' }}>{item.title || 'Live on NXQ Social'}</Text>
               <Text style={{ color: '#cbd5e1', marginTop: 4 }}>Host: @{item.host?.username || 'unknown'}</Text>
-              <Text style={{ color: '#93a1bd', marginTop: 4 }}>Room: {item.room}</Text>
-              <Text style={{ color: '#93a1bd', marginTop: 4 }}>Viewers: {item.viewerCount ?? 0}</Text>
-              <Pressable onPress={() => openNativeViewer(item.room)} style={{ marginTop: 10, borderRadius: 10, backgroundColor: '#1f2937', paddingVertical: 10 }}>
-                <Text style={{ color: '#e5e7eb', textAlign: 'center', fontWeight: '700' }}>Watch live video</Text>
+              <Text style={{ color: colors.muted, marginTop: 4 }}>Room: {item.room}</Text>
+              <Text style={{ color: colors.muted, marginTop: 4 }}>Viewers: {item.viewerCount ?? 0}</Text>
+              <Pressable onPress={() => openNativeViewer(item.room)} style={{ marginTop: 10, borderRadius: 10, backgroundColor: colors.raised, paddingVertical: 10 }}>
+                <Text style={{ color: colors.text, textAlign: 'center', fontWeight: '700' }}>Watch live video</Text>
               </Pressable>
             </View>
           ))}

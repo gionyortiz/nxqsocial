@@ -1,7 +1,12 @@
+import { PhotoLooks, FilteredPhoto } from '@/components/PhotoLooks';
+import { VideoEffectsButton } from '@/components/VideoEffectsButton';
+import { EditedVideo, removeEditedVideo } from '@/modules/nxq-video-effects';
+import { KeyboardDoneBar, useComposerKeyboard } from '@/components/KeyboardDoneBar';
+import { colors } from '@/lib/theme';
 import * as ImagePicker from 'expo-image-picker';
 import * as ImageManipulator from 'expo-image-manipulator';
 import { File, UploadType } from 'expo-file-system';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import {
   ActivityIndicator,
@@ -11,12 +16,12 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Platform,
+  PanResponder,
   Pressable,
   SafeAreaView,
   ScrollView,
   Text,
   TextInput,
-  TouchableWithoutFeedback,
   View,
 } from 'react-native';
 import { useVideoPlayer, VideoView } from 'expo-video';
@@ -24,6 +29,8 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { API_BASE_URL, LIVE_NATIVE_ENABLED } from '@/lib/config';
 import { useAuth } from '@/lib/auth';
 import { CreateActionSheet, CreateActionMode } from '@/components/CreateActionSheet';
+import { publishMedia, UploadDraft, VIDEO_DURATION_LIMIT_MS, VIDEO_SIZE_LIMIT } from '@/lib/media-publish';
+import { CreatorDraft, readCreatorDraft, saveCreatorDraft, discardCreatorDraft } from '@/lib/creator-draft';
 
 type UploadErrorView = {
   title: string;
@@ -39,43 +46,12 @@ const AUDIENCES: { value: Audience; label: string; desc: string; icon: keyof typ
   { value: 'PRIVATE', label: 'Only me', desc: 'Visible to you only', icon: 'lock' },
 ];
 
-const MEDIA_POLL_INTERVAL_MS = 1500;
-const MEDIA_POLL_MAX_ATTEMPTS = 240; // ~6 minutes: transcode plus bounded moderation timeout
-
-/**
- * Poll GET /media/:id/status while the video is still being processed
- * server-side (TRANSCODING, then SCANNING). Resolves once it's safe to
- * attach the asset to a post; throws if it's rejected or never finishes.
- */
-async function pollMediaUntilProcessed(
-  apiBase: string,
-  token: string,
-  mediaId: string,
-  onStatus: (message: string) => void,
-): Promise<void> {
-  for (let attempt = 0; attempt < MEDIA_POLL_MAX_ATTEMPTS; attempt++) {
-    const res = await fetch(`${apiBase}/media/${mediaId}/status`, {
-      headers: { Authorization: `Bearer ${token}`, Accept: 'application/json' },
-    });
-    const body = await res.json().catch(() => null);
-    const status = body?.uploadStatus;
-
-    if (status === 'REJECTED') {
-      throw new Error(body?.message || 'Video could not be processed.');
-    }
-    if (status === 'PUBLISHED') {
-      return;
-    }
-
-    onStatus(body?.message || 'Processing video...');
-    await new Promise((resolve) => setTimeout(resolve, MEDIA_POLL_INTERVAL_MS));
-  }
-
-  throw new Error('Media is still processing. Please check its status and try again shortly.');
-}
-
 function mapUploadError(rawMessage: string, isVideo: boolean): UploadErrorView {
   const msg = rawMessage.toLowerCase();
+
+  if (msg.includes('monthly media review capacity')) {
+    return { title: 'Media Review Limit Reached', message: 'The current media review allowance has been reached. Please contact NXQ support about upload capacity.', retryable: false };
+  }
 
   if (
     msg.includes('network request failed')
@@ -83,10 +59,12 @@ function mapUploadError(rawMessage: string, isVideo: boolean): UploadErrorView {
     || msg.includes('fetch failed')
     || msg.includes('load failed')
     || msg.includes('network error')
+    || msg.includes('network connection was lost')
+    || msg.includes('could not complete the connection')
   ) {
     return {
       title: 'Network Error',
-      message: 'Connection was interrupted. Check your network and try again.',
+      message: 'Connection was interrupted. Keep this screen open and retry to continue your upload.',
       retryable: true,
     };
   }
@@ -97,10 +75,12 @@ function mapUploadError(rawMessage: string, isVideo: boolean): UploadErrorView {
     || msg.includes('request entity too large')
     || msg.includes('entity too large')
     || msg.includes('too large')
+    || msg.includes('exceeds limit')
+    || msg.includes('must not be greater')
   ) {
     return {
       title: 'File Too Large',
-      message: 'This file is too large to upload. Try a shorter or smaller-quality media file.',
+      message: isVideo ? 'Choose a video under 200 MB and no longer than 10 minutes.' : 'Choose a smaller photo and try again.',
       retryable: false,
     };
   }
@@ -166,8 +146,9 @@ function mapUploadError(rawMessage: string, isVideo: boolean): UploadErrorView {
   };
 }
 
-function VideoPreview({ uri }: { uri: string }) {
+function VideoPreview({ uri, editing }: { uri: string; editing: boolean }) {
   const player = useVideoPlayer(uri);
+  useEffect(() => { if (editing) player?.pause(); }, [editing, player]);
   return (
     <VideoView
       player={player}
@@ -197,7 +178,46 @@ export default function CreateScreen() {
   const [imageScale, setImageScale] = useState(1);
   const [imageOffsetX, setImageOffsetX] = useState(0);
   const [imageOffsetY, setImageOffsetY] = useState(0);
+  const [photoDragging, setPhotoDragging] = useState(false);
+  const photoDragOrigin = useRef({ x: 0, y: 0 });
+  const photoGesture = useRef({ enabled: false, x: 0, y: 0, clamp: (x: number, y: number) => ({ x, y }) });
+  const photoPanResponder = useMemo(() => PanResponder.create({
+    onStartShouldSetPanResponder: () => photoGesture.current.enabled,
+    onMoveShouldSetPanResponder: () => photoGesture.current.enabled,
+    onPanResponderGrant: () => {
+      photoDragOrigin.current = { x: photoGesture.current.x, y: photoGesture.current.y };
+      setPhotoDragging(true);
+    },
+    onPanResponderMove: (_event, gesture) => {
+      if (!photoGesture.current.enabled || gesture.numberActiveTouches !== 1) return;
+      const next = photoGesture.current.clamp(photoDragOrigin.current.x + gesture.dx, photoDragOrigin.current.y + gesture.dy);
+      setImageOffsetX(next.x);
+      setImageOffsetY(next.y);
+    },
+    onPanResponderRelease: () => setPhotoDragging(false),
+    onPanResponderTerminate: () => setPhotoDragging(false),
+    onPanResponderTerminationRequest: () => !photoGesture.current.enabled,
+    onShouldBlockNativeResponder: () => photoGesture.current.enabled,
+  }), []);
   const [caption, setCaption] = useState('');
+  const keyboard = useComposerKeyboard();
+  const [photoEffect, setPhotoEffect] = useState<FilteredPhoto | null>(null);
+  const [filterBusy, setFilterBusy] = useState(false);
+  const [videoEffect, setVideoEffect] = useState<EditedVideo | null>(null);
+  const [videoEditing, setVideoEditing] = useState(false);
+  const videoEditingRef = useRef(false);
+  const onVideoEditing = (busy: boolean) => {
+    videoEditingRef.current = busy;
+    setVideoEditing(busy);
+    if (busy) keyboard.dismiss();
+  };
+  useEffect(() => {
+    const uri = videoEffect?.uri;
+    return () => { void removeEditedVideo(uri); };
+  }, [videoEffect?.uri]);
+  const photoUri = photoEffect?.uri || assetUri;
+  const photoWidth = photoEffect?.width || assetWidth;
+  const photoHeight = photoEffect?.height || assetHeight;
   const [visibility, setVisibility] = useState<Audience>('PUBLIC');
   const [posting, setPosting] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
@@ -205,10 +225,88 @@ export default function CreateScreen() {
   const [uploadError, setUploadError] = useState<UploadErrorView | null>(null);
   const [publishedType, setPublishedType] = useState<'image' | 'video' | null>(null);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
+  const submitting = useRef(false);
+  const uploadDraft = useRef<UploadDraft | null>(null);
   const previewHeight = 260;
+  const [savedDraft, setSavedDraft] = useState<CreatorDraft | null>(null);
+  const [draftBusy, setDraftBusy] = useState(false);
+  const [draftError, setDraftError] = useState<string | null>(null);
+  const activeDraft = useRef<string | null>(null);
+  const draftScope = useRef(0);
+  const draftFrame = useRef<{ x: number; y: number } | null>(null);
+  useEffect(() => {
+    const current = ++draftScope.current;
+    setSavedDraft(null); setDraftError(null); activeDraft.current = null;
+    setAssetUri(null); setAssetType(null); setPhotoEffect(null); setVideoEffect(null);
+    setCaption(''); setVisibility('PUBLIC'); setDraftBusy(false); draftFrame.current = null;
+    if (Platform.OS !== 'web' && user?.id) void readCreatorDraft(user.id).then(draft => {
+      if (draftScope.current === current) setSavedDraft(draft);
+    }).catch(error => { if (draftScope.current === current) setDraftError(error.message); });
+    return () => { draftScope.current += 1; };
+  }, [user?.id]);
+  useEffect(() => {
+    if (draftFrame.current && previewWidth) {
+      setImageOffsetX(draftFrame.current.x * previewWidth);
+      setImageOffsetY(draftFrame.current.y * previewHeight);
+      draftFrame.current = null;
+    }
+  }, [previewWidth, assetUri]);
+
+  const restoreDraft = (draft: CreatorDraft) => {
+    if (submitting.current || videoEditingRef.current) return;
+    initialModeHandled.current = true;
+    router.setParams({ mode: draft.isStory ? 'story' : draft.type === 'video' ? 'reel' : 'photo' });
+    setAssetUri(draft.uri); setAssetType(draft.type); setAssetMime(draft.mime);
+    setAssetName(draft.type === 'video' ? 'draft.mp4' : 'draft.jpg');
+    setAssetWidth(draft.width); setAssetHeight(draft.height); setAssetSize(null);
+    setPhotoEffect(null); setVideoEffect(null); setCaption(draft.caption); setVisibility(draft.visibility);
+    setImageScale(draft.scale); draftFrame.current = { x: draft.offsetX, y: draft.offsetY };
+    setImageOffsetX(draft.offsetX * previewWidth); setImageOffsetY(draft.offsetY * previewHeight);
+    setUploadError(null); setPublishedType(null); uploadDraft.current = null; activeDraft.current = draft.id;
+  };
+  const saveDraft = async () => {
+    if (!user?.id || !assetUri || !assetType || submitting.current || filterBusy || videoEditingRef.current) return;
+    submitting.current = true; setDraftBusy(true); setDraftError(null); keyboard.dismiss();
+    const current = draftScope.current;
+    try {
+      const saved = await saveCreatorDraft(user.id, {
+        uri: assetType === 'video' ? videoEffect?.uri || assetUri : photoUri || assetUri,
+        type: assetType, mime: assetType === 'video' ? 'video/mp4' : photoEffect ? 'image/jpeg' : assetMime || 'image/jpeg',
+        caption, visibility, isStory, width: assetType === 'image' ? photoWidth : assetWidth,
+        height: assetType === 'image' ? photoHeight : assetHeight,
+        scale: imageScale, offsetX: previewWidth ? displayedOffsets.x / previewWidth : 0, offsetY: displayedOffsets.y / previewHeight,
+      });
+      if (draftScope.current !== current) return;
+      setSavedDraft(saved); activeDraft.current = saved.id;
+      // Use the durable copy immediately; replacing a previous draft may remove its file.
+      setAssetUri(saved.uri); setAssetWidth(saved.width); setAssetHeight(saved.height);
+      setPhotoEffect(null); setVideoEffect(null); setAssetMime(saved.mime); uploadDraft.current = null;
+    } catch (error) { if (draftScope.current === current) setDraftError(error instanceof Error ? error.message : 'Could not save draft.'); }
+    finally { submitting.current = false; if (draftScope.current === current) setDraftBusy(false); }
+  };
+  const discardDraft = () => Alert.alert('Discard saved draft?', 'This removes the draft from this phone. Your library original stays safe.', [
+    { text: 'Cancel', style: 'cancel' },
+    { text: 'Discard', style: 'destructive', onPress: async () => {
+      if (!user?.id || submitting.current) return;
+      try {
+        await discardCreatorDraft(user.id);
+        if (activeDraft.current === savedDraft?.id) { activeDraft.current = null; resetComposer(); }
+        setSavedDraft(null); setDraftError(null);
+      } catch { setDraftError('Could not discard this draft. Please retry.'); }
+    } },
+  ]);
 
   const resetComposer = () => {
+    if (activeDraft.current && user?.id) {
+      const id = activeDraft.current; activeDraft.current = null;
+      void discardCreatorDraft(user.id, id).then(() => setSavedDraft(current => current?.id === id ? null : current)).catch(() => setDraftError('Posted successfully, but the saved draft could not be removed.'));
+    }
+    setPhotoDragging(false);
+    uploadDraft.current = null;
     setAssetUri(null);
+    setPhotoEffect(null);
+    setVideoEffect(null);
+    setFilterBusy(false);
     setAssetType(null);
     setAssetName(null);
     setAssetMime(null);
@@ -226,14 +324,24 @@ export default function CreateScreen() {
   };
 
   const storeSelectedAsset = (asset: ImagePicker.ImagePickerAsset) => {
+    if (submitting.current || videoEditingRef.current) return;
     const isVideo = asset.type === 'video';
+    if (isVideo && ((asset.fileSize ?? 0) > VIDEO_SIZE_LIMIT || (asset.duration ?? 0) > VIDEO_DURATION_LIMIT_MS)) {
+      Alert.alert('Video Too Large', 'Choose a video under 200 MB and no longer than 10 minutes.');
+      return;
+    }
+    activeDraft.current = null; draftFrame.current = null;
     const fallbackName = isVideo ? 'mobile-upload.mp4' : 'mobile-upload.jpg';
     const fallbackMime = isVideo ? 'video/mp4' : 'image/jpeg';
     const supportedMime = isVideo
       ? (asset.mimeType === 'video/mp4' ? asset.mimeType : fallbackMime)
       : (asset.mimeType && /^(image\/(jpeg|png))$/.test(asset.mimeType) ? asset.mimeType : fallbackMime);
 
+    setPhotoDragging(false);
     setAssetUri(asset.uri);
+    setPhotoEffect(null);
+    setVideoEffect(null);
+    setFilterBusy(false);
     setAssetType(isVideo ? 'video' : 'image');
     setAssetName(asset.fileName || fallbackName);
     setAssetMime(supportedMime);
@@ -252,19 +360,19 @@ export default function CreateScreen() {
     if (width > 0 && width !== previewWidth) setPreviewWidth(width);
   };
 
-  const getImageFrameMetrics = () => {
-    if (!assetWidth || !assetHeight || !previewWidth) return null;
-    const baseScale = Math.max(previewWidth / assetWidth, previewHeight / assetHeight);
-    const totalScale = baseScale * imageScale;
-    const shownWidth = assetWidth * totalScale;
-    const shownHeight = assetHeight * totalScale;
+  const getImageFrameMetrics = (scale = imageScale) => {
+    if (!photoWidth || !photoHeight || !previewWidth) return null;
+    const baseScale = Math.max(previewWidth / photoWidth, previewHeight / photoHeight);
+    const totalScale = baseScale * scale;
+    const shownWidth = photoWidth * totalScale;
+    const shownHeight = photoHeight * totalScale;
     const maxOffsetX = Math.max(0, (shownWidth - previewWidth) / 2);
     const maxOffsetY = Math.max(0, (shownHeight - previewHeight) / 2);
     return { baseScale, totalScale, shownWidth, shownHeight, maxOffsetX, maxOffsetY };
   };
 
-  const clampOffsets = (nextX: number, nextY: number) => {
-    const metrics = getImageFrameMetrics();
+  const clampOffsets = (nextX: number, nextY: number, scale = imageScale) => {
+    const metrics = getImageFrameMetrics(scale);
     if (!metrics) return { x: nextX, y: nextY };
     return {
       x: Math.min(metrics.maxOffsetX, Math.max(-metrics.maxOffsetX, nextX)),
@@ -272,24 +380,27 @@ export default function CreateScreen() {
     };
   };
 
-  const adjustOffset = (dx: number, dy: number) => {
-    const next = clampOffsets(imageOffsetX + dx, imageOffsetY + dy);
+  const frameMetrics = getImageFrameMetrics();
+  const displayedOffsets = clampOffsets(imageOffsetX, imageOffsetY);
+  photoGesture.current = {
+    enabled: assetType === 'image' && Boolean(assetUri && assetWidth && assetHeight && previewWidth) && !posting,
+    x: displayedOffsets.x,
+    y: displayedOffsets.y,
+    clamp: clampOffsets,
+  };
+
+  const updateScale = (nextScale: number) => {
+    const scale = Math.min(3, Math.max(1, nextScale));
+    const next = clampOffsets(imageOffsetX, imageOffsetY, scale);
+    setImageScale(scale);
     setImageOffsetX(next.x);
     setImageOffsetY(next.y);
   };
 
-  const updateScale = (nextScale: number) => {
-    const clampedScale = Math.min(3, Math.max(1, nextScale));
-    setImageScale(clampedScale);
-    // Keep image inside the frame after scale changes.
-    setTimeout(() => {
-      const next = clampOffsets(imageOffsetX, imageOffsetY);
-      setImageOffsetX(next.x);
-      setImageOffsetY(next.y);
-    }, 0);
-  };
-
   const pickMedia = async (mode: 'all' | 'video' | 'image' = 'all') => {
+    if (submitting.current) return;
+    keyboard.dismiss();
+    try {
     const perms = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perms.granted) {
       Alert.alert('Permission needed', 'Enable photo library access to create posts.');
@@ -304,15 +415,25 @@ export default function CreateScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes,
-      allowsEditing: true,
+      // Use the modern iOS picker for videos and export a local H.264 MP4.
+      // Passthrough can return an iCloud-only or incompatible MOV resource.
+      allowsEditing: mode === 'image',
+      videoExportPreset: ImagePicker.VideoExportPreset.H264_1280x720,
+      preferredAssetRepresentationMode: ImagePicker.UIImagePickerPreferredAssetRepresentationMode.Compatible,
+      shouldDownloadFromNetwork: true,
       quality: 1,
     });
 
     if (result.canceled || !result.assets?.length) return;
     storeSelectedAsset(result.assets[0]);
+    } catch {
+      Alert.alert('Could not open media', 'NXQ could not prepare this file. If it is stored in iCloud, open it in Photos and let it download, then try again.');
+    }
   };
 
   const captureMedia = async (mode: 'all' | 'video' | 'image' = 'all') => {
+    if (submitting.current) return;
+    keyboard.dismiss();
     const perms = await ImagePicker.requestCameraPermissionsAsync();
     if (!perms.granted) {
       Alert.alert('Permission needed', 'Enable camera access to capture media.');
@@ -419,8 +540,10 @@ export default function CreateScreen() {
   };
 
   const submit = async () => {
-    if (!token || !assetUri || !assetType) return;
-    Keyboard.dismiss();
+    if (submitting.current || filterBusy || videoEditingRef.current || !token || !assetUri || !assetType) return;
+    submitting.current = true;
+    keyboard.dismiss();
+    setPhotoDragging(false);
     setPosting(true);
     setUploadError(null);
     setUploadProgress(5);
@@ -431,20 +554,20 @@ export default function CreateScreen() {
 
       // Apply in-app framing crop, then compress photos to JPEG ≤ 1280px long edge.
       // so they stay well under any proxy body-size limit.
-      let finalUri = assetUri;
-      let finalMime = mime;
+      let finalUri = isVideo ? (videoEffect?.uri || assetUri) : (photoUri || assetUri);
+      let finalMime = isVideo && videoEffect ? 'video/mp4' : mime;
       if (!isVideo) {
         const metrics = getImageFrameMetrics();
-        if (metrics && assetWidth && assetHeight) {
-          const imageLeft = (previewWidth - metrics.shownWidth) / 2 + imageOffsetX;
-          const imageTop = (previewHeight - metrics.shownHeight) / 2 + imageOffsetY;
-          const cropX = Math.max(0, Math.min(assetWidth - 1, (0 - imageLeft) / metrics.totalScale));
-          const cropY = Math.max(0, Math.min(assetHeight - 1, (0 - imageTop) / metrics.totalScale));
-          const cropWidth = Math.max(1, Math.min(assetWidth - cropX, previewWidth / metrics.totalScale));
-          const cropHeight = Math.max(1, Math.min(assetHeight - cropY, previewHeight / metrics.totalScale));
+        if (metrics && photoWidth && photoHeight) {
+          const imageLeft = (previewWidth - metrics.shownWidth) / 2 + displayedOffsets.x;
+          const imageTop = (previewHeight - metrics.shownHeight) / 2 + displayedOffsets.y;
+          const cropX = Math.max(0, Math.min(photoWidth - 1, (0 - imageLeft) / metrics.totalScale));
+          const cropY = Math.max(0, Math.min(photoHeight - 1, (0 - imageTop) / metrics.totalScale));
+          const cropWidth = Math.max(1, Math.min(photoWidth - cropX, previewWidth / metrics.totalScale));
+          const cropHeight = Math.max(1, Math.min(photoHeight - cropY, previewHeight / metrics.totalScale));
 
           const cropped = await ImageManipulator.manipulateAsync(
-            assetUri,
+            finalUri,
             [{ crop: { originX: Math.round(cropX), originY: Math.round(cropY), width: Math.round(cropWidth), height: Math.round(cropHeight) } }],
             { compress: 1 },
           );
@@ -461,7 +584,7 @@ export default function CreateScreen() {
       }
 
       const filename = isVideo
-        ? (assetName || 'mobile-upload.mp4')
+        ? (videoEffect ? 'nxq-video.mp4' : (assetName || 'mobile-upload.mp4'))
         : 'mobile-upload.jpg';
 
       // Keep large photos and videos on disk on native devices. Converting an
@@ -535,130 +658,37 @@ export default function CreateScreen() {
         return;
       }
 
-      // Production uses only the presigned quarantine/moderation pipeline.
-      setUploadProgress(15);
-      setUploadStatusMessage('Requesting secure upload URL...');
-      const createUploadRes = await fetch(`${API_BASE_URL}/media/create-upload-url`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          mimeType: finalMime,
-          size: finalSize,
-        }),
-      });
-
-      const createUploadBody = await createUploadRes.text();
-
-      if (!createUploadRes.ok) {
-        const err = (() => {
-          try { return JSON.parse(createUploadBody || '{}'); } catch { return {} as any; }
-        })();
-        throw new Error(err?.message || `Secure upload could not start (${createUploadRes.status})`);
-      }
-
-      const uploadTarget = JSON.parse(createUploadBody) as {
-        uploadUrl: string;
-        mediaId: string;
-      };
-
-      setUploadProgress(55);
-      setUploadStatusMessage('Uploading media...');
-      const uploadResult = uploadFile ? await uploadFile.upload(uploadTarget.uploadUrl, {
-        httpMethod: 'PUT',
-        uploadType: UploadType.BINARY_CONTENT,
+      await publishMedia({
+        token,
+        fingerprint: JSON.stringify([user?.id, assetUri, photoEffect?.uri, videoEffect?.uri, isStory, imageScale, imageOffsetX, imageOffsetY, previewWidth, assetWidth, assetHeight]),
+        draft: uploadDraft,
         mimeType: finalMime,
-        headers: { 'Content-Type': finalMime },
-        sessionType: 'foreground',
-      }) : null;
-
-      if (Platform.OS === 'web') {
-        if (!webBlob) throw new Error('Storage upload failed (missing blob)');
-        const webUploadRes = await fetch(uploadTarget.uploadUrl, {
-          method: 'PUT',
-          headers: { 'Content-Type': finalMime },
-          body: webBlob,
-        });
-        if (!webUploadRes.ok) {
-          throw new Error(`Storage upload failed (${webUploadRes.status})`);
-        }
-      } else if (!uploadResult || uploadResult.status < 200 || uploadResult.status >= 300) {
-        throw new Error(`Storage upload failed (${uploadResult?.status ?? 'unknown'})`);
-      }
-
-      setUploadProgress(75);
-      setUploadStatusMessage('Finalizing upload...');
-      const completeRes = await fetch(`${API_BASE_URL}/media/complete-upload`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ mediaId: uploadTarget.mediaId }),
-      });
-
-      const completeBody = await completeRes.text();
-      if (!completeRes.ok) {
-        const err = (() => {
-          try {
-            return JSON.parse(completeBody || '{}');
-          } catch {
-            return {} as any;
-          }
-        })();
-        throw new Error(err?.message || `Failed to finalize upload (${completeRes.status})`);
-      }
-
-      let completeJson: any = null;
-      try {
-        completeJson = JSON.parse(completeBody || '{}');
-      } catch {
-        completeJson = null;
-      }
-
-      const uploadStatus = completeJson?.uploadStatus;
-      if (uploadStatus === 'REJECTED') {
-        throw new Error(completeJson?.message || 'Media did not pass safety review.');
-      }
-      if (uploadStatus !== 'PUBLISHED') {
-        setUploadProgress(88);
-        await pollMediaUntilProcessed(API_BASE_URL, token, uploadTarget.mediaId, (message) => {
+        size: finalSize,
+        caption,
+        visibility,
+        isStory,
+        onStatus: (progress, message) => {
+          setUploadProgress(progress);
           setUploadStatusMessage(message);
-        });
-      }
-
-      setUploadProgress(95);
-      setUploadStatusMessage(isStory ? 'Sharing to story...' : 'Publishing post...');
-      const res = await fetch(`${API_BASE_URL}/${isStory ? 'stories' : 'posts'}`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
         },
-        body: JSON.stringify(
-          isStory
-            ? { caption, visibility, mediaId: uploadTarget.mediaId }
-            : { caption, type: assetType === 'video' ? 'VIDEO' : 'PHOTO', visibility, mediaId: uploadTarget.mediaId },
-        ),
-      });
-      const status = res.status;
-      const responseBody = await res.text();
-
-      if (status < 200 || status >= 300) {
-        const err = (() => {
-          try {
-            return JSON.parse(responseBody || '{}');
-          } catch {
-            return {} as any;
+        transfer: async (url) => {
+          if (uploadFile) {
+            const result = await uploadFile.upload(url, {
+              httpMethod: 'PUT', uploadType: UploadType.BINARY_CONTENT,
+              mimeType: finalMime, headers: { 'Content-Type': finalMime },
+              sessionType: 'foreground',
+              onProgress: ({ bytesSent, totalBytes }) => {
+                if (totalBytes > 0) setUploadProgress(20 + Math.min(1, bytesSent / totalBytes) * 50);
+              },
+            });
+            if (result.status < 200 || result.status >= 300) throw new Error('Storage upload failed (' + result.status + ')');
+          } else {
+            if (!webBlob) throw new Error('Upload file is unavailable.');
+            const result = await fetch(url, { method: 'PUT', headers: { 'Content-Type': finalMime }, body: webBlob });
+            if (!result.ok) throw new Error('Storage upload failed (' + result.status + ')');
           }
-        })();
-        throw new Error(err?.message || `Failed to ${isStory ? 'share story' : 'create post'} (${status})`);
-      }
+        },
+      });
 
       setUploadProgress(100);
       setUploadStatusMessage('Published');
@@ -671,6 +701,7 @@ export default function CreateScreen() {
       setUploadError(mapped);
       Alert.alert(mapped.title, mapped.message);
     } finally {
+      submitting.current = false;
       setPosting(false);
       setUploadStatusMessage(null);
       setUploadProgress(0);
@@ -678,91 +709,40 @@ export default function CreateScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <KeyboardAvoidingView
         style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 14 : 0}
       >
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
           <ScrollView
-            contentContainerStyle={{ padding: 14, gap: 12, paddingBottom: 28 }}
+            pointerEvents={draftBusy ? 'none' : 'auto'}
+            scrollEnabled={!photoDragging}
+            contentContainerStyle={{ padding: 18, gap: 14, paddingBottom: 28 }}
             keyboardShouldPersistTaps="handled"
+            keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <View style={{ flex: 1 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900' }}>
-                    {launchModeLabel ? `Create ${launchModeLabel}` : 'Create Post'}
-                  </Text>
-                  <View style={{ backgroundColor: '#7c3aed', borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 }}>
-                    <Text style={{ color: '#fff', fontSize: 11, fontWeight: '900', letterSpacing: 0.5 }}>NEW</Text>
-                  </View>
-                </View>
-                <Text style={{ color: '#93a1bd', marginTop: 2 }}>
-                  {launchModeLabel === 'Photo'
-                    ? 'Photo opens straight into your library.'
-                    : launchModeLabel === 'Reel'
-                      ? 'Reel opens straight into the camera.'
-                      : 'Pick your audience, add a caption, and share'}
-                </Text>
-              </View>
-              <Pressable
-                onPress={() => setShowCreateMenu(true)}
-                disabled={posting}
-                style={({ pressed }) => ({
-                  width: 44,
-                  height: 44,
-                  borderRadius: 16,
-                  backgroundColor: pressed ? '#4338ca' : '#312e81',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  opacity: posting ? 0.6 : 1,
-                })}
-              >
-                <MaterialCommunityIcons name="plus" size={26} color="#fff" />
+              <View><Text style={{ color: colors.text, fontSize: 30, fontWeight: '900', letterSpacing: -0.8 }}>Create</Text>
+                <Text style={{ color: colors.muted, marginTop: 4 }}>Make a moment worth sharing.</Text></View>
+              <Pressable accessibilityRole="button" accessibilityLabel="Creation options" disabled={posting} onPress={() => { keyboard.dismiss(); setShowCreateMenu(true); }} style={{ width: 48, height: 48, borderRadius: 24, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center' }}>
+                <MaterialCommunityIcons name="dots-horizontal" size={24} color={colors.text} />
               </Pressable>
             </View>
-
-            {launchModeLabel ? (
-              <View style={{ alignSelf: 'flex-start', flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#1f2a44', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 7, borderWidth: 1, borderColor: '#32405f' }}>
-                <MaterialCommunityIcons name={launchModeLabel === 'Reel' ? 'video-outline' : 'image-outline'} size={14} color="#c7d2fe" />
-                <Text style={{ color: '#dbe4ff', fontWeight: '800', fontSize: 12 }}>{launchModeLabel} shortcut</Text>
+            {Platform.OS !== 'web' ? <View style={{ borderRadius: 18, backgroundColor: colors.surface, padding: 14, gap: 10 }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}><MaterialCommunityIcons name="file-document-edit-outline" size={20} color={colors.accent} /><Text style={{ color: colors.text, fontWeight: '800', fontSize: 16 }}>Your draft</Text></View>
+              <Text style={{ color: colors.muted, lineHeight: 20 }}>{savedDraft ? `${savedDraft.type === 'video' ? 'Video' : 'Photo'} saved ${new Date(savedDraft.savedAt).toLocaleDateString()}. Only on this phone, for this account.` : 'Save one photo or video with its current look, framing, caption and audience. Resume it after restarting NXQ.'}</Text>
+              {draftError ? <Text accessibilityRole="alert" style={{ color: '#fca5a5' }}>{draftError}</Text> : null}
+              <View style={{ flexDirection: 'row', gap: 16, flexWrap: 'wrap' }}>
+                {assetUri ? <Pressable accessibilityRole="button" disabled={posting || filterBusy || videoEditing || draftBusy} onPress={() => savedDraft && activeDraft.current !== savedDraft.id ? Alert.alert('Replace saved draft?', 'You can keep one draft on this phone. Saving this will replace the previous draft.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Replace', onPress: () => void saveDraft() }]) : void saveDraft()} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.accent, fontWeight: '800' }}>{draftBusy ? 'Saving draft…' : 'Save draft'}</Text></Pressable> : null}
+                {savedDraft && !assetUri ? <Pressable accessibilityRole="button" disabled={posting || draftBusy} onPress={() => restoreDraft(savedDraft)} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.accent, fontWeight: '800' }}>Resume draft</Text></Pressable> : null}
+                {savedDraft || draftError ? <Pressable accessibilityRole="button" disabled={posting || draftBusy || videoEditing} onPress={discardDraft} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.muted }}>Discard draft</Text></Pressable> : null}
               </View>
-            ) : null}
-
-            {/* Audience selector pinned to the top so it is immediately visible */}
-            <View style={{ gap: 8, backgroundColor: '#141b30', borderRadius: 16, padding: 12, borderWidth: 1, borderColor: '#2c2f63' }}>
-              <Text style={{ color: '#c4b5fd', fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>WHO CAN SEE THIS</Text>
-              <View style={{ flexDirection: 'row', gap: 8 }}>
-                {AUDIENCES.map((a) => {
-                  const active = visibility === a.value;
-                  return (
-                    <Pressable
-                      key={a.value}
-                      onPress={() => setVisibility(a.value)}
-                      disabled={posting}
-                      style={{
-                        flex: 1,
-                        alignItems: 'center',
-                        gap: 4,
-                        paddingVertical: 12,
-                        borderRadius: 14,
-                        borderWidth: 2,
-                        borderColor: active ? '#7c3aed' : '#28324a',
-                        backgroundColor: active ? '#241b45' : '#151d33',
-                        opacity: posting ? 0.6 : 1,
-                      }}
-                    >
-                      <MaterialCommunityIcons name={a.icon} size={18} color={active ? '#c4b5fd' : '#8790ab'} />
-                      <Text style={{ color: active ? '#ddd6fe' : '#93a1bd', fontWeight: '700', fontSize: 12 }}>{a.label}</Text>
-                    </Pressable>
-                  );
-                })}
-              </View>
-              <Text style={{ color: '#5b6680', fontSize: 12 }}>
-                {AUDIENCES.find((a) => a.value === visibility)?.desc}
-              </Text>
+            </View> : null}
+            <View style={{ flexDirection: 'row', gap: 10, marginVertical: 4 }}>
+              <Pressable disabled={posting} accessibilityRole="button" onPress={() => pickMedia('image')} style={{ paddingVertical: 12, paddingHorizontal: 18, borderRadius: 24, backgroundColor: assetType === 'image' ? colors.accent : colors.surface }}><Text style={{ color: '#fff', fontWeight: '800' }}>Photo</Text></Pressable>
+              <Pressable disabled={posting} accessibilityRole="button" onPress={chooseReelSource} style={{ paddingVertical: 12, paddingHorizontal: 18, borderRadius: 24, backgroundColor: assetType === 'video' && !isStory ? colors.accent : colors.surface }}><Text style={{ color: '#fff', fontWeight: '800' }}>Video</Text></Pressable>
+              <Pressable disabled={posting} accessibilityRole="button" onPress={() => onSelectCreateMode('story')} style={{ paddingVertical: 12, paddingHorizontal: 18, borderRadius: 24, backgroundColor: isStory ? colors.accent : colors.surface }}><Text style={{ color: '#fff', fontWeight: '800' }}>Story</Text></Pressable>
             </View>
 
             {publishedType && !assetUri ? (
@@ -780,24 +760,24 @@ export default function CreateScreen() {
                   onPress={() => setPublishedType(null)}
                   style={{ backgroundColor: '#16a34a', borderRadius: 12, paddingVertical: 12, alignItems: 'center' }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '800' }}>{isStory ? 'Create another story' : 'Create another post'}</Text>
+                  <Text style={{ color: colors.text, fontWeight: '800' }}>{isStory ? 'Create another story' : 'Create another post'}</Text>
                 </Pressable>
               </View>
             ) : null}
 
             {posting && uploadStatusMessage ? (
-              <View style={{ backgroundColor: '#111827', borderRadius: 12, padding: 10 }}>
-                <Text style={{ color: '#c7d2fe', fontWeight: '700', marginBottom: 8 }}>{uploadStatusMessage}</Text>
-                <View style={{ height: 8, borderRadius: 999, backgroundColor: '#1f2937', overflow: 'hidden' }}>
+              <View style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 10 }}>
+                <Text style={{ color: colors.verified, fontWeight: '700', marginBottom: 8 }}>{uploadStatusMessage}</Text>
+                <View style={{ height: 8, borderRadius: 999, backgroundColor: colors.raised, overflow: 'hidden' }}>
                   <View
                     style={{
                       width: `${Math.max(3, Math.min(100, uploadProgress))}%`,
                       height: '100%',
-                      backgroundColor: '#6366f1',
+                      backgroundColor: colors.accent,
                     }}
                   />
                 </View>
-                <Text style={{ color: '#93a1bd', marginTop: 6, fontSize: 12 }}>{Math.round(uploadProgress)}%</Text>
+                <Text style={{ color: colors.muted, marginTop: 6, fontSize: 12 }}>{Math.round(uploadProgress)}%</Text>
               </View>
             ) : null}
 
@@ -808,109 +788,144 @@ export default function CreateScreen() {
                 {uploadError.retryable ? (
                   <Pressable
                     onPress={submit}
-                    style={{ marginTop: 10, backgroundColor: '#7c3aed', borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
+                    style={{ marginTop: 10, backgroundColor: colors.accent, borderRadius: 10, paddingVertical: 10, alignItems: 'center' }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '800' }}>Retry Upload</Text>
+                    <Text style={{ color: colors.text, fontWeight: '800' }}>Continue Upload</Text>
                   </Pressable>
                 ) : null}
               </View>
             ) : null}
 
+            {!assetUri ? <>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable onPress={() => captureMedia()} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#1f2937', alignItems: 'center', gap: 8 }}>
-                <MaterialCommunityIcons name="camera-outline" size={24} color="#c7d2fe" />
-                <Text style={{ color: '#c7d2fe', fontWeight: '800', textAlign: 'center' }}>Open camera</Text>
+              <Pressable onPress={() => captureMedia()} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.raised, alignItems: 'center', gap: 8 }}>
+                <MaterialCommunityIcons name="camera-outline" size={24} color={colors.verified} />
+                <Text style={{ color: colors.verified, fontWeight: '800', textAlign: 'center' }}>Open camera</Text>
               </Pressable>
-              <Pressable onPress={() => pickMedia()} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#1f2937', alignItems: 'center', gap: 8 }}>
-                <MaterialCommunityIcons name="image-multiple-outline" size={24} color="#c7d2fe" />
-                <Text style={{ color: '#c7d2fe', fontWeight: '800', textAlign: 'center' }}>{assetUri ? 'Change media' : 'Pick from library'}</Text>
+              <Pressable onPress={() => pickMedia()} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.raised, alignItems: 'center', gap: 8 }}>
+                <MaterialCommunityIcons name="image-multiple-outline" size={24} color={colors.verified} />
+                <Text style={{ color: colors.verified, fontWeight: '800', textAlign: 'center' }}>{assetUri ? 'Change media' : 'Pick from library'}</Text>
               </Pressable>
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
               <Pressable onPress={() => captureMedia('video')} style={{ flex: 1, backgroundColor: '#1b1c3a', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#3b3e7a', alignItems: 'center', gap: 8 }}>
-                <MaterialCommunityIcons name="record-rec" size={24} color="#c7d2fe" />
-                <Text style={{ color: '#c7d2fe', fontWeight: '800', textAlign: 'center' }}>Record video</Text>
+                <MaterialCommunityIcons name="record-rec" size={24} color={colors.verified} />
+                <Text style={{ color: colors.verified, fontWeight: '800', textAlign: 'center' }}>Record video</Text>
               </Pressable>
               <Pressable onPress={() => pickMedia('video')} style={{ flex: 1, backgroundColor: '#1b1c3a', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#3b3e7a', alignItems: 'center', gap: 8 }}>
-                <MaterialCommunityIcons name="filmstrip-box-multiple" size={24} color="#c7d2fe" />
-                <Text style={{ color: '#c7d2fe', fontWeight: '800', textAlign: 'center' }}>Upload video</Text>
+                <MaterialCommunityIcons name="filmstrip-box-multiple" size={24} color={colors.verified} />
+                <Text style={{ color: colors.verified, fontWeight: '800', textAlign: 'center' }}>Upload video</Text>
               </Pressable>
             </View>
+
+            <Text style={{ color: colors.muted, fontSize: 12 }}>Videos: up to 200 MB and 10 minutes. Keep NXQ open while uploading.</Text>
+
+            </> : <Pressable accessibilityRole="button" disabled={posting || filterBusy} onPress={() => pickMedia()} style={{ alignSelf: 'flex-end', minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.verified, fontWeight: '700' }}>Change media</Text></Pressable>}
 
             {assetUri && assetType === 'image' ? (
               <View>
                 <View
+                  {...photoPanResponder.panHandlers}
+                  testID="photo-adjustment-frame"
+                  accessibilityLabel="Photo preview. Drag to reposition the photo."
                   onLayout={onPreviewLayout}
-                  style={{ width: '100%', height: previewHeight, borderRadius: 12, backgroundColor: '#0b1020', overflow: 'hidden' }}
+                  style={{ width: '100%', height: previewHeight, borderRadius: 24, backgroundColor: colors.background, overflow: 'hidden' }}
                 >
                   <Image
-                    source={{ uri: assetUri }}
-                    style={{
-                      width: '100%',
-                      height: '100%',
-                      transform: [
-                        { scale: imageScale },
-                        { translateX: imageOffsetX },
-                        { translateY: imageOffsetY },
-                      ],
-                    }}
+                    source={{ uri: photoUri || assetUri }}
+                    style={frameMetrics ? {
+                      position: 'absolute',
+                      width: frameMetrics.shownWidth,
+                      height: frameMetrics.shownHeight,
+                      left: (previewWidth - frameMetrics.shownWidth) / 2 + displayedOffsets.x,
+                      top: (previewHeight - frameMetrics.shownHeight) / 2 + displayedOffsets.y,
+                    } : { width: '100%', height: '100%' }}
                     resizeMode="cover"
                   />
                 </View>
-                <Text style={{ color: '#93a1bd', marginTop: 8 }}>Adjust photo: move and zoom</Text>
+                <PhotoLooks key={assetUri} uri={assetUri} width={assetWidth || 1} height={assetHeight || 1} disabled={posting} onChange={setPhotoEffect} onBusy={setFilterBusy} />
+                <Text style={{ color: colors.muted, marginTop: 8 }}>Drag the photo to reposition. Use zoom to adjust the crop.</Text>
                 <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <Pressable onPress={() => updateScale(imageScale - 0.1)} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 10, padding: 10 }}>
-                    <Text style={{ color: '#c7d2fe', textAlign: 'center', fontWeight: '700' }}>Zoom -</Text>
+                  <Pressable onPress={() => updateScale(imageScale - 0.1)} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 10, padding: 10 }}>
+                    <Text style={{ color: colors.verified, textAlign: 'center', fontWeight: '700' }}>Zoom -</Text>
                   </Pressable>
-                  <Pressable onPress={() => updateScale(imageScale + 0.1)} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 10, padding: 10 }}>
-                    <Text style={{ color: '#c7d2fe', textAlign: 'center', fontWeight: '700' }}>Zoom +</Text>
+                  <Pressable onPress={() => updateScale(imageScale + 0.1)} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 10, padding: 10 }}>
+                    <Text style={{ color: colors.verified, textAlign: 'center', fontWeight: '700' }}>Zoom +</Text>
                   </Pressable>
                 </View>
-                <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                  <Pressable onPress={() => adjustOffset(-16, 0)} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 10, padding: 10 }}>
-                    <Text style={{ color: '#c7d2fe', textAlign: 'center', fontWeight: '700' }}>Left</Text>
-                  </Pressable>
-                  <Pressable onPress={() => adjustOffset(16, 0)} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 10, padding: 10 }}>
-                    <Text style={{ color: '#c7d2fe', textAlign: 'center', fontWeight: '700' }}>Right</Text>
-                  </Pressable>
-                  <Pressable onPress={() => adjustOffset(0, -16)} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 10, padding: 10 }}>
-                    <Text style={{ color: '#c7d2fe', textAlign: 'center', fontWeight: '700' }}>Up</Text>
-                  </Pressable>
-                  <Pressable onPress={() => adjustOffset(0, 16)} style={{ flex: 1, backgroundColor: '#111827', borderRadius: 10, padding: 10 }}>
-                    <Text style={{ color: '#c7d2fe', textAlign: 'center', fontWeight: '700' }}>Down</Text>
-                  </Pressable>
-                </View>
-                <Pressable onPress={() => { setImageScale(1); setImageOffsetX(0); setImageOffsetY(0); }} style={{ marginTop: 8, backgroundColor: '#111827', borderRadius: 10, padding: 10 }}>
-                  <Text style={{ color: '#c7d2fe', textAlign: 'center', fontWeight: '700' }}>Reset alignment</Text>
+                <Pressable onPress={() => { setImageScale(1); setImageOffsetX(0); setImageOffsetY(0); }} style={{ marginTop: 8, backgroundColor: colors.surface, borderRadius: 10, padding: 10 }}>
+                  <Text style={{ color: colors.verified, textAlign: 'center', fontWeight: '700' }}>Reset alignment</Text>
                 </Pressable>
               </View>
             ) : null}
 
             {assetUri && assetType === 'video' ? (
-              <VideoPreview uri={assetUri} />
+              <View style={{ gap: 12 }}>
+                <VideoPreview key={videoEffect?.uri || assetUri} uri={videoEffect?.uri || assetUri} editing={videoEditing} />
+                <VideoEffectsButton key={assetUri} uri={assetUri} value={videoEffect} disabled={posting || videoEditing} onChange={setVideoEffect} onBusy={onVideoEditing} />
+              </View>
             ) : null}
 
             <TextInput
+              ref={keyboard.inputRef}
+              onFocus={keyboard.onFocus}
+              onBlur={keyboard.onBlur}
+              editable={!posting}
+              accessibilityLabel="Caption"
               value={caption}
               onChangeText={setCaption}
               placeholder="Write a caption"
               placeholderTextColor="#8790ab"
               multiline
               maxLength={2200}
-              style={{ backgroundColor: '#151d33', color: '#fff', borderRadius: 16, padding: 14, minHeight: 104, textAlignVertical: 'top', borderWidth: 1, borderColor: '#28324a' }}
+              style={{ backgroundColor: colors.raised, color: colors.text, borderRadius: 16, padding: 14, minHeight: 104, textAlignVertical: 'top', borderWidth: 1, borderColor: '#28324a' }}
             />
             <Text style={{ color: '#5b6680', fontSize: 12, textAlign: 'right', marginTop: -4 }}>{caption.length}/2200</Text>
 
+            {/* Audience remains explicit before publishing. */}
+            <View style={{ gap: 8, backgroundColor: colors.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.border }}>
+              <Text style={{ color: colors.verified, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>WHO CAN SEE THIS</Text>
+              <View style={{ flexDirection: 'row', gap: 8 }}>
+                {AUDIENCES.map((a) => {
+                  const active = visibility === a.value;
+                  return (
+                    <Pressable
+                      key={a.value}
+                      onPress={() => setVisibility(a.value)}
+                      disabled={posting}
+                      style={{
+                        flex: 1,
+                        alignItems: 'center',
+                        gap: 4,
+                        paddingVertical: 9,
+                        borderRadius: 14,
+                        borderWidth: 1,
+                        borderColor: active ? colors.accent : '#28324a',
+                        backgroundColor: active ? '#241b45' : colors.raised,
+                        opacity: posting ? 0.6 : 1,
+                      }}
+                    >
+                      <MaterialCommunityIcons name={a.icon} size={18} color={active ? colors.verified : '#8790ab'} />
+                      <Text style={{ color: active ? '#ddd6fe' : colors.muted, fontWeight: '700', fontSize: 12 }}>{a.label}</Text>
+                    </Pressable>
+                  );
+                })}
+              </View>
+              <Text style={{ color: '#5b6680', fontSize: 12 }}>
+                {AUDIENCES.find((a) => a.value === visibility)?.desc}
+              </Text>
+            </View>
+
             <Pressable
               onPress={submit}
-              disabled={!assetUri || posting}
-              style={{ backgroundColor: '#4f46e5', borderRadius: 16, paddingVertical: 15, alignItems: 'center', opacity: !assetUri || posting ? 0.6 : 1 }}
+              disabled={!assetUri || posting || filterBusy || videoEditing}
+              style={{ backgroundColor: colors.accent, borderRadius: 16, paddingVertical: 15, alignItems: 'center', opacity: !assetUri || posting || filterBusy || videoEditing ? 0.6 : 1 }}
             >
-              {posting ? <ActivityIndicator color="#fff" /> : <Text style={{ color: '#fff', fontWeight: '800' }}>{isStory ? 'Share to story' : 'Publish'}</Text>}
+              {posting ? <ActivityIndicator color={colors.text} /> : <Text style={{ color: colors.text, fontWeight: '800' }}>{isStory ? 'Share to story' : 'Publish'}</Text>}
             </Pressable>
           </ScrollView>
-        </TouchableWithoutFeedback>
+        <KeyboardDoneBar visible={keyboard.visible} onDone={keyboard.dismiss} />
       </KeyboardAvoidingView>
       <CreateActionSheet visible={showCreateMenu} onClose={() => setShowCreateMenu(false)} onSelect={onSelectCreateMode} />
     </SafeAreaView>

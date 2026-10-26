@@ -1,5 +1,7 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, Animated, Image, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
+import { colors } from '@/lib/theme';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useFocusedRefresh } from '@/lib/useFocusedRefresh';
+import { ActivityIndicator, Alert, Animated, Image, Keyboard, Platform, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { apiRequest, resolveMediaUrl } from '@/lib/api';
@@ -38,15 +40,15 @@ type UserResult = {
 };
 
 const PALETTE = {
-  bg: '#060b18',
-  panel: '#0b1428',
-  panelAlt: '#101d34',
-  border: '#203758',
-  ink: '#ecf3ff',
-  subInk: '#8fa7cf',
+  bg: colors.background,
+  panel: colors.surface,
+  panelAlt: colors.raised,
+  border: colors.border,
+  ink: colors.text,
+  subInk: colors.muted,
   accent: '#21d4fd',
-  accent2: '#4f46e5',
-  unread: '#3b82f6',
+  accent2: colors.accent,
+  unread: colors.accent,
 };
 
 function timeAgo(iso: string): string {
@@ -68,7 +70,7 @@ function ConversationAvatar({ uri, name, size }: { uri?: string; name: string; s
       <Image
         accessibilityLabel={`${name} profile photo`}
         source={{ uri }}
-        style={{ width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: '#1f2937' }}
+        style={{ width: size, height: size, borderRadius: Math.round(size * 0.3), backgroundColor: colors.raised }}
       />
     );
   }
@@ -104,27 +106,28 @@ export default function MessagesScreen() {
   const [searchingUsers, setSearchingUsers] = useState(false);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const reveal = useRef(new Animated.Value(0)).current;
-
-  const runReveal = () => {
-    reveal.setValue(0);
-    Animated.timing(reveal, {
-      toValue: 1,
-      duration: 380,
-      useNativeDriver: true,
-    }).start();
-  };
+  const [unreadOnly, setUnreadOnly] = useState(false);
+  const [inboxError, setInboxError] = useState<string | null>(null);
+  const [searchError, setSearchError] = useState<string | null>(null);
+  const createBusy = useRef(false);
+  const inboxBusy = useRef(false);
+  const scope = useRef(0);
+  const reveal = useRef(new Animated.Value(1)).current;
 
   const normalizeUsername = (value: string) => value.trim().replace(/^@+/, '');
 
-  const loadInbox = async () => {
+  const loadInbox = useCallback(async (isCurrent: () => boolean = () => true) => {
     if (!token) {
       setItems([]);
       setLoading(false);
       return;
     }
+    if (inboxBusy.current) { setRefreshing(false); return; }
+    inboxBusy.current = true;
+    const currentScope = scope.current;
     try {
       const response = await apiRequest<{ data: ApiConversation[] }>('/messages/conversations', { token });
+      if (!isCurrent() || scope.current !== currentScope) return;
       const next = (response.data || []).map((conversation) => ({
         id: conversation.id,
         name: conversation.participant?.displayName || 'Unknown',
@@ -136,17 +139,16 @@ export default function MessagesScreen() {
         online: false,
       }));
       setItems(next);
-      runReveal();
+      setInboxError(null);
     } catch {
-      setItems([]);
-      runReveal();
+      if (isCurrent() && scope.current === currentScope) setInboxError('Could not refresh messages. Pull down to retry.');
     } finally {
-      setLoading(false);
-      setRefreshing(false);
+      inboxBusy.current = false;
+      if (isCurrent() && scope.current === currentScope) { setLoading(false); setRefreshing(false); }
     }
-  };
+  }, [token]);
 
-  const searchUsers = async (value: string) => {
+  const searchUsers = async (value: string, isCurrent: () => boolean) => {
     if (!token) return;
     const q = value.trim();
     if (q.length < 2) {
@@ -156,24 +158,29 @@ export default function MessagesScreen() {
     }
     try {
       setSearchingUsers(true);
+      setSearchError(null);
       const users = await apiRequest<UserResult[]>(`/users/search?q=${encodeURIComponent(q)}`, { token });
-      setFoundUsers(Array.isArray(users) ? users.slice(0, 8) : []);
+      if (isCurrent()) setFoundUsers(Array.isArray(users) ? users.slice(0, 8) : []);
     } catch {
-      setFoundUsers([]);
+      if (isCurrent()) { setFoundUsers([]); setSearchError('Search unavailable. Check your connection and try again.'); }
     } finally {
-      setSearchingUsers(false);
+      if (isCurrent()) setSearchingUsers(false);
     }
   };
 
   useEffect(() => {
-    loadInbox();
+    scope.current += 1; setItems([]); setLoading(true);
+    return () => { scope.current += 1; };
   }, [token]);
+  useFocusedRefresh(loadInbox, 15000);
 
   useEffect(() => {
+    let current = true;
+    setFoundUsers([]); setSearchError(null); setSearchingUsers(query.trim().length >= 2);
     const timer = setTimeout(() => {
-      searchUsers(query);
+      void searchUsers(query, () => current);
     }, 260);
-    return () => clearTimeout(timer);
+    return () => { current = false; clearTimeout(timer); };
   }, [query, token]);
 
   const openThread = (item: Conversation) => {
@@ -186,7 +193,7 @@ export default function MessagesScreen() {
   };
 
   const createConversation = async () => {
-    if (!token || creating) return;
+    if (!token || createBusy.current) return;
     const username = normalizeUsername(targetUsername);
     if (!username) {
       Alert.alert('Start conversation', 'Enter a username first.');
@@ -198,6 +205,7 @@ export default function MessagesScreen() {
       return;
     }
 
+    createBusy.current = true;
     try {
       setCreating(true);
       const created = await apiRequest<{ id: string }>('/messages/conversations', {
@@ -219,16 +227,18 @@ export default function MessagesScreen() {
         Alert.alert('Could not start chat', message);
       }
     } finally {
+      createBusy.current = false;
       setCreating(false);
     }
   };
 
   const createConversationForUser = async (candidate: UserResult) => {
-    if (!token || creating) return;
+    if (!token || createBusy.current) return;
     if (user?.username && candidate.username.toLowerCase() === user.username.toLowerCase()) {
       Alert.alert('Could not start chat', 'You cannot start a chat with yourself.');
       return;
     }
+    createBusy.current = true;
     try {
       setCreating(true);
       const created = await apiRequest<{ id: string }>('/messages/conversations', {
@@ -248,23 +258,24 @@ export default function MessagesScreen() {
         Alert.alert('Could not start chat', message);
       }
     } finally {
+      createBusy.current = false;
       setCreating(false);
     }
   };
 
   const filteredItems = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q) return items;
-    return items.filter((item) =>
-      item.name.toLowerCase().includes(q) || item.username.toLowerCase().includes(q),
-    );
-  }, [items, query]);
+    return items.filter(item => (!unreadOnly || item.unread > 0) &&
+      (!q || item.name.toLowerCase().includes(q) || item.username.toLowerCase().includes(q)));
+  }, [items, query, unreadOnly]);
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: PALETTE.bg }}>
       <View style={{ position: 'absolute', top: -120, right: -80, width: 260, height: 260, borderRadius: 130, backgroundColor: '#132548' }} />
       <View style={{ position: 'absolute', bottom: 120, left: -70, width: 210, height: 210, borderRadius: 105, backgroundColor: '#102746' }} />
       <ScrollView
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode={Platform.OS === 'ios' ? 'interactive' : 'on-drag'}
         contentContainerStyle={{ padding: 16, paddingBottom: 26 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); loadInbox(); }} tintColor={PALETTE.accent} />}
       >
@@ -281,11 +292,12 @@ export default function MessagesScreen() {
           <View style={{ position: 'absolute', top: -40, right: -10, width: 140, height: 100, borderRadius: 50, backgroundColor: '#1a2f56' }} />
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <View>
-              <Text style={{ color: PALETTE.subInk, fontFamily: 'SpaceMono', fontSize: 11, letterSpacing: 1.1 }}>NXQ SIGNAL</Text>
-              <Text style={{ color: PALETTE.ink, fontSize: 30, fontWeight: '900', marginTop: 2 }}>Inbox Grid</Text>
-              <Text style={{ color: PALETTE.subInk, marginTop: 3 }}>Priority channels and private messages</Text>
+              <Text style={{ color: PALETTE.subInk, fontSize: 12 }}>NXQ Social</Text>
+              <Text style={{ color: PALETTE.ink, fontSize: 30, fontWeight: '900', marginTop: 2 }}>Messages</Text>
+              <Text style={{ color: PALETTE.subInk, marginTop: 3 }}>Keep your people close.</Text>
             </View>
             <Pressable
+              accessibilityRole="button" accessibilityLabel={createOpen ? 'Close new message' : 'New message'}
               onPress={() => setCreateOpen((prev) => !prev)}
               style={{
                 width: 44,
@@ -301,6 +313,11 @@ export default function MessagesScreen() {
               <MaterialCommunityIcons name={createOpen ? 'close' : 'square-edit-outline'} size={22} color={PALETTE.ink} />
             </Pressable>
           </View>
+
+          <Pressable accessibilityRole="button" accessibilityLabel="New voice or group video call" onPress={() => router.push('/new-call' as never)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, marginTop: 12, borderRadius: 14, backgroundColor: colors.accent }}>
+            <MaterialCommunityIcons name="phone-plus" size={22} color="#fff" />
+            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 16 }}>New call · Voice, video or group</Text>
+          </Pressable>
 
           {createOpen ? (
             <View style={{ marginTop: 12, borderRadius: 14, borderWidth: 1, borderColor: '#2a4368', backgroundColor: '#0d1a30', padding: 10, gap: 8 }}>
@@ -318,21 +335,21 @@ export default function MessagesScreen() {
                 <Pressable
                   onPress={createConversation}
                   disabled={creating}
-                  style={{ borderRadius: 10, backgroundColor: '#1d4ed8', paddingHorizontal: 12, paddingVertical: 9, opacity: creating ? 0.7 : 1 }}
+                  style={{ borderRadius: 10, backgroundColor: colors.accent, paddingHorizontal: 12, paddingVertical: 9, opacity: creating ? 0.7 : 1 }}
                 >
-                  <Text style={{ color: '#fff', fontWeight: '800' }}>{creating ? '...' : 'Start'}</Text>
+                  <Text style={{ color: colors.text, fontWeight: '800' }}>{creating ? '...' : 'Start'}</Text>
                 </Pressable>
               </View>
             </View>
           ) : null}
 
           <View style={{ flexDirection: 'row', gap: 8, marginTop: 12 }}>
-            <View style={{ backgroundColor: '#12315b', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
-              <Text style={{ color: '#b7d8ff', fontWeight: '800', fontSize: 11 }}>ALL {filteredItems.length}</Text>
-            </View>
-            <View style={{ backgroundColor: '#0e2848', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 }}>
-              <Text style={{ color: '#93c5fd', fontWeight: '800', fontSize: 11 }}>UNREAD {filteredItems.filter((i) => i.unread > 0).length}</Text>
-            </View>
+            <Pressable accessibilityRole="button" accessibilityLabel="All conversations" accessibilityState={{ selected: !unreadOnly }} onPress={() => setUnreadOnly(false)} style={{ backgroundColor: !unreadOnly ? colors.accent : colors.raised, borderRadius: 24, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center' }}>
+              <Text style={{ color: colors.text, fontWeight: '800' }}>All {items.length}</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" accessibilityLabel="Unread conversations" accessibilityState={{ selected: unreadOnly }} onPress={() => setUnreadOnly(true)} style={{ backgroundColor: unreadOnly ? colors.accent : colors.raised, borderRadius: 24, paddingHorizontal: 16, minHeight: 44, justifyContent: 'center' }}>
+              <Text style={{ color: colors.text, fontWeight: '800' }}>Unread {items.filter(i => i.unread > 0).length}</Text>
+            </Pressable>
           </View>
         </View>
 
@@ -354,7 +371,9 @@ export default function MessagesScreen() {
           <TextInput
             value={query}
             onChangeText={setQuery}
-            placeholder="Search users or channels"
+            placeholder="Search people or messages"
+            accessibilityLabel="Search conversations and people"
+            returnKeyType="done" onSubmitEditing={Keyboard.dismiss}
             placeholderTextColor={PALETTE.subInk}
             style={{ flex: 1, color: PALETTE.ink, fontSize: 16 }}
           />
@@ -364,7 +383,8 @@ export default function MessagesScreen() {
           <View style={{ marginTop: 10, borderRadius: 14, borderWidth: 1, borderColor: PALETTE.border, backgroundColor: PALETTE.panel, padding: 10, gap: 8 }}>
             <Text style={{ color: PALETTE.subInk, fontSize: 12, fontWeight: '800' }}>People</Text>
             {searchingUsers ? <ActivityIndicator color={PALETTE.accent} /> : null}
-            {!searchingUsers && foundUsers.length === 0 ? <Text style={{ color: PALETTE.subInk }}>No users found.</Text> : null}
+            {searchError ? <Text accessibilityRole="alert" style={{ color: '#fca5a5' }}>{searchError}</Text> : null}
+            {!searchingUsers && !searchError && foundUsers.length === 0 ? <Text style={{ color: PALETTE.subInk }}>No users found.</Text> : null}
             {foundUsers
               .filter((candidate) => !user?.username || candidate.username.toLowerCase() !== user.username.toLowerCase())
               .map((candidate) => (
@@ -391,10 +411,11 @@ export default function MessagesScreen() {
         {loading ? (
           <View style={{ marginTop: 18, alignItems: 'center', justifyContent: 'center', paddingVertical: 28 }}>
             <ActivityIndicator color={PALETTE.accent} />
-            <Text style={{ color: PALETTE.subInk, marginTop: 8 }}>Loading channels...</Text>
+            <Text style={{ color: PALETTE.subInk, marginTop: 8 }}>Loading messages…</Text>
           </View>
         ) : null}
 
+        {inboxError ? <Text accessibilityRole="alert" style={{ color: '#fca5a5', marginTop: 12 }}>{inboxError}</Text> : null}
         <View style={{ marginTop: 16, gap: 10 }}>
           {filteredItems.map((item, index) => (
             <Animated.View
@@ -425,7 +446,6 @@ export default function MessagesScreen() {
                   borderColor: index % 2 === 0 ? '#284a73' : '#274c6f',
                   borderRadius: 16,
                   padding: 10,
-                  marginLeft: index % 2 === 0 ? 0 : 6,
                 }}
               >
                 <View>
@@ -442,7 +462,7 @@ export default function MessagesScreen() {
                   <Text style={{ color: '#9ec4f7', fontSize: 11, fontFamily: 'SpaceMono' }}>{item.time}</Text>
                   {item.unread > 0 ? (
                     <View style={{ minWidth: 20, height: 20, borderRadius: 10, backgroundColor: PALETTE.unread, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' }}>
-                      <Text style={{ color: '#fff', fontSize: 11, fontWeight: '800' }}>{item.unread}</Text>
+                      <Text style={{ color: colors.text, fontSize: 11, fontWeight: '800' }}>{item.unread}</Text>
                     </View>
                   ) : (
                     <MaterialCommunityIcons name="chevron-right" size={20} color="#5f7cab" />
@@ -452,10 +472,10 @@ export default function MessagesScreen() {
             </Animated.View>
           ))}
 
-          {!loading && filteredItems.length === 0 ? (
+          {!loading && !inboxError && filteredItems.length === 0 ? (
             <View style={{ borderRadius: 14, borderWidth: 1, borderColor: PALETTE.border, backgroundColor: PALETTE.panel, padding: 14 }}>
-              <Text style={{ color: PALETTE.ink, fontWeight: '800' }}>No conversations yet</Text>
-              <Text style={{ color: PALETTE.subInk, marginTop: 4 }}>Use search above to find a real user and start a chat.</Text>
+              <Text style={{ color: PALETTE.ink, fontWeight: '800' }}>{unreadOnly ? 'You’re all caught up' : query ? 'No matching conversations' : 'Your people, one message away'}</Text>
+              <Text style={{ color: PALETTE.subInk, marginTop: 4 }}>{unreadOnly ? 'New unread conversations will appear here.' : 'Search for a username above to start a chat.'}</Text>
             </View>
           ) : null}
         </View>

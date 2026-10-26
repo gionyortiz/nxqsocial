@@ -1,3 +1,5 @@
+import { colors } from '@/lib/theme';
+import { startPrivateCall } from '@/lib/calls';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Alert, FlatList, Image, Pressable, RefreshControl, SafeAreaView, Text, View } from 'react-native';
 import { useFocusEffect, useLocalSearchParams, useRouter } from 'expo-router';
@@ -138,73 +140,29 @@ export default function UserProfileScreen() {
     router.push(target as never);
   };
 
+  const callStarting = useRef(false);
   const startDirectCall = async (mode: 'call' | 'video') => {
-    mobileProof('Profile call button pressed', {
-      mode,
-      hasToken: !!token,
-      profile: profile?.username,
-      user: user?.username,
-    });
-    
-    if (!token) {
-      Alert.alert('Not signed in', 'Please log in to make calls.');
-      return;
-    }
-    if (!profile) {
-      Alert.alert('Profile loading', 'Please wait for the profile to load.');
-      return;
-    }
-    if (profile.username === user?.username) {
-      Alert.alert('Cannot call yourself', 'You cannot start a call with yourself.');
-      return;
-    }
-    
-    const safePeer = profile.username.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
-    const safeMe = (user?.username || 'guest').toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 24);
-    const room = `dm_${safeMe}_${safePeer}_${Date.now().toString(36)}`;
-    
-    mobileProof('Profile call ring request', { room, targets: [profile.username], video: mode === 'video' });
-    
-    let response: { invited?: string[] } | undefined;
+    const target = profile?.username;
+    if (!token || !target || callStarting.current || target === user?.username) return;
+    callStarting.current = true;
     try {
-      response = await apiRequest('/calls/ring', {
-        method: 'POST',
-        token,
-        body: {
-          room,
-          targets: [profile.username],
-          video: mode === 'video',
-          group: false,
-        },
-      });
-      mobileProof('Profile call ring response', response);
-    } catch (e: any) {
-      mobileProof('Profile call ring error', { message: e?.message });
-      Alert.alert('Call invite failed', e?.message ?? 'Could not notify this user right now.');
-      return;
-    }
-
-    if (!response?.invited?.length) {
-      mobileProof('Profile call ring no-op', { username: profile.username, response });
-      Alert.alert('Call failed', `Couldn't reach @${profile.username}. They may not exist or their account may have changed.`);
-      return;
-    }
-
-    mobileProof('Profile call navigation', { room, mode, kind: 'call' });
-    pauseAllMedia();
-    router.push({ pathname: '/live-native' as never, params: { room, mode, kind: 'call' } as never });
+      const room = await startPrivateCall(token, [target], mode === 'video');
+      pauseAllMedia();
+      router.push({ pathname: '/call', params: { room } } as never);
+    } catch (e) { Alert.alert('Call unavailable', e instanceof Error ? e.message : 'Please try again.'); }
+    finally { callStarting.current = false; }
   };
 
   if (loading) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#080f22', alignItems: 'center', justifyContent: 'center' }}>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
         <ActivityIndicator color="#22d3ee" />
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#080f22' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <FlatList
         data={posts}
         keyExtractor={(item) => item.id}
@@ -224,13 +182,13 @@ export default function UserProfileScreen() {
               <View style={{ position: 'absolute', inset: 0, backgroundColor: 'rgba(12, 18, 39, 0.18)' }} />
             </View>
             {error ? (
-              <Pressable onPress={() => { setError(null); void load(); }} style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: '#111827', borderWidth: 1, borderColor: '#334155', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 }}>
-                <Text style={{ color: '#f8fafc', fontWeight: '800' }}>Couldn’t load this section. Tap to retry.</Text>
+              <Pressable onPress={() => { setError(null); void load(); }} style={{ marginHorizontal: 16, marginTop: 12, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 }}>
+                <Text style={{ color: colors.text, fontWeight: '800' }}>Couldn’t load this section. Tap to retry.</Text>
               </Pressable>
             ) : null}
             <View style={{ paddingHorizontal: 16, marginTop: -42 }}>
               <View style={{ flexDirection: 'row', alignItems: 'flex-end', gap: 14 }}>
-                <View style={{ width: 96, height: 96, borderRadius: 28, overflow: 'hidden', backgroundColor: '#1d4ed8', borderWidth: 4, borderColor: '#080f22', alignItems: 'center', justifyContent: 'center' }}>
+                <View style={{ width: 96, height: 96, borderRadius: 28, overflow: 'hidden', backgroundColor: colors.accent, borderWidth: 4, borderColor: colors.background, alignItems: 'center', justifyContent: 'center' }}>
                   {profile?.avatarUrl ? (
                     <Image source={{ uri: resolveMediaUrl(profile.avatarUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                   ) : (
@@ -239,30 +197,30 @@ export default function UserProfileScreen() {
                 </View>
                 <View style={{ flex: 1, paddingBottom: 8 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                    <Text style={{ color: '#f8fafc', fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
+                    <Text style={{ color: colors.text, fontSize: 26, fontWeight: '900', letterSpacing: -0.5 }}>
                       {profile?.displayName || profile?.username}
                     </Text>
                     {profile?.verificationStatus && profile.verificationStatus !== 'UNVERIFIED' ? (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#233047', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#233047', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
                         <MaterialCommunityIcons name="check-decagram" size={13} color="#67e8f9" />
                         <Text style={{ color: '#dbeafe', fontSize: 11, fontWeight: '900' }}>Verified</Text>
                       </View>
                     ) : null}
                   </View>
-                  <Text style={{ color: '#9fb0cb', marginTop: 3, fontSize: 13 }}>@{profile?.username}</Text>
+                  <Text style={{ color: colors.muted, marginTop: 3, fontSize: 13 }}>@{profile?.username}</Text>
                 </View>
               </View>
 
               {profile?.bio ? <Text style={{ color: '#e2e8f0', marginTop: 12, lineHeight: 21, fontSize: 14 }}>{profile.bio}</Text> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 10 }}>
                 {profile?.location ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#233047', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#233047', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 }}>
                     <MaterialCommunityIcons name="map-marker-outline" size={14} color="#93c5fd" />
                     <Text style={{ color: '#cbd5e1', fontSize: 12, fontWeight: '700' }}>{profile.location}</Text>
                   </View>
                 ) : null}
                 {profile?.website ? (
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#0f172a', borderWidth: 1, borderColor: '#233047', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: colors.surface, borderWidth: 1, borderColor: '#233047', borderRadius: 999, paddingHorizontal: 10, paddingVertical: 7 }}>
                     <MaterialCommunityIcons name="link-variant" size={14} color="#67e8f9" />
                     <Text style={{ color: '#cbd5e1', fontSize: 12, fontWeight: '700' }}>{profile.website}</Text>
                   </View>
@@ -270,24 +228,24 @@ export default function UserProfileScreen() {
               </View>
 
               <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-                <View style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 16, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1, borderColor: '#233047' }}>
-                  <Text style={{ color: '#f8fafc', fontWeight: '900', fontSize: 17 }}>{profile?._count?.posts ?? posts.length}</Text>
-                  <Text style={{ color: '#93a1bd', fontSize: 12 }}>posts</Text>
+                <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1, borderColor: '#233047' }}>
+                  <Text style={{ color: colors.text, fontWeight: '900', fontSize: 17 }}>{profile?._count?.posts ?? posts.length}</Text>
+                  <Text style={{ color: colors.muted, fontSize: 12 }}>posts</Text>
                 </View>
-                <View style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 16, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1, borderColor: '#233047' }}>
-                  <Text style={{ color: '#f8fafc', fontWeight: '900', fontSize: 17 }}>{profile?._count?.followers ?? 0}</Text>
-                  <Text style={{ color: '#93a1bd', fontSize: 12 }}>followers</Text>
+                <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1, borderColor: '#233047' }}>
+                  <Text style={{ color: colors.text, fontWeight: '900', fontSize: 17 }}>{profile?._count?.followers ?? 0}</Text>
+                  <Text style={{ color: colors.muted, fontSize: 12 }}>followers</Text>
                 </View>
-                <View style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 16, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1, borderColor: '#233047' }}>
-                  <Text style={{ color: '#f8fafc', fontWeight: '900', fontSize: 17 }}>{profile?._count?.following ?? 0}</Text>
-                  <Text style={{ color: '#93a1bd', fontSize: 12 }}>following</Text>
+                <View style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, paddingVertical: 12, paddingHorizontal: 10, alignItems: 'center', borderWidth: 1, borderColor: '#233047' }}>
+                  <Text style={{ color: colors.text, fontWeight: '900', fontSize: 17 }}>{profile?._count?.following ?? 0}</Text>
+                  <Text style={{ color: colors.muted, fontSize: 12 }}>following</Text>
                 </View>
               </View>
 
-              <View style={{ backgroundColor: '#0f172a', borderRadius: 18, padding: 14, marginTop: 14, borderWidth: 1, borderColor: '#233047' }}>
+              <View style={{ backgroundColor: colors.surface, borderRadius: 18, padding: 14, marginTop: 14, borderWidth: 1, borderColor: '#233047' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <MaterialCommunityIcons name="shield-check-outline" size={20} color="#a78bfa" />
-                  <Text style={{ color: '#c4b5fd', fontWeight: '900' }}>Trust score: {profile?.trustScore ?? 'N/A'}</Text>
+                  <MaterialCommunityIcons name="shield-check-outline" size={20} color={colors.verified} />
+                  <Text style={{ color: colors.verified, fontWeight: '900' }}>Trust score: {profile?.trustScore ?? 'N/A'}</Text>
                 </View>
               </View>
 
@@ -297,15 +255,15 @@ export default function UserProfileScreen() {
                     <Pressable
                       onPress={toggleFollow}
                       disabled={followBusy}
-                      style={{ flex: 1, backgroundColor: profile?.isFollowing ? '#111827' : '#0ea5e9', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: profile?.isFollowing ? '#243047' : '#67e8f9' }}
+                      style={{ flex: 1, backgroundColor: profile?.isFollowing ? colors.surface : '#0ea5e9', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: profile?.isFollowing ? '#243047' : '#67e8f9' }}
                     >
-                      <Text style={{ color: '#fff', fontWeight: '900', textAlign: 'center' }}>
+                      <Text style={{ color: colors.text, fontWeight: '900', textAlign: 'center' }}>
                         {followBusy ? 'Updating...' : profile?.isFollowing ? 'Following' : 'Follow'}
                       </Text>
                     </Pressable>
                     <Pressable
                       onPress={startChat}
-                      style={{ flex: 1, backgroundColor: '#1f2937', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#334155' }}
+                      style={{ flex: 1, backgroundColor: colors.raised, borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: colors.border }}
                     >
                       <Text style={{ color: '#e2e8f0', fontWeight: '900', textAlign: 'center' }}>Message</Text>
                     </Pressable>
@@ -313,14 +271,14 @@ export default function UserProfileScreen() {
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable
                       onPress={() => startDirectCall('call')}
-                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                     >
                       <MaterialCommunityIcons name="phone-outline" size={16} color="#cbd5e1" />
                       <Text style={{ color: '#cbd5e1', fontWeight: '800' }}>Call</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => startDirectCall('video')}
-                      style={{ flex: 1, backgroundColor: '#0f172a', borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
+                      style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 12, paddingVertical: 10, borderWidth: 1, borderColor: '#233047', flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 }}
                     >
                       <MaterialCommunityIcons name="video-outline" size={16} color="#cbd5e1" />
                       <Text style={{ color: '#cbd5e1', fontWeight: '800' }}>Video</Text>
@@ -330,28 +288,28 @@ export default function UserProfileScreen() {
               ) : null}
 
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, marginBottom: 10 }}>
-                <Text style={{ color: '#f8fafc', fontWeight: '900', fontSize: 18, letterSpacing: -0.2 }}>Posts</Text>
-                <Text style={{ color: '#93a1bd', fontSize: 12 }}>{profile?._count?.posts ?? posts.length} total</Text>
+                <Text style={{ color: colors.text, fontWeight: '900', fontSize: 18, letterSpacing: -0.2 }}>Posts</Text>
+                <Text style={{ color: colors.muted, fontSize: 12 }}>{profile?._count?.posts ?? posts.length} total</Text>
               </View>
               {error ? <Text style={{ color: '#fca5a5', marginBottom: 10 }}>{error}</Text> : null}
             </View>
           </View>
         )}
-        ListEmptyComponent={<Text style={{ color: '#93a1bd', paddingHorizontal: 16 }}>No posts yet.</Text>}
+        ListEmptyComponent={<Text style={{ color: colors.muted, paddingHorizontal: 16 }}>No posts yet.</Text>}
         renderItem={({ item }) => {
           return (
-            <View style={{ backgroundColor: '#0f172a', borderRadius: 18, marginHorizontal: 16, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#233047' }}>
+            <View style={{ backgroundColor: colors.surface, borderRadius: 18, marginHorizontal: 16, marginBottom: 12, overflow: 'hidden', borderWidth: 1, borderColor: '#233047' }}>
               <PostMedia asset={item.media?.[0]} style={{ height: 300 }} shouldPlay={screenFocused && activePostId === item.id} />
               <View style={{ padding: 12, gap: 8 }}>
                 {item.caption ? <Text style={{ color: '#e2e8f0', lineHeight: 20 }}>{item.caption}</Text> : null}
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <MaterialCommunityIcons name="heart-outline" size={14} color="#94a3b8" />
-                    <Text style={{ color: '#93a1bd', fontSize: 12 }}>{item._count?.likes ?? 0}</Text>
+                    <MaterialCommunityIcons name="heart-outline" size={14} color={colors.muted} />
+                    <Text style={{ color: colors.muted, fontSize: 12 }}>{item._count?.likes ?? 0}</Text>
                   </View>
                   <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                    <MaterialCommunityIcons name="comment-outline" size={14} color="#94a3b8" />
-                    <Text style={{ color: '#93a1bd', fontSize: 12 }}>{item._count?.comments ?? 0}</Text>
+                    <MaterialCommunityIcons name="comment-outline" size={14} color={colors.muted} />
+                    <Text style={{ color: colors.muted, fontSize: 12 }}>{item._count?.comments ?? 0}</Text>
                   </View>
                 </View>
                 <Text style={{ color: '#64748b', fontSize: 11 }}>Engagement summary</Text>

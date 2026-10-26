@@ -1,6 +1,7 @@
 import { API_BASE_URL } from './config';
 import { Platform } from 'react-native';
 import { mobileProof } from './runtimeProof';
+import { NetworkFailureClassification, recordAuthNetworkFailure } from './network-diagnostics';
 
 export interface User {
   id: string;
@@ -68,6 +69,8 @@ interface ApiOptions {
   body?: unknown;
   headers?: Record<string, string>;
   retryNetworkErrors?: boolean;
+  /** Restricted to native POST /auth/verify-email; at most one transport retry. */
+  verificationRetry?: boolean;
 }
 
 interface ApiErrorPayload {
@@ -110,6 +113,18 @@ const NATIVE_NETWORK_RETRY_ATTEMPTS = 3;
 const NATIVE_NETWORK_RETRY_DELAY_MS = 500;
 const REQUEST_TIMEOUT_MS = 12000;
 
+export class ApiNetworkError extends Error {
+  constructor(
+    readonly classification: NetworkFailureClassification,
+    readonly attempts: number,
+  ) {
+    super(classification === 'timeout'
+      ? 'The connection timed out. Please try again.'
+      : 'We could not complete the connection. Please try again.');
+    this.name = 'ApiNetworkError';
+  }
+}
+
 let unauthorizedHandler: (() => void) | null = null;
 
 export function setUnauthorizedHandler(handler: (() => void) | null) {
@@ -143,19 +158,20 @@ function apiErrorMessage(payload: ApiErrorPayload | undefined, status: number): 
   return `Request failed (${status})`;
 }
 
-function classifyNetworkError(error: unknown): string {
-  if (!(error instanceof Error)) return `Could not connect to ${API_BASE_URL}`;
+function classifyNetworkError(error: unknown): NetworkFailureClassification {
+  if (!(error instanceof Error)) return 'unknown';
   const m = error.message.toLowerCase();
   if (m.includes('timed out') || m.includes('timeout') || error.name === 'AbortError') {
-    return `Request timed out after ${REQUEST_TIMEOUT_MS / 1000}s. Please try again.`;
+    return 'timeout';
   }
   if (m.includes('hostname') || m.includes('host could not be found') || m.includes('dns') || m.includes('nodename nor servname')) {
-    return `We could not reach ${API_BASE_URL} right now. Please try again.`;
+    return 'dns';
   }
-  if (m.includes('network request failed') || m.includes('fetch failed') || m.includes('load failed') || m.includes('network connection was lost')) {
-    return `We could not reach ${API_BASE_URL} right now. Please try again.`;
+  if (m.includes('ssl') || m.includes('tls') || m.includes('certificate')) return 'tls';
+  if (isTransientNativeNetworkError(error)) {
+    return 'network';
   }
-  return `We could not reach ${API_BASE_URL} right now. Please try again.`;
+  return 'unknown';
 }
 
 function isTransientNativeNetworkError(error: unknown): boolean {
@@ -172,11 +188,29 @@ function isTransientNativeNetworkError(error: unknown): boolean {
 
 export async function apiRequest<T>(
   path: string,
-  { method = 'GET', token, body, headers = {}, retryNetworkErrors = true }: ApiOptions = {},
+  {
+    method = 'GET',
+    token,
+    body,
+    headers = {},
+    retryNetworkErrors,
+    verificationRetry = false,
+  }: ApiOptions = {},
 ): Promise<T> {
   let res: Response | null = null;
   let lastError: unknown = null;
-  const maxAttempts = retryNetworkErrors ? NATIVE_NETWORK_RETRY_ATTEMPTS : 1;
+  // Mutations are never retried implicitly: a server may commit a POST/PATCH/
+  // DELETE even when the client loses the response. Callers can opt in only
+  // when their operation is protected by an idempotency contract.
+  const shouldRetryNetworkErrors = retryNetworkErrors ?? method === 'GET';
+  const nativeVerificationRetry = verificationRetry
+    && (Platform.OS === 'ios' || Platform.OS === 'android')
+    && method === 'POST' && path === '/auth/verify-email';
+  // A resend creates a fresh OTP: even an accidental caller opt-in must not replay it.
+  const isVerificationResend = method === 'POST' && path === '/auth/resend-verification';
+  const maxAttempts = isVerificationResend ? 1
+    : nativeVerificationRetry ? 2
+      : (shouldRetryNetworkErrors ? NATIVE_NETWORK_RETRY_ATTEMPTS : 1);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     const controller = new AbortController();
@@ -197,10 +231,22 @@ export async function apiRequest<T>(
     } catch (error) {
       clearTimeout(timer);
       lastError = error;
+      const classification = classifyNetworkError(error);
+      if (path === '/auth/verify-email' || path === '/auth/resend-verification' || path === '/auth/forgot-password') {
+        await recordAuthNetworkFailure(
+          path === '/auth/verify-email' ? 'email_verification'
+            : path === '/auth/resend-verification' ? 'email_verification_resend'
+              : 'password_reset_request',
+          classification, attempt,
+        );
+      }
       const isAbort = error instanceof Error && error.name === 'AbortError';
-      const shouldRetry = (isAbort || isTransientNativeNetworkError(error)) && attempt < maxAttempts;
+      const retryable = nativeVerificationRetry
+        ? classification !== 'unknown'
+        : isAbort || isTransientNativeNetworkError(error);
+      const shouldRetry = retryable && attempt < maxAttempts;
       if (!shouldRetry) {
-        throw new Error(classifyNetworkError(error));
+        throw new ApiNetworkError(classification, attempt);
       }
 
       await sleep(NATIVE_NETWORK_RETRY_DELAY_MS * attempt);
@@ -208,9 +254,7 @@ export async function apiRequest<T>(
   }
 
   if (!res) {
-    const message = classifyNetworkError(lastError);
-    mobileProof('apiRequest failed', { path, method, reason: message, error: lastError });
-    throw new Error(message);
+    throw new ApiNetworkError(classifyNetworkError(lastError), maxAttempts);
   }
 
   if (!res.ok) {
@@ -227,16 +271,19 @@ export async function apiRequest<T>(
       : undefined;
     const retryAfterSeconds = retryAfterFromHeader ?? retryAfterFromBody;
     const message = apiErrorMessage(payload, res.status);
-    if (res.status === 401 && token) {
+    // The password-change endpoint uses 401 for a wrong current password even
+    // after its JWT guard passed. Preserve that valid session, not arbitrary 401s.
+    const incorrectCurrentPassword = path === '/auth/change-password'
+      && res.status === 401 && payload?.message === 'Your current password is incorrect.';
+    if (res.status === 401 && token && !incorrectCurrentPassword) {
       unauthorizedHandler?.();
     }
     mobileProof('apiRequest failed', {
       path,
       method,
       status: res.status,
-      code: payload?.code,
       retryAfterSeconds,
-      reason: message,
+      ...(!path.startsWith('/auth/') ? { reason: message, code: payload?.code } : {}),
     });
     throw new ApiError({
       status: res.status,

@@ -2,11 +2,11 @@
   "expo": {
     "name": "NXQ Social",
     "slug": "nxq-social-mobile",
-    "version": "1.0.7",
+    "version": "1.0.14",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "nxqsocial",
-    "userInterfaceStyle": "automatic",
+    "userInterfaceStyle": "dark",
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.gionyortiz.nxqsocial",
@@ -16,8 +16,9 @@
       ],
       "infoPlist": {
         "ITSAppUsesNonExemptEncryption": false,
-        "NSCameraUsageDescription": "NXQ Social uses the camera so you can capture photos and videos for your posts, reels, stories, and profile picture.",
-        "NSMicrophoneUsageDescription": "NXQ Social uses the microphone to record audio for the videos and reels you create.",
+        "NSCameraUsageDescription": "NXQ Social uses the camera for video calls and to capture photos and videos for your posts, reels, stories, and profile picture.",
+        "NSMicrophoneUsageDescription": "NXQ Social uses the microphone for voice and video calls and to record audio for the videos and reels you create.",
+        "UIBackgroundModes": ["audio", "remote-notification"],
         "NSPhotoLibraryUsageDescription": "NXQ Social needs access to your photo library so you can upload photos and videos to your posts, reels, stories, and profile.",
         "NSAppTransportSecurity": {
           "NSAllowsArbitraryLoads": false,
@@ -59,10 +60,11 @@
         {
           "image": "./assets/images/splash-icon.png",
           "resizeMode": "contain",
-          "backgroundColor": "#0b1020"
+          "backgroundColor": "#0b0e14"
         }
       ],
       "expo-notifications",
+      ["expo-secure-store", { "faceIDPermission": false }],
       "expo-video",
       "expo-font",
       "@livekit/react-native-expo-plugin",

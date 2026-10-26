@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Linking, Pressable, SafeAreaView, Text, View } from 'react-native';
 import { useLocalSearchParams, router } from 'expo-router';
@@ -28,11 +29,14 @@ export default function LiveRoomScreen() {
     const search = new URLSearchParams({
       mobile: '1',
       room,
-      token: liveToken.token,
-      serverUrl: liveToken.url,
       ...(isHost ? { host: '1' } : {}),
     });
-    return `${WEB_BASE_URL}/live/${encodeURIComponent(room)}?${search.toString()}`;
+    // Fragments stay on the device rather than reaching HTTP request logs.
+    const fragment = new URLSearchParams({
+      token: liveToken.token,
+      serverUrl: liveToken.url,
+    });
+    return `${WEB_BASE_URL}/live/${encodeURIComponent(room)}?${search.toString()}#${fragment.toString()}`;
   }, [room, liveToken, isHost]);
 
   useEffect(() => {
@@ -94,10 +98,10 @@ export default function LiveRoomScreen() {
 
   if (!room) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <Text style={{ color: '#fff', fontSize: 18, fontWeight: '900', textAlign: 'center' }}>Missing live room</Text>
-        <Pressable onPress={() => router.back()} style={{ marginTop: 16, borderRadius: 12, backgroundColor: '#4f46e5', paddingHorizontal: 16, paddingVertical: 12 }}>
-          <Text style={{ color: '#fff', fontWeight: '800' }}>Back</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <Text style={{ color: colors.text, fontSize: 18, fontWeight: '900', textAlign: 'center' }}>Missing live room</Text>
+        <Pressable onPress={() => router.back()} style={{ marginTop: 16, borderRadius: 12, backgroundColor: colors.accent, paddingHorizontal: 16, paddingVertical: 12 }}>
+          <Text style={{ color: colors.text, fontWeight: '800' }}>Back</Text>
         </Pressable>
       </SafeAreaView>
     );
@@ -106,36 +110,36 @@ export default function LiveRoomScreen() {
   if (loading) {
     return (
       <SafeAreaView style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#8b5cf6" />
-        <Text style={{ color: '#93a1bd', marginTop: 12 }}>{isHost ? 'Starting live video...' : 'Opening live video...'}</Text>
+        <ActivityIndicator color={colors.accent} />
+        <Text style={{ color: colors.muted, marginTop: 12 }}>{isHost ? 'Starting live video...' : 'Opening live video...'}</Text>
       </SafeAreaView>
     );
   }
 
   if (error || !roomUrl) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <Text style={{ color: '#fff', fontSize: 20, fontWeight: '900', textAlign: 'center' }}>Live unavailable</Text>
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+        <Text style={{ color: colors.text, fontSize: 20, fontWeight: '900', textAlign: 'center' }}>Live unavailable</Text>
         <Text style={{ color: '#fca5a5', marginTop: 10, textAlign: 'center' }}>{error || 'Could not open this live room.'}</Text>
-        <Pressable onPress={() => router.back()} style={{ marginTop: 18, borderRadius: 12, backgroundColor: '#4f46e5', paddingHorizontal: 16, paddingVertical: 12 }}>
-          <Text style={{ color: '#fff', fontWeight: '800' }}>Back</Text>
+        <Pressable onPress={() => router.back()} style={{ marginTop: 18, borderRadius: 12, backgroundColor: colors.accent, paddingHorizontal: 16, paddingVertical: 12 }}>
+          <Text style={{ color: colors.text, fontWeight: '800' }}>Back</Text>
         </Pressable>
       </SafeAreaView>
     );
   }
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-      <Text style={{ color: '#fff', fontSize: 22, fontWeight: '900', textAlign: 'center' }}>{isHost ? 'Your live room is ready' : 'Live room is ready'}</Text>
-      <Text style={{ color: '#93a1bd', marginTop: 10, textAlign: 'center' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', padding: 20 }}>
+      <Text style={{ color: colors.text, fontSize: 22, fontWeight: '900', textAlign: 'center' }}>{isHost ? 'Your live room is ready' : 'Live room is ready'}</Text>
+      <Text style={{ color: colors.muted, marginTop: 10, textAlign: 'center' }}>
         The video opens in Safari with your mobile live token, so it will not ask for web login.
       </Text>
       <Pressable
         onPress={openRoom}
         disabled={opening}
-        style={{ marginTop: 22, borderRadius: 14, backgroundColor: opening ? '#374151' : '#4f46e5', paddingHorizontal: 18, paddingVertical: 13, minWidth: 190 }}
+        style={{ marginTop: 22, borderRadius: 14, backgroundColor: opening ? '#374151' : colors.accent, paddingHorizontal: 18, paddingVertical: 13, minWidth: 190 }}
       >
-        <Text style={{ color: '#fff', fontWeight: '900', textAlign: 'center' }}>{opening ? 'Opening...' : 'Open live video'}</Text>
+        <Text style={{ color: colors.text, fontWeight: '900', textAlign: 'center' }}>{opening ? 'Opening...' : 'Open live video'}</Text>
       </Pressable>
       <Pressable onPress={() => router.back()} style={{ marginTop: 12, paddingHorizontal: 16, paddingVertical: 10 }}>
         <Text style={{ color: '#a5b4fc', fontWeight: '800' }}>Back to Live</Text>

@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Image, Pressable, RefreshControl, SafeAreaView, ScrollView, Text, TextInput, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -194,37 +195,37 @@ export default function ExploreScreen() {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#0b1020' }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       {loading ? (
         <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#8b5cf6" />
+          <ActivityIndicator color={colors.accent} />
         </View>
       ) : (
         <ScrollView
           contentContainerStyle={{ padding: 16, gap: 12, paddingBottom: 30 }}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
+          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor={colors.accent} />}
         >
-          <Text style={{ color: '#fff', fontSize: 24, fontWeight: '900' }}>Explore</Text>
-          <Text style={{ color: '#93a1bd' }}>Discover creators, trending topics, and standout posts across NXQ.</Text>
+          <Text style={{ color: colors.text, fontSize: 24, fontWeight: '900' }}>Explore</Text>
+          <Text style={{ color: colors.muted }}>Discover creators, trending topics, and standout posts across NXQ.</Text>
 
           <TextInput
             value={query}
             onChangeText={runSearch}
             placeholder="Search people or creators"
-            placeholderTextColor="#93a1bd"
-            style={{ backgroundColor: '#111827', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: '#fff' }}
+            placeholderTextColor={colors.muted}
+            style={{ backgroundColor: colors.surface, borderRadius: 12, paddingHorizontal: 14, paddingVertical: 12, color: colors.text }}
           />
 
-          {searching ? <ActivityIndicator color="#8b5cf6" /> : null}
+          {searching ? <ActivityIndicator color={colors.accent} /> : null}
           {error ? (
-            <Pressable onPress={() => { setError(null); void load(); }} style={{ backgroundColor: '#111827', borderWidth: 1, borderColor: '#334155', borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 }}>
-              <Text style={{ color: '#f8fafc', fontWeight: '800' }}>Couldn’t load this section. Tap to retry.</Text>
+            <Pressable onPress={() => { setError(null); void load(); }} style={{ backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, borderRadius: 14, paddingHorizontal: 14, paddingVertical: 12 }}>
+              <Text style={{ color: colors.text, fontWeight: '800' }}>Couldn’t load this section. Tap to retry.</Text>
             </Pressable>
           ) : null}
 
-          <View style={{ backgroundColor: '#111827', borderRadius: 14, padding: 12, gap: 10 }}>
+          <View style={{ backgroundColor: colors.surface, borderRadius: 14, padding: 12, gap: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>Trending topics</Text>
+              <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>Trending topics</Text>
               {selectedTopic ? (
                 <Pressable onPress={() => setSelectedTopic(null)}>
                   <Text style={{ color: '#a5b4fc', fontWeight: '800', fontSize: 12 }}>Clear</Text>
@@ -238,7 +239,7 @@ export default function ExploreScreen() {
                   <Pressable
                     key={topic}
                     onPress={() => setSelectedTopic((prev) => prev === topic ? null : topic)}
-                    style={{ backgroundColor: active ? '#4f46e5' : '#151d33', borderRadius: 999, borderWidth: 1, borderColor: active ? '#818cf8' : '#334155', paddingHorizontal: 12, paddingVertical: 7 }}
+                    style={{ backgroundColor: active ? colors.accent : colors.raised, borderRadius: 999, borderWidth: 1, borderColor: active ? '#818cf8' : colors.border, paddingHorizontal: 12, paddingVertical: 7 }}
                   >
                     <Text style={{ color: '#e0e7ff', fontWeight: '800', fontSize: 12 }}>{topic}</Text>
                   </Pressable>
@@ -247,15 +248,15 @@ export default function ExploreScreen() {
             </ScrollView>
           </View>
 
-          <Text style={{ color: '#c7d2fe', fontWeight: '800', marginTop: 4 }}>Suggested creators</Text>
-          {users.length === 0 ? <Text style={{ color: '#93a1bd' }}>No users found.</Text> : null}
+          <Text style={{ color: colors.verified, fontWeight: '800', marginTop: 4 }}>Suggested creators</Text>
+          {users.length === 0 ? <Text style={{ color: colors.muted }}>No users found.</Text> : null}
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10, paddingRight: 8 }}>
             {users.map((u) => {
               const following = !!followedUsers[u.username];
               const busy = !!followBusy[u.username];
               return (
-                <View key={u.id} style={{ width: 168, backgroundColor: '#111827', borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: '#1f2937' }}>
-                  <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: '#1f2937', alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
+                <View key={u.id} style={{ width: 168, backgroundColor: colors.surface, borderRadius: 14, padding: 12, gap: 10, borderWidth: 1, borderColor: colors.raised }}>
+                  <View style={{ width: 54, height: 54, borderRadius: 27, backgroundColor: colors.raised, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' }}>
                     {u.avatarUrl ? (
                       <Image source={{ uri: resolveMediaUrl(u.avatarUrl) }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
                     ) : (
@@ -264,51 +265,51 @@ export default function ExploreScreen() {
                   </View>
                   <Pressable onPress={() => openUserProfile(u.username)}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{ color: '#fff', fontWeight: '800' }} numberOfLines={1}>{u.displayName}</Text>
+                      <Text style={{ color: colors.text, fontWeight: '800' }} numberOfLines={1}>{u.displayName}</Text>
                       {u.verificationStatus && u.verificationStatus !== 'UNVERIFIED' ? (
                         <MaterialCommunityIcons name="check-decagram" size={14} color="#60a5fa" />
                       ) : null}
                     </View>
-                    <Text style={{ color: '#93a1bd', marginTop: 3 }} numberOfLines={1}>@{u.username}</Text>
+                    <Text style={{ color: colors.muted, marginTop: 3 }} numberOfLines={1}>@{u.username}</Text>
                     <Text style={{ color: '#cbd5e1', marginTop: 5, fontSize: 11 }}>Trust {Math.round(u.trustScore ?? 50)}</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => followCreator(u.username)}
                     disabled={following || busy}
-                    style={{ borderRadius: 10, paddingVertical: 8, alignItems: 'center', backgroundColor: following ? '#243047' : '#4f46e5', opacity: busy ? 0.75 : 1 }}
+                    style={{ borderRadius: 10, paddingVertical: 8, alignItems: 'center', backgroundColor: following ? '#243047' : colors.accent, opacity: busy ? 0.75 : 1 }}
                   >
-                    <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{following ? 'Following' : busy ? 'Following...' : 'Follow'}</Text>
+                    <Text style={{ color: colors.text, fontWeight: '800', fontSize: 12 }}>{following ? 'Following' : busy ? 'Following...' : 'Follow'}</Text>
                   </Pressable>
                 </View>
               );
             })}
           </ScrollView>
 
-          <Text style={{ color: '#c7d2fe', fontWeight: '800', marginTop: 8 }}>Discover posts</Text>
-          {visiblePosts.length === 0 ? <Text style={{ color: '#93a1bd' }}>{selectedTopic ? `No discover posts for ${selectedTopic}.` : 'No discover posts yet.'}</Text> : null}
+          <Text style={{ color: colors.verified, fontWeight: '800', marginTop: 8 }}>Discover posts</Text>
+          {visiblePosts.length === 0 ? <Text style={{ color: colors.muted }}>{selectedTopic ? `No discover posts for ${selectedTopic}.` : 'No discover posts yet.'}</Text> : null}
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 10 }}>
           {visiblePosts.map((p, index) => {
             const image = resolveMediaUrl(p.media?.[0]?.thumbnailUrl || p.media?.[0]?.url);
             const isOwnPost = p.author.username === user?.username;
             return (
-              <View key={p.id} style={{ backgroundColor: '#111827', borderRadius: 12, padding: 10, width: '48%' }}>
+              <View key={p.id} style={{ backgroundColor: colors.surface, borderRadius: 12, padding: 10, width: '48%' }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                   <Pressable onPress={() => openUserProfile(p.author.username)} style={{ flex: 1 }}>
-                    <Text style={{ color: '#fff', fontWeight: '700' }} numberOfLines={1}>{p.author.displayName}</Text>
-                    <Text style={{ color: '#93a1bd' }} numberOfLines={1}>@{p.author.username}</Text>
+                    <Text style={{ color: colors.text, fontWeight: '700' }} numberOfLines={1}>{p.author.displayName}</Text>
+                    <Text style={{ color: colors.muted }} numberOfLines={1}>@{p.author.username}</Text>
                   </Pressable>
                   <Pressable
                     onPress={() => openPostActions(p)}
-                    style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: isOwnPost ? '#2a1620' : '#1f2937', alignItems: 'center', justifyContent: 'center' }}
+                    style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: isOwnPost ? '#2a1620' : colors.raised, alignItems: 'center', justifyContent: 'center' }}
                   >
                     <Text style={{ color: isOwnPost ? '#fca5a5' : '#cbd5e1', fontSize: 18, fontWeight: '700' }}>⋯</Text>
                   </Pressable>
                 </View>
                 {image ? <Image source={{ uri: image }} style={{ width: '100%', height: index % 3 === 0 ? 200 : 140, borderRadius: 10 }} resizeMode="cover" /> : null}
-                {p.caption ? <Text numberOfLines={3} style={{ color: '#e5e7eb', marginTop: 8 }}>{p.caption}</Text> : null}
+                {p.caption ? <Text numberOfLines={3} style={{ color: colors.text, marginTop: 8 }}>{p.caption}</Text> : null}
                 <View style={{ flexDirection: 'row', gap: 10, marginTop: 8 }}>
-                  <Text style={{ color: '#93a1bd', fontSize: 11 }}>{p._count?.likes ?? 0} likes</Text>
-                  <Text style={{ color: '#93a1bd', fontSize: 11 }}>{p._count?.comments ?? 0} comments</Text>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>{p._count?.likes ?? 0} likes</Text>
+                  <Text style={{ color: colors.muted, fontSize: 11 }}>{p._count?.comments ?? 0} comments</Text>
                 </View>
               </View>
             );

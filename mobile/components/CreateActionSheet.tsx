@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { Modal, Pressable, Text, View } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -28,7 +29,7 @@ export function CreateActionSheet({
         <Pressable
           onPress={(e) => e.stopPropagation()}
           style={{
-            backgroundColor: '#0f172a',
+            backgroundColor: colors.surface,
             borderTopLeftRadius: 20,
             borderTopRightRadius: 20,
             padding: 16,
@@ -36,8 +37,8 @@ export function CreateActionSheet({
             gap: 10,
           }}
         >
-          <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: '#334155', marginBottom: 6 }} />
-          <Text style={{ color: '#fff', fontWeight: '900', fontSize: 16, marginBottom: 4 }}>Create</Text>
+          <View style={{ alignSelf: 'center', width: 40, height: 4, borderRadius: 2, backgroundColor: colors.border, marginBottom: 6 }} />
+          <Text style={{ color: colors.text, fontWeight: '900', fontSize: 16, marginBottom: 4 }}>Create</Text>
           {OPTIONS.map((opt) => (
             <Pressable
               key={opt.mode}
@@ -46,7 +47,7 @@ export function CreateActionSheet({
                 flexDirection: 'row',
                 alignItems: 'center',
                 gap: 12,
-                backgroundColor: '#151d33',
+                backgroundColor: colors.raised,
                 borderRadius: 14,
                 paddingVertical: 14,
                 paddingHorizontal: 16,

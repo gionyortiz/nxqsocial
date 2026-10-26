@@ -4,6 +4,15 @@
     "appVersionSource": "remote"
   },
   "build": {
+    "testflight": {
+      "extends": "production",
+      "distribution": "store",
+      "channel": "testflight",
+      "environment": "production",
+      "env": {
+        "NXQ_TESTFLIGHT_BUILD": "true"
+      }
+    },
     "development": {
       "developmentClient": true,
       "distribution": "internal",

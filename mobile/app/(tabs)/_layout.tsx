@@ -1,15 +1,18 @@
 import { Redirect, Tabs } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { ActivityIndicator, View } from 'react-native';
+import { colors } from '@/lib/theme';
 import { useAuth } from '@/lib/auth';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
   const { token, loading } = useAuth();
+  const insets = useSafeAreaInsets();
 
   if (loading) {
     return (
-      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: '#0b1020' }}>
-        <ActivityIndicator size="large" color="#8b5cf6" />
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.accent} />
       </View>
     );
   }
@@ -19,18 +22,26 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: true,
-        tabBarActiveTintColor: '#6366f1',
-        tabBarStyle: { backgroundColor: '#0f172a', borderTopColor: '#1f2937' },
-        tabBarInactiveTintColor: '#93a1bd',
-        headerStyle: { backgroundColor: '#0f172a' },
-        headerTitleStyle: { color: '#fff', fontWeight: '700' },
-        headerTintColor: '#fff',
+        headerShown: false,
+        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        tabBarItemStyle: { paddingTop: 4 },
+        sceneStyle: { backgroundColor: colors.background },
+        tabBarActiveTintColor: colors.verified,
+        tabBarStyle: {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          height: 60 + insets.bottom,
+          paddingBottom: Math.max(8, insets.bottom),
+        },
+        tabBarInactiveTintColor: colors.muted,
+        headerStyle: { backgroundColor: colors.surface },
+        headerTitleStyle: { color: colors.text, fontWeight: '700' },
+        headerTintColor: colors.text,
       }}>
       <Tabs.Screen
         name="feed"
         options={{
-          title: 'Feed',
+          title: 'Home',
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="home-variant" color={color} size={size} />,
         }}
       />
@@ -42,23 +53,24 @@ export default function TabLayout() {
         }}
       />
       <Tabs.Screen
-        name="reels"
-        options={{
-          title: 'Reels',
-          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="movie-open-play" color={color} size={size} />,
-        }}
-      />
-      <Tabs.Screen
         name="create"
         options={{
           title: 'Create',
-          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="plus-box" color={color} size={size} />,
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="plus-circle-outline" color={color} size={size} />,
+        }}
+      />
+      <Tabs.Screen
+        name="reels"
+        options={{
+          title: 'Reels',
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="movie-open-play-outline" color={color} size={size} />,
         }}
       />
       <Tabs.Screen
         name="messages"
         options={{
           title: 'Messages',
+          href: null,
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="send-outline" color={color} size={size} />,
         }}
       />
@@ -73,6 +85,7 @@ export default function TabLayout() {
         name="more"
         options={{
           title: 'More',
+          href: null,
           tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="dots-grid" color={color} size={size} />,
         }}
       />

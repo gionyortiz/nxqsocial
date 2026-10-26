@@ -1,116 +1,26 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, Image, Platform, Pressable, RefreshControl, SafeAreaView, Share, Text, useWindowDimensions, View } from 'react-native';
+import { ReelsToolbar } from '@/components/ReelsToolbar';
+import { CommentComposer } from '@/components/CommentComposer';
+import { colors } from '@/lib/theme';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Alert, AppState, FlatList, Image, Platform, Pressable, RefreshControl, SafeAreaView, Share, Text, useWindowDimensions, View } from 'react-native';
 import { useFocusEffect, useRouter } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
-import { useVideoPlayer, VideoView } from 'expo-video';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { ReelVideo } from '@/components/ReelVideo';
 import { apiRequest, PostItem, resolveMediaUrl } from '@/lib/api';
 import { useAuth } from '@/lib/auth';
-import { pauseAllMedia, registerMediaPauseHandler } from '@/lib/mediaPlayback';
+import { pauseAllMedia } from '@/lib/mediaPlayback';
 import { mobileProof } from '@/lib/runtimeProof';
 import { WEB_BASE_URL } from '@/lib/config';
 
-function ReelVideo({ uri, focused }: { uri: string; focused: boolean }) {
-  const [paused, setPaused] = useState(false);
-  const [errored, setErrored] = useState(false);
-  const [loading, setLoading] = useState(true);
-  const focusedRef = useRef(focused);
-  const pausedRef = useRef(paused);
-  const wasFocusedRef = useRef(false);
-  focusedRef.current = focused;
-  pausedRef.current = paused;
-
-  const source = useMemo(() => ({
-    uri,
-    contentType: 'progressive' as const,
-    useCaching: true,
-  }), [uri]);
-
-  const player = useVideoPlayer(source, (p) => {
-    p.loop = true;
-  });
-
-  useEffect(() => {
-    mobileProof('Reel video component props', { component: 'VideoView', uri, focused, paused });
-    const justFocused = focused && !wasFocusedRef.current;
-    wasFocusedRef.current = focused;
-
-    if (errored || !focused || paused) {
-      player.pause();
-      return;
-    }
-
-    if (justFocused) player.currentTime = 0;
-    if (player.status === 'readyToPlay') {
-      player.play();
-    }
-    return () => player.pause();
-  }, [focused, paused, errored, player]);
-
-  useEffect(() => {
-    const sub = player.addListener('statusChange', ({ status, error }) => {
-      setLoading(status === 'idle' || status === 'loading');
-      if (error || status === 'error') {
-        mobileProof('Reel video status error', { uri, status, error });
-        setErrored(true);
-        return;
-      }
-      if (status === 'readyToPlay' && focusedRef.current && !pausedRef.current) {
-        player.play();
-      }
-    });
-    return () => sub.remove();
-  }, [player, uri]);
-
-  useEffect(() => registerMediaPauseHandler(() => player.pause()), [player]);
-
-  if (errored) {
-    return (
-      <View style={{ width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center', backgroundColor: '#0a0a0a' }}>
-        <MaterialCommunityIcons name="video-off-outline" size={40} color="#64748b" />
-        <Text style={{ color: '#64748b', marginTop: 8, fontSize: 12 }}>Could not load video</Text>
-      </View>
-    );
-  }
-
-  return (
-    <Pressable
-      onPress={() => setPaused((current) => {
-        const next = !current;
-        if (next) player.pause();
-        else if (focused) player.play();
-        return next;
-      })}
-      style={{ width: '100%', height: '100%' }}
-    >
-      <VideoView
-        player={player}
-        style={{ width: '100%', height: '100%' }}
-        contentFit="cover"
-        nativeControls={false}
-        surfaceType="textureView"
-        onFirstFrameRender={() => setLoading(false)}
-      />
-      {loading && focused && !paused && (
-        <View pointerEvents="none" style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
-          <ActivityIndicator color="#fff" size="large" />
-        </View>
-      )}
-      {paused && (
-        <View style={{ position: 'absolute', inset: 0, alignItems: 'center', justifyContent: 'center' }}>
-          <View style={{ width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(0,0,0,0.55)', alignItems: 'center', justifyContent: 'center' }}>
-            <MaterialCommunityIcons name="play" size={36} color="#fff" />
-          </View>
-        </View>
-      )}
-    </Pressable>
-  );
-}
+const AUTO_SCROLL_KEY = 'nxq.reels.autoScroll.v1';
 
 export default function ReelsScreen() {
   const router = useRouter();
   const { token, user } = useAuth();
   const { height: windowHeight } = useWindowDimensions();
   const [items, setItems] = useState<PostItem[]>([]);
+  const [commentPost, setCommentPost] = useState<PostItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -122,6 +32,12 @@ export default function ReelsScreen() {
   const [activePostId, setActivePostId] = useState<string | null>(null);
   const [screenFocused, setScreenFocused] = useState(false);
   const [scrolling, setScrolling] = useState(false);
+  const [autoScroll, setAutoScroll] = useState(true);
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  const preferenceChangedRef = useRef(false);
+  const listRef = useRef<FlatList<PostItem>>(null);
+  const advancingRef = useRef(false);
+  const scrollingRef = useRef(false);
   const [reelHeight, setReelHeight] = useState(windowHeight);
   const activePostIdRef = useRef<string | null>(null);
   const scrollEndTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -134,6 +50,52 @@ export default function ReelsScreen() {
     activePostIdRef.current = nextActive;
     setActivePostId(nextActive);
   }).current;
+
+  useEffect(() => {
+    let mounted = true;
+    AsyncStorage.getItem(AUTO_SCROLL_KEY).then((value) => {
+      if (mounted && !preferenceChangedRef.current && value !== null) setAutoScroll(value === 'true');
+    }).catch(() => {});
+    const subscription = AppState.addEventListener('change', (state) => {
+      setAppActive(state === 'active');
+      if (state !== 'active') pauseAllMedia();
+    });
+    return () => { mounted = false; subscription.remove(); };
+  }, []);
+
+  const toggleAutoScroll = () => {
+    preferenceChangedRef.current = true;
+    const next = !autoScroll;
+    setAutoScroll(next);
+    AsyncStorage.setItem(AUTO_SCROLL_KEY, String(next)).catch(() => {});
+  };
+
+  const finishScrolling = () => {
+    if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+    scrollEndTimerRef.current = null;
+    advancingRef.current = false;
+    scrollingRef.current = false;
+    setScrolling(false);
+  };
+
+  const advanceReel = (postId: string) => {
+    if (!autoScroll || !!commentPost || !screenFocused || AppState.currentState !== 'active' || refreshing ||
+        scrollingRef.current || advancingRef.current || activePostIdRef.current !== postId) return;
+    const index = items.findIndex((item) => item.id === postId);
+    // Stay on the final reel and offer replay instead of jumping back to the beginning.
+    if (index < 0 || index + 1 >= items.length || !listRef.current) return;
+    advancingRef.current = true;
+    scrollingRef.current = true;
+    setScrolling(true);
+    pauseAllMedia();
+    try {
+      listRef.current.scrollToIndex({ index: index + 1, animated: true });
+      // Some platforms omit momentum-end after a programmatic scroll.
+      scrollEndTimerRef.current = setTimeout(finishScrolling, 900);
+    } catch {
+      finishScrolling();
+    }
+  };
 
   const load = async () => {
     if (!token) return;
@@ -162,18 +124,13 @@ export default function ReelsScreen() {
     }
   };
 
-  useEffect(() => {
-    load();
-  }, [token, mode]);
-
   useFocusEffect(
     useCallback(() => {
       setScreenFocused(true);
       load();
       return () => {
         setScreenFocused(false);
-        setScrolling(false);
-        if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+        finishScrolling();
         pauseAllMedia();
       };
     }, [token, mode]),
@@ -196,6 +153,7 @@ export default function ReelsScreen() {
   };
 
   const confirmDeletePost = (postId: string) => {
+    pauseAllMedia();
     Alert.alert(
       'Delete post',
       'This will permanently delete this post.',
@@ -248,38 +206,12 @@ export default function ReelsScreen() {
   };
 
   const promptComment = (post: PostItem) => {
-    if (Platform.OS === 'web') {
-      Alert.alert('Comments on web', 'Opening the text prompt is not supported in this web runtime yet. Please comment from the mobile app build.');
-      return;
-    }
-
-    Alert.prompt(
-      'Add comment',
-      `Reply to @${post.author.username}`,
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Post',
-          onPress: async (value?: string) => {
-            const content = (value || '').trim();
-            if (!content || !token) return;
-            try {
-              await apiRequest(`/posts/${post.id}/comments`, { method: 'POST', token, body: { content } });
-              setItems((prev) => prev.map((item) => item.id === post.id ? {
-                ...item,
-                _count: { ...(item._count ?? { likes: 0, comments: 0 }), comments: (item._count?.comments ?? 0) + 1 },
-              } : item));
-            } catch (e: any) {
-              Alert.alert('Comment failed', e?.message ?? 'Could not post comment.');
-            }
-          },
-        },
-      ],
-      'plain-text',
-    );
+    pauseAllMedia();
+    setCommentPost(post);
   };
 
   const sharePost = async (post: PostItem) => {
+    pauseAllMedia();
     const message = `${post.caption || 'Check out this reel on NXQ Social'}\n${WEB_BASE_URL}/feed?post=${post.id}`;
     try {
       if (Platform.OS === 'web') {
@@ -353,6 +285,7 @@ export default function ReelsScreen() {
   };
 
   const openPostActions = (post: PostItem) => {
+    pauseAllMedia();
     const isOwnPost = post.author.id === user?.id;
     if (isOwnPost) {
       confirmDeletePost(post.id);
@@ -373,53 +306,21 @@ export default function ReelsScreen() {
     );
   };
 
-  if (loading) {
+  const toolbar = <ReelsToolbar mode={mode} onMode={setMode} autoScroll={autoScroll} onToggle={toggleAutoScroll} />;
+  if (loading || !items.length) {
     return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center' }}>
-        <ActivityIndicator color="#8b5cf6" />
-      </SafeAreaView>
-    );
-  }
-
-  if (!items.length) {
-    return (
-      <SafeAreaView style={{ flex: 1, backgroundColor: '#000', alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-          <Pressable
-            onPress={() => setMode('FOR_YOU')}
-            style={{
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 999,
-              backgroundColor: mode === 'FOR_YOU' ? 'rgba(99,102,241,0.95)' : 'rgba(15,23,42,0.65)',
-              borderWidth: 1,
-              borderColor: mode === 'FOR_YOU' ? '#818cf8' : 'rgba(148,163,184,0.35)',
-            }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>For You</Text>
-          </Pressable>
-          <Pressable
-            onPress={() => setMode('FOLLOWING')}
-            style={{
-              paddingHorizontal: 10,
-              paddingVertical: 6,
-              borderRadius: 999,
-              backgroundColor: mode === 'FOLLOWING' ? 'rgba(99,102,241,0.95)' : 'rgba(15,23,42,0.65)',
-              borderWidth: 1,
-              borderColor: mode === 'FOLLOWING' ? '#818cf8' : 'rgba(148,163,184,0.35)',
-            }}
-          >
-            <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Following</Text>
-          </Pressable>
-        </View>
-        <Text style={{ color: '#fff', textAlign: 'center', fontWeight: '900', fontSize: 18 }}>No reels yet</Text>
-        <Text style={{ color: '#93a1bd', textAlign: 'center', marginTop: 8 }}>
-          {error || (mode === 'FOLLOWING' ? 'Follow more creators to unlock your Following reel stream.' : 'Start posting short videos to light up this tab.')}
-        </Text>
-        <View style={{ flexDirection: 'row', gap: 10, marginTop: 16 }}>
-          <Pressable onPress={load} style={{ backgroundColor: '#1f2937', borderRadius: 999, paddingHorizontal: 14, paddingVertical: 10 }}>
-            <Text style={{ color: '#fff', fontWeight: '800' }}>Refresh</Text>
-          </Pressable>
+      <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+        {toolbar}
+        <View style={{ flex: 1, padding: 28, alignItems: 'center', justifyContent: 'center', gap: 16 }}>
+          {loading ? <ActivityIndicator color={colors.accent} /> : <>
+            <MaterialCommunityIcons name="movie-open-play-outline" size={48} color={colors.accent} />
+            <Text style={{ color: colors.text, fontSize: 24, fontWeight: '800' }}>Your next favorite moment</Text>
+            <Text style={{ color: colors.muted, textAlign: 'center', lineHeight: 22 }}>{error || (mode === 'FOLLOWING' ? 'Follow creators to see their videos here.' : 'Share the first reel. Your videos will appear here.')}</Text>
+            <Pressable accessibilityRole="button" onPress={() => router.push('/create')} style={{ backgroundColor: colors.accent, borderRadius: 16, padding: 16 }}>
+              <Text style={{ color: '#fff', fontWeight: '800' }}>Create a video</Text>
+            </Pressable>
+            <Pressable accessibilityRole="button" onPress={load} style={{ minHeight: 44, justifyContent: 'center' }}><Text style={{ color: colors.muted }}>Refresh</Text></Pressable>
+          </>}
         </View>
       </SafeAreaView>
     );
@@ -427,7 +328,9 @@ export default function ReelsScreen() {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#000' }}>
+      {toolbar}
       <FlatList
+        ref={listRef}
         data={items}
         pagingEnabled
         onLayout={(event) => {
@@ -439,26 +342,27 @@ export default function ReelsScreen() {
         onViewableItemsChanged={onViewableItemsChanged}
         onScrollBeginDrag={() => {
           if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+          scrollingRef.current = true;
           setScrolling(true);
           pauseAllMedia();
         }}
         onMomentumScrollBegin={() => {
           if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
+          scrollingRef.current = true;
           setScrolling(true);
+          scrollEndTimerRef.current = setTimeout(finishScrolling, 900);
         }}
         onScrollEndDrag={() => {
           if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
-          scrollEndTimerRef.current = setTimeout(() => setScrolling(false), 180);
+          scrollEndTimerRef.current = setTimeout(finishScrolling, 180);
         }}
-        onMomentumScrollEnd={() => {
-          if (scrollEndTimerRef.current) clearTimeout(scrollEndTimerRef.current);
-          setScrolling(false);
-        }}
+        onMomentumScrollEnd={finishScrolling}
+        onScrollToIndexFailed={finishScrolling}
         initialNumToRender={2}
         maxToRenderPerBatch={2}
         windowSize={3}
         getItemLayout={(_data, index) => ({ length: reelHeight, offset: reelHeight * index, index })}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { setRefreshing(true); load(); }} tintColor="#8b5cf6" />}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={() => { pauseAllMedia(); setRefreshing(true); load(); }} tintColor={colors.accent} />}
         renderItem={({ item }) => {
           const isVideoAsset = (asset: any) => {
             if (!asset?.url) return false;
@@ -482,63 +386,27 @@ export default function ReelsScreen() {
           });
           const isOwnPost = item.author.id === user?.id;
           const deleting = deletingPostId === item.id;
-          const focused = screenFocused && !scrolling && activePostId === item.id;
+          const focused = screenFocused && appActive && !commentPost && !refreshing && !scrolling && activePostId === item.id;
           return (
             <View style={{ height: reelHeight, backgroundColor: '#000' }}>
               {isPlayableVideo ? (
-                <ReelVideo uri={src} focused={focused} />
+                <ReelVideo uri={src} focused={focused} autoScroll={autoScroll} onFinish={() => advanceReel(item.id)} />
               ) : fallbackImage ? (
                 <Image source={{ uri: fallbackImage }} style={{ width: '100%', height: '100%' }} resizeMode="cover" />
               ) : (
                 <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 24 }}>
-                  <MaterialCommunityIcons name="video-off-outline" size={34} color="#94a3b8" />
+                  <MaterialCommunityIcons name="video-off-outline" size={34} color={colors.muted} />
                   <Text style={{ color: '#cbd5e1', marginTop: 10, textAlign: 'center' }}>
                     Reel video is still processing. Pull to refresh in a moment.
                   </Text>
                 </View>
               )}
-              <View style={{ position: 'absolute', top: 50, left: 16, right: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View>
-                  <Text style={{ color: '#fff', fontSize: 28, fontWeight: '900', textShadowColor: '#000', textShadowRadius: 8 }}>Reels</Text>
-                  <View style={{ flexDirection: 'row', gap: 8, marginTop: 8 }}>
-                    <Pressable
-                      onPress={() => setMode('FOR_YOU')}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        borderRadius: 999,
-                        backgroundColor: mode === 'FOR_YOU' ? 'rgba(99,102,241,0.95)' : 'rgba(15,23,42,0.65)',
-                        borderWidth: 1,
-                        borderColor: mode === 'FOR_YOU' ? '#818cf8' : 'rgba(148,163,184,0.35)',
-                      }}
-                    >
-                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>For You</Text>
-                    </Pressable>
-                    <Pressable
-                      onPress={() => setMode('FOLLOWING')}
-                      style={{
-                        paddingHorizontal: 10,
-                        paddingVertical: 6,
-                        borderRadius: 999,
-                        backgroundColor: mode === 'FOLLOWING' ? 'rgba(99,102,241,0.95)' : 'rgba(15,23,42,0.65)',
-                        borderWidth: 1,
-                        borderColor: mode === 'FOLLOWING' ? '#818cf8' : 'rgba(148,163,184,0.35)',
-                      }}
-                    >
-                      <Text style={{ color: '#fff', fontWeight: '800', fontSize: 11 }}>Following</Text>
-                    </Pressable>
-                  </View>
-                </View>
-                <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: 'rgba(15,23,42,0.65)', alignItems: 'center', justifyContent: 'center' }}>
-                  <MaterialCommunityIcons name="magnify" size={22} color="#fff" />
-                </View>
-              </View>
               <Pressable
                 onPress={() => openPostActions(item)}
                 disabled={deleting}
                 style={{
                   position: 'absolute',
-                  top: 54,
+                  top: 12,
                   right: 12,
                   width: 38,
                   height: 38,
@@ -552,44 +420,49 @@ export default function ReelsScreen() {
                 <MaterialCommunityIcons
                   name={isOwnPost ? 'trash-can-outline' : 'dots-horizontal'}
                   size={20}
-                  color={isOwnPost ? '#fca5a5' : '#fff'}
+                  color={isOwnPost ? '#fca5a5' : colors.text}
                 />
               </Pressable>
-              <View style={{ position: 'absolute', right: 14, bottom: 130, alignItems: 'center', gap: 18 }}>
+              <View style={{ position: 'absolute', right: 14, bottom: 100, alignItems: 'center', gap: 18 }}>
                 <Pressable onPress={() => toggleLike(item)} hitSlop={10} style={{ alignItems: 'center' }}>
-                  <MaterialCommunityIcons name={item.isLiked ? 'heart' : 'heart-outline'} size={34} color={item.isLiked ? '#f43f5e' : '#fff'} />
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{item._count?.likes ?? 0}</Text>
+                  <MaterialCommunityIcons name={item.isLiked ? 'heart' : 'heart-outline'} size={34} color={item.isLiked ? '#f43f5e' : colors.text} />
+                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: 12 }}>{item._count?.likes ?? 0}</Text>
                 </Pressable>
                 <Pressable onPress={() => promptComment(item)} hitSlop={10} style={{ alignItems: 'center' }}>
-                  <MaterialCommunityIcons name="comment-outline" size={32} color="#fff" />
-                  <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{item._count?.comments ?? 0}</Text>
+                  <MaterialCommunityIcons name="comment-outline" size={32} color={colors.text} />
+                  <Text style={{ color: colors.text, fontWeight: '800', fontSize: 12 }}>{item._count?.comments ?? 0}</Text>
                 </Pressable>
                 <Pressable onPress={() => sharePost(item)} hitSlop={10}>
-                  <MaterialCommunityIcons name="send-outline" size={31} color="#fff" />
+                  <MaterialCommunityIcons name="send-outline" size={31} color={colors.text} />
                 </Pressable>
                 <Pressable onPress={() => toggleSave(item.id)} hitSlop={10}>
-                  <MaterialCommunityIcons name={savedPostIds[item.id] ? 'bookmark' : 'bookmark-outline'} size={31} color={savedPostIds[item.id] ? '#a78bfa' : '#fff'} />
+                  <MaterialCommunityIcons name={savedPostIds[item.id] ? 'bookmark' : 'bookmark-outline'} size={31} color={savedPostIds[item.id] ? colors.verified : colors.text} />
                 </Pressable>
               </View>
-              <View style={{ position: 'absolute', left: 14, right: 84, bottom: 88 }}>
+              <View style={{ position: 'absolute', left: 14, right: 84, bottom: 28 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <Text onPress={() => openUserProfile(item.author.username)} style={{ color: '#fff', fontWeight: '900', fontSize: 16 }}>@{item.author.username}</Text>
+                  <Text onPress={() => openUserProfile(item.author.username)} style={{ color: colors.text, fontWeight: '900', fontSize: 16 }}>@{item.author.username}</Text>
                   {!followedCreators[item.author.username] && item.author.id !== user?.id && mode !== 'FOLLOWING' ? (
                     <Pressable
                       onPress={() => followCreator(item.author.username)}
                       disabled={!!followBusy[item.author.username]}
                       style={{ backgroundColor: 'rgba(255,255,255,0.95)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999, opacity: followBusy[item.author.username] ? 0.7 : 1 }}
                     >
-                      <Text style={{ color: '#0f172a', fontWeight: '900', fontSize: 11 }}>{followBusy[item.author.username] ? '...' : 'Follow'}</Text>
+                      <Text style={{ color: colors.surface, fontWeight: '900', fontSize: 11 }}>{followBusy[item.author.username] ? '...' : 'Follow'}</Text>
                     </Pressable>
                   ) : null}
                 </View>
-                {item.caption ? <Text numberOfLines={2} style={{ color: '#e5e7eb', marginTop: 6, fontWeight: '600' }}>{item.caption}</Text> : null}
+                {item.caption ? <Text numberOfLines={2} style={{ color: colors.text, marginTop: 6, fontWeight: '600' }}>{item.caption}</Text> : null}
               </View>
             </View>
           );
         }}
       />
+      {commentPost ? <CommentComposer key={commentPost.id} post={commentPost} token={token} onClose={() => setCommentPost(null)} onPosted={() => {
+        setItems((previous) => previous.map((item) => item.id === commentPost.id ? {
+          ...item, _count: { ...(item._count ?? { likes: 0, comments: 0 }), comments: (item._count?.comments ?? 0) + 1 },
+        } : item));
+      }} /> : null}
     </SafeAreaView>
   );
 }

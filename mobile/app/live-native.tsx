@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -290,7 +291,7 @@ function LiveStage({
     <View style={styles.stage}>
       {isDirectCall && roomMode === 'call' ? (
         <View style={[styles.video, styles.center]}>
-          <MaterialCommunityIcons name="phone-in-talk-outline" size={42} color="#fff" />
+          <MaterialCommunityIcons name="phone-in-talk-outline" size={42} color={colors.text} />
           <Text style={styles.title}>Audio call</Text>
           <Text style={styles.dim}>{participants.length > 1 ? 'Connected' : 'Waiting for the other person...'}</Text>
         </View>
@@ -298,7 +299,7 @@ function LiveStage({
         <VideoTrack trackRef={hostTrack as never} style={styles.video} />
       ) : (
         <View style={[styles.video, styles.center]}>
-          <ActivityIndicator color="#fff" />
+          <ActivityIndicator color={colors.text} />
           <Text style={styles.dim}>{isDirectCall ? 'Connecting to call...' : isHost ? (roomMode === 'video' ? 'Starting camera...' : 'Connecting to call...') : 'Waiting for broadcaster...'}</Text>
         </View>
       )}
@@ -539,7 +540,7 @@ export default function NativeLiveScreen() {
   if (loading) {
     return (
       <SafeAreaView style={[styles.fill, styles.center]}>
-        <ActivityIndicator color="#8b5cf6" />
+        <ActivityIndicator color={colors.accent} />
         <Text style={styles.dim}>{isHost ? 'Starting your live...' : 'Joining live...'}</Text>
       </SafeAreaView>
     );
@@ -560,7 +561,7 @@ export default function NativeLiveScreen() {
   if (audioReadyForCredentials !== creds) {
     return (
       <SafeAreaView style={[styles.fill, styles.center]}>
-        <ActivityIndicator color="#8b5cf6" />
+        <ActivityIndicator color={colors.accent} />
         <Text style={styles.dim}>Preparing call audio...</Text>
       </SafeAreaView>
     );
@@ -598,36 +599,36 @@ const styles = StyleSheet.create({
   stage: { flex: 1, backgroundColor: '#000' },
   video: { ...StyleSheet.absoluteFill, backgroundColor: '#000' },
   center: { alignItems: 'center', justifyContent: 'center' },
-  dim: { color: '#93a1bd', marginTop: 10 },
-  title: { color: '#fff', fontSize: 20, fontWeight: '900', textAlign: 'center' },
+  dim: { color: colors.muted, marginTop: 10 },
+  title: { color: colors.text, fontSize: 20, fontWeight: '900', textAlign: 'center' },
   errorText: { color: '#fca5a5', marginTop: 10, textAlign: 'center', paddingHorizontal: 24 },
   topBar: { position: 'absolute', top: 0, left: 0, right: 0 },
   topRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 14, paddingTop: 8 },
   liveBadge: { flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#dc2626', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
-  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#fff' },
-  liveText: { color: '#fff', fontWeight: '900', fontSize: 12 },
+  liveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: colors.text },
+  liveText: { color: colors.text, fontWeight: '900', fontSize: 12 },
   viewerPill: { backgroundColor: 'rgba(0,0,0,0.45)', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 999 },
-  viewerText: { color: '#fff', fontWeight: '700', fontSize: 12 },
+  viewerText: { color: colors.text, fontWeight: '700', fontSize: 12 },
   modeBtn: { backgroundColor: 'rgba(255,255,255,0.15)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 999 },
-  modeBtnActive: { backgroundColor: '#4f46e5' },
-  modeBtnText: { color: '#fff', fontWeight: '800', fontSize: 12 },
+  modeBtnActive: { backgroundColor: colors.accent },
+  modeBtnText: { color: colors.text, fontWeight: '800', fontSize: 12 },
   endBtn: { backgroundColor: '#ef4444', paddingHorizontal: 14, paddingVertical: 7, borderRadius: 999 },
-  endText: { color: '#fff', fontWeight: '900' },
+  endText: { color: colors.text, fontWeight: '900' },
   likeBurst: { position: 'absolute', right: 24, bottom: 180 },
   likeBurstText: { fontSize: 44 },
   bottomWrap: { position: 'absolute', left: 0, right: 0, bottom: 0 },
   chatList: { maxHeight: 200 },
   chatBubble: { flexDirection: 'row', alignSelf: 'flex-start', backgroundColor: 'rgba(0,0,0,0.45)', borderRadius: 16, paddingHorizontal: 10, paddingVertical: 6, maxWidth: '85%' },
   chatName: { color: '#fca5a5', fontWeight: '800', fontSize: 12 },
-  chatText: { color: '#fff', fontSize: 12, flexShrink: 1 },
+  chatText: { color: colors.text, fontSize: 12, flexShrink: 1 },
   stickerText: { fontSize: 24, marginLeft: 4 },
   photoPreview: { width: 110, height: 110, borderRadius: 12, marginLeft: 6, marginTop: 2 },
   inputRow: { flexDirection: 'row', alignItems: 'center', gap: 8, paddingHorizontal: 12, paddingTop: 10, paddingBottom: 16 },
-  input: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, color: '#fff' },
+  input: { flex: 1, backgroundColor: 'rgba(255,255,255,0.15)', borderRadius: 999, paddingHorizontal: 16, paddingVertical: 10, color: colors.text },
   actionBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: 'rgba(255,255,255,0.18)', alignItems: 'center', justifyContent: 'center' },
   actionBtnMuted: { backgroundColor: 'rgba(245,158,11,0.4)' },
   likeBtn: { width: 46, height: 46, borderRadius: 23, backgroundColor: '#dc2626', alignItems: 'center', justifyContent: 'center' },
   actionEmoji: { fontSize: 22 },
-  primaryBtn: { marginTop: 18, backgroundColor: '#4f46e5', paddingHorizontal: 18, paddingVertical: 12, borderRadius: 14 },
-  primaryText: { color: '#fff', fontWeight: '900' },
+  primaryBtn: { marginTop: 18, backgroundColor: colors.accent, paddingHorizontal: 18, paddingVertical: 12, borderRadius: 14 },
+  primaryText: { color: colors.text, fontWeight: '900' },
 });

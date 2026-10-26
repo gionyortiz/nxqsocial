@@ -1,3 +1,4 @@
+import { colors } from '@/lib/theme';
 import { useEffect, useState } from 'react';
 import { Image, ImageStyle, StyleProp, Text, View, ViewStyle } from 'react-native';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
@@ -17,7 +18,7 @@ type MediaStyle = StyleProp<ImageStyle>;
 
 function MediaFallback({ label, style }: { label: string; style?: MediaStyle }) {
   return (
-    <View style={[{ width: '100%', height: 300, backgroundColor: '#0b1020', alignItems: 'center', justifyContent: 'center' }, style as StyleProp<ViewStyle>]}>
+    <View style={[{ width: '100%', height: 300, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center' }, style as StyleProp<ViewStyle>]}>
       <MaterialCommunityIcons name="image-off-outline" size={30} color="#64748b" />
       <Text style={{ color: '#64748b', marginTop: 8, fontSize: 12 }}>{label}</Text>
     </View>
@@ -62,7 +63,7 @@ function VideoMedia({ uri, style, shouldPlay }: { uri: string; style?: MediaStyl
   return (
     <VideoView
       player={player}
-      style={[{ width: '100%', height: 300, backgroundColor: '#0b1020' }, style as StyleProp<ViewStyle>]}
+      style={[{ width: '100%', height: 300, backgroundColor: colors.background }, style as StyleProp<ViewStyle>]}
       contentFit="cover"
       nativeControls
     />
@@ -95,7 +96,7 @@ export function PostMedia({ asset, style, shouldPlay = true }: { asset?: MediaAs
   return (
     <Image
       source={{ uri }}
-      style={[{ width: '100%', height: 300, backgroundColor: '#0b1020' }, style]}
+      style={[{ width: '100%', height: 300, backgroundColor: colors.background }, style]}
       resizeMode="cover"
       onError={(event) => {
         mobileProof('Image component error', { uri, error: event.nativeEvent?.error });
