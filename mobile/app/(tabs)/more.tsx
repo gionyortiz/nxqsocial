@@ -1,70 +1,28 @@
 import { colors } from '@/lib/theme';
+import { LIVE_NATIVE_ENABLED } from '@/lib/config';
+import { useAuth } from '@/lib/auth';
+import { Avatar } from '@/components/Avatar';
 import { router } from 'expo-router';
 import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { Pressable, SafeAreaView, ScrollView, Text, View } from 'react-native';
 
-function MenuButton({
-  title,
-  subtitle,
-  icon,
-  accent,
-  onPress,
-}: {
-  title: string;
-  subtitle: string;
-  icon: keyof typeof MaterialCommunityIcons.glyphMap;
-  accent: string;
-  onPress: () => void;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      style={{
-        backgroundColor: colors.surface,
-        borderRadius: 18,
-        padding: 14,
-        marginBottom: 10,
-        borderWidth: 1,
-        borderColor: colors.raised,
-        flexDirection: 'row',
-        alignItems: 'center',
-        gap: 12,
-      }}
-    >
-      <View style={{ width: 44, height: 44, borderRadius: 15, backgroundColor: accent, alignItems: 'center', justifyContent: 'center' }}>
-        <MaterialCommunityIcons name={icon} size={24} color={colors.text} />
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={{ color: colors.text, fontWeight: '900', fontSize: 15 }}>{title}</Text>
-        <Text style={{ color: colors.muted, marginTop: 4 }}>{subtitle}</Text>
-      </View>
-      <MaterialCommunityIcons name="chevron-right" size={24} color="#64748b" />
-    </Pressable>
-  );
+function Row({title, icon, onPress}: {title:string; icon:keyof typeof MaterialCommunityIcons.glyphMap; onPress:()=>void}) {
+  return <Pressable accessibilityRole="button" onPress={onPress} style={({pressed})=>({minHeight:56,paddingHorizontal:14,flexDirection:'row',alignItems:'center',gap:12,backgroundColor:pressed?colors.raised:colors.surface})}>
+    <MaterialCommunityIcons name={icon} size={21} color={colors.verified}/><Text style={{flex:1,color:colors.text,fontSize:15,fontWeight:'500'}}>{title}</Text><MaterialCommunityIcons name="chevron-right" size={20} color={colors.muted}/>
+  </Pressable>;
 }
-
-export default function MoreScreen() {
-  return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-      <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 34 }}>
-        <Text style={{ color: colors.text, fontSize: 32, fontWeight: '900', marginBottom: 4, letterSpacing: -0.6 }}>More</Text>
-        <Text style={{ color: colors.muted, marginBottom: 16, fontSize: 14 }}>Your NXQ tools in one place</Text>
-
-        <View style={{ backgroundColor: colors.surface, borderRadius: 22, padding: 16, borderWidth: 1, borderColor: colors.border, marginBottom: 16 }}>
-          <Text style={{ color: colors.text, fontWeight: '900', fontSize: 18 }}>NXQ Social</Text>
-          <Text style={{ color: '#b9c7df', marginTop: 5, lineHeight: 20 }}>Create, discover, and manage your account without the clutter.</Text>
-        </View>
-
-        <MenuButton title="Messages" subtitle="Keep in touch with your people" icon="message-text-outline" accent={colors.accentSoft} onPress={() => router.push('/(tabs)/messages')} />
-        <MenuButton title="Notifications" subtitle="Follows, likes, comments, and mentions" icon="bell-outline" accent={colors.accent} onPress={() => router.push('/notifications' as any)} />
-        <MenuButton title="Explore" subtitle="Find creators and discover posts" icon="compass-outline" accent="#0891b2" onPress={() => router.push('/explore' as any)} />
-        <MenuButton title="Feedback" subtitle="Report issues and send product feedback" icon="message-alert-outline" accent="#ca8a04" onPress={() => router.push('/feedback')} />
-        <MenuButton title="Settings" subtitle="Manage account and safety tools" icon="account-cog-outline" accent="#475569" onPress={() => router.push('/(tabs)/profile')} />
-        <MenuButton title="Password & security" subtitle="Change your account password" icon="lock-outline" accent={colors.accentSoft} onPress={() => router.push('/change-password' as never)} />
-
-        <MenuButton title="App updates" subtitle="See which update this phone is running" icon="cellphone-arrow-down" accent={colors.accentSoft} onPress={() => router.push('/app-updates' as never)} />
-        <Text style={{ color: '#64748b', textAlign: 'center', marginTop: 18, fontSize: 12 }}>NXQ Social · Creator update</Text>
-      </ScrollView>
-    </SafeAreaView>
-  );
+function Group({title,children}:{title:string;children:React.ReactNode}) {
+  return <View style={{gap:8}}><Text style={{color:colors.muted,fontSize:11,fontWeight:'700',letterSpacing:1.2,marginLeft:4}}>{title.toUpperCase()}</Text><View style={{borderWidth:1,borderColor:colors.border,borderRadius:16,overflow:'hidden'}}>{children}</View></View>;
+}
+export default function MoreScreen(){
+  const {user}=useAuth();
+  return <SafeAreaView style={{flex:1,backgroundColor:colors.background}}><ScrollView contentContainerStyle={{padding:20,paddingBottom:32,gap:22}}>
+    <View style={{flexDirection:'row',alignItems:'center',justifyContent:'space-between'}}><Text style={{color:colors.text,fontSize:28,fontWeight:'800',letterSpacing:-.6}}>More</Text><Pressable accessibilityRole="button" accessibilityLabel="Back to Home" onPress={()=>router.push('/(tabs)/feed')} style={{width:44,height:44,alignItems:'center',justifyContent:'center'}}><MaterialCommunityIcons name="close" size={23} color={colors.muted}/></Pressable></View>
+    <Pressable accessibilityRole="button" onPress={()=>router.push('/(tabs)/profile')} style={{flexDirection:'row',alignItems:'center',gap:12}}><Avatar src={user?.avatarUrl} name={user?.displayName||'Your profile'} size={48}/><View style={{flex:1}}><Text style={{color:colors.text,fontSize:17,fontWeight:'700'}}>{user?.displayName}</Text><Text style={{color:colors.muted,fontSize:13,marginTop:4}}>View your profile</Text></View><MaterialCommunityIcons name="chevron-right" size={22} color={colors.muted}/></Pressable>
+    <Group title="Communication"><Row title="Messages" icon="message-text-outline" onPress={()=>router.push('/(tabs)/messages')}/><Row title="Notifications" icon="bell-outline" onPress={()=>router.push('/notifications')}/></Group>
+    {LIVE_NATIVE_ENABLED&&<Group title="Creator tools"><Row title="Live" icon="broadcast" onPress={()=>router.push('/live-native')}/></Group>}
+    <Group title="Account"><Row title="Settings" icon="cog-outline" onPress={()=>router.push('/account-settings' as never)}/><Row title="Password & security" icon="lock-outline" onPress={()=>router.push('/change-password')}/></Group>
+    <Group title="Support"><Row title="Feedback & help" icon="message-alert-outline" onPress={()=>router.push('/feedback')}/><Row title="App updates" icon="cellphone-arrow-down" onPress={()=>router.push('/app-updates')}/></Group>
+    <Text style={{color:colors.muted,fontSize:12,textAlign:'center'}}>NXQ Social · Create. Share. Belong.</Text>
+  </ScrollView></SafeAreaView>;
 }

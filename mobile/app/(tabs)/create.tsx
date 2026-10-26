@@ -798,24 +798,24 @@ export default function CreateScreen() {
 
             {!assetUri ? <>
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable onPress={() => captureMedia()} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.raised, alignItems: 'center', gap: 8 }}>
+              <Pressable accessibilityRole="button" onPress={() => captureMedia()} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 14, padding: 12, minHeight: 60, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
                 <MaterialCommunityIcons name="camera-outline" size={24} color={colors.verified} />
-                <Text style={{ color: colors.verified, fontWeight: '800', textAlign: 'center' }}>Open camera</Text>
+                <Text style={{ color: colors.verified, fontWeight: '600', fontSize: 12, textAlign: 'center' }}>Open camera</Text>
               </Pressable>
-              <Pressable onPress={() => pickMedia()} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 16, padding: 14, borderWidth: 1, borderColor: colors.raised, alignItems: 'center', gap: 8 }}>
+              <Pressable accessibilityRole="button" onPress={() => pickMedia()} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 14, padding: 12, minHeight: 60, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
                 <MaterialCommunityIcons name="image-multiple-outline" size={24} color={colors.verified} />
-                <Text style={{ color: colors.verified, fontWeight: '800', textAlign: 'center' }}>{assetUri ? 'Change media' : 'Pick from library'}</Text>
+                <Text style={{ color: colors.verified, fontWeight: '600', fontSize: 12, textAlign: 'center' }}>{assetUri ? 'Change media' : 'Pick from library'}</Text>
               </Pressable>
             </View>
 
             <View style={{ flexDirection: 'row', gap: 10 }}>
-              <Pressable onPress={() => captureMedia('video')} style={{ flex: 1, backgroundColor: '#1b1c3a', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#3b3e7a', alignItems: 'center', gap: 8 }}>
+              <Pressable accessibilityRole="button" onPress={() => captureMedia('video')} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 14, padding: 12, minHeight: 60, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
                 <MaterialCommunityIcons name="record-rec" size={24} color={colors.verified} />
-                <Text style={{ color: colors.verified, fontWeight: '800', textAlign: 'center' }}>Record video</Text>
+                <Text style={{ color: colors.verified, fontWeight: '600', fontSize: 12, textAlign: 'center' }}>Record video</Text>
               </Pressable>
-              <Pressable onPress={() => pickMedia('video')} style={{ flex: 1, backgroundColor: '#1b1c3a', borderRadius: 16, padding: 14, borderWidth: 1, borderColor: '#3b3e7a', alignItems: 'center', gap: 8 }}>
+              <Pressable accessibilityRole="button" onPress={() => pickMedia('video')} style={{ flex: 1, backgroundColor: colors.surface, borderRadius: 14, padding: 12, minHeight: 60, borderWidth: 1, borderColor: colors.border, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 8 }}>
                 <MaterialCommunityIcons name="filmstrip-box-multiple" size={24} color={colors.verified} />
-                <Text style={{ color: colors.verified, fontWeight: '800', textAlign: 'center' }}>Upload video</Text>
+                <Text style={{ color: colors.verified, fontWeight: '600', fontSize: 12, textAlign: 'center' }}>Upload video</Text>
               </Pressable>
             </View>
 
@@ -879,13 +879,13 @@ export default function CreateScreen() {
               placeholderTextColor="#8790ab"
               multiline
               maxLength={2200}
-              style={{ backgroundColor: colors.raised, color: colors.text, borderRadius: 16, padding: 14, minHeight: 104, textAlignVertical: 'top', borderWidth: 1, borderColor: '#28324a' }}
+              style={{ backgroundColor: colors.raised, color: colors.text, borderRadius: 16, padding: 14, minHeight: 88, textAlignVertical: 'top', borderWidth: 1, borderColor: '#28324a' }}
             />
-            <Text style={{ color: '#5b6680', fontSize: 12, textAlign: 'right', marginTop: -4 }}>{caption.length}/2200</Text>
+            <Text style={{ color: colors.muted, fontSize: 12, textAlign: 'right', marginTop: -4 }}>{caption.length}/2200</Text>
 
             {/* Audience remains explicit before publishing. */}
             <View style={{ gap: 8, backgroundColor: colors.surface, borderRadius: 16, padding: 12, borderWidth: 1, borderColor: colors.border }}>
-              <Text style={{ color: colors.verified, fontWeight: '800', fontSize: 12, letterSpacing: 0.5 }}>WHO CAN SEE THIS</Text>
+              <Text style={{ color: colors.verified, fontWeight: '600', fontSize: 11, letterSpacing: 0.5 }}>AUDIENCE</Text>
               <View style={{ flexDirection: 'row', gap: 8 }}>
                 {AUDIENCES.map((a) => {
                   const active = visibility === a.value;
@@ -897,8 +897,11 @@ export default function CreateScreen() {
                       style={{
                         flex: 1,
                         alignItems: 'center',
+                        flexDirection: 'row',
+                        justifyContent: 'center',
                         gap: 4,
-                        paddingVertical: 9,
+                        minHeight: 44,
+                        paddingVertical: 7,
                         borderRadius: 14,
                         borderWidth: 1,
                         borderColor: active ? colors.accent : '#28324a',
@@ -912,7 +915,7 @@ export default function CreateScreen() {
                   );
                 })}
               </View>
-              <Text style={{ color: '#5b6680', fontSize: 12 }}>
+              <Text style={{ color: colors.muted, fontSize: 12 }}>
                 {AUDIENCES.find((a) => a.value === visibility)?.desc}
               </Text>
             </View>

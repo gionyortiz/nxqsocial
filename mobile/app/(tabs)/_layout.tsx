@@ -23,7 +23,7 @@ export default function TabLayout() {
     <Tabs
       screenOptions={{
         headerShown: false,
-        tabBarLabelStyle: { fontSize: 10, fontWeight: '600' },
+        tabBarLabelStyle: { fontSize: 11, fontWeight: '600' },
         tabBarItemStyle: { paddingTop: 4 },
         sceneStyle: { backgroundColor: colors.background },
         tabBarActiveTintColor: colors.verified,
